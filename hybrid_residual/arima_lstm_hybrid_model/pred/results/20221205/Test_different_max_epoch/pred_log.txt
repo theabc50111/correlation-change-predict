@@ -1,0 +1,737 @@
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva1-test_test, fig_title basis:PAPER_EVA_1-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+2022-12-05 15:36:33.865008: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:33.867821: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:33.867958: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:33.868281: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-12-05 15:36:33.869050: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:33.869208: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:33.869351: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:34.174714: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:34.174896: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:34.175034: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-05 15:36:34.175141: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 22308 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 3090, pci bus id: 0000:0b:00.0, compute capability: 8.6
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+2022-12-05 15:36:35.191818: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+1/2 [==============>...............] - ETA: 1s2/2 [==============================] - 1s 2ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on PAPER_EVA_1
+INFO:root:
+                     mse :0.16557247297580177,
+                     std of square_err :0.23372223818002366,
+                     rmse :0.40690597559608505,
+                     mae : 0.32344970557681474,
+                     std of abs_err: 0.2496758918265707,
+                     sklearn mse: 0.16557247297580177
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.23025885369994417,
+                     std of square_err ARIMA :0.30978898216440004,
+                     rmse of ARIMA :0.47985295007944273,
+                     sklearn mse of ARIMA: 0.23025885369994417
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva1-test_test, fig_title basis:PAPER_EVA_1-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_1
+INFO:root:
+                     mse :0.2233404147296131,
+                     std of square_err :0.34490029685004203,
+                     rmse :0.47258905481360136,
+                     mae : 0.36318406585536084,
+                     std of abs_err: 0.30580366200937703,
+                     sklearn mse: 0.2233404147296131
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.23025885369994417,
+                     std of square_err ARIMA :0.30978898216440004,
+                     rmse of ARIMA :0.47985295007944273,
+                     sklearn mse of ARIMA: 0.23025885369994417
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_1000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva1-test_test, fig_title basis:PAPER_EVA_1-test_test-sp500_20082017_1000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_TEST_1000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_1
+INFO:root:
+                     mse :0.19376045238190376,
+                     std of square_err :0.28711226444350924,
+                     rmse :0.4401822944893442,
+                     mae : 0.3484640857917432,
+                     std of abs_err: 0.2719874453271226,
+                     sklearn mse: 0.19376045238190376
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.23025885369994417,
+                     std of square_err ARIMA :0.30978898216440004,
+                     rmse of ARIMA :0.47985295007944273,
+                     sklearn mse of ARIMA: 0.23025885369994417
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_300_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva1-test_test, fig_title basis:PAPER_EVA_1-test_test-sp500_20082017_300_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_300_EPOCH_KS_HYPER_LSTM on PAPER_EVA_1
+INFO:root:
+                     mse :0.27055897595983086,
+                     std of square_err :0.3867934782531414,
+                     rmse :0.5201528390385184,
+                     mae : 0.40149586975881807,
+                     std of abs_err: 0.33443309949585676,
+                     sklearn mse: 0.27055897595983086
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.23025885369994417,
+                     std of square_err ARIMA :0.30978898216440004,
+                     rmse of ARIMA :0.47985295007944273,
+                     sklearn mse of ARIMA: 0.23025885369994417
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva2-test_test, fig_title basis:PAPER_EVA_2-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+WARNING:tensorflow:5 out of the last 9 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7f028405d670> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+WARNING:tensorflow:5 out of the last 9 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7f028405d670> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on PAPER_EVA_2
+INFO:root:
+                     mse :0.38377946584043443,
+                     std of square_err :0.40061955164733765,
+                     rmse :0.6194993671025294,
+                     mae : 0.5214713677834536,
+                     std of abs_err: 0.33821451399599217,
+                     sklearn mse: 0.38377946584043443
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5277644260173502,
+                     std of square_err ARIMA :0.5018370893771195,
+                     rmse of ARIMA :0.7264739678869093,
+                     sklearn mse of ARIMA: 0.5277644260173502
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva2-test_test, fig_title basis:PAPER_EVA_2-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+WARNING:tensorflow:6 out of the last 11 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7f02f466f790> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+WARNING:tensorflow:6 out of the last 11 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7f02f466f790> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_2
+INFO:root:
+                     mse :0.47864290541751847,
+                     std of square_err :0.44286074700406836,
+                     rmse :0.6918402311354251,
+                     mae : 0.585403319097997,
+                     std of abs_err: 0.37287469480972246,
+                     sklearn mse: 0.47864290541751847
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5277644260173502,
+                     std of square_err ARIMA :0.5018370893771195,
+                     rmse of ARIMA :0.7264739678869093,
+                     sklearn mse of ARIMA: 0.5277644260173502
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_1000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva2-test_test, fig_title basis:PAPER_EVA_2-test_test-sp500_20082017_1000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_1000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_2
+INFO:root:
+                     mse :0.41358406497499917,
+                     std of square_err :0.39616586122974123,
+                     rmse :0.6431050186205975,
+                     mae : 0.5411528107542928,
+                     std of abs_err: 0.35139968559021706,
+                     sklearn mse: 0.4135840649749991
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5277644260173502,
+                     std of square_err ARIMA :0.5018370893771195,
+                     rmse of ARIMA :0.7264739678869093,
+                     sklearn mse of ARIMA: 0.5277644260173502
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_300_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva2-test_test, fig_title basis:PAPER_EVA_2-test_test-sp500_20082017_300_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_300_EPOCH_KS_HYPER_LSTM on PAPER_EVA_2
+INFO:root:
+                     mse :0.6143731846225552,
+                     std of square_err :0.5544013440062504,
+                     rmse :0.7838196122977246,
+                     mae : 0.6723778392090887,
+                     std of abs_err: 0.4073934653919367,
+                     sklearn mse: 0.6143731846225553
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5277644260173502,
+                     std of square_err ARIMA :0.5018370893771195,
+                     rmse of ARIMA :0.7264739678869093,
+                     sklearn mse of ARIMA: 0.5277644260173502
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva3-test_test, fig_title basis:PAPER_EVA_3-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on PAPER_EVA_3
+INFO:root:
+                     mse :0.3387258676225287,
+                     std of square_err :0.36319690505863383,
+                     rmse :0.5820016044844969,
+                     mae : 0.4816137701168453,
+                     std of abs_err: 0.3304553326484989,
+                     sklearn mse: 0.33872586762252865
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.43290147956679054,
+                     std of square_err ARIMA :0.4952190181712898,
+                     rmse of ARIMA :0.6579524903568574,
+                     sklearn mse of ARIMA: 0.43290147956679054
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva3-test_test, fig_title basis:PAPER_EVA_3-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_3
+INFO:root:
+                     mse :0.4226534113098957,
+                     std of square_err :0.46616881380063147,
+                     rmse :0.6501179979895155,
+                     mae : 0.5321588616186481,
+                     std of abs_err: 0.37766375373588873,
+                     sklearn mse: 0.4226534113098957
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.43290147956679054,
+                     std of square_err ARIMA :0.4952190181712898,
+                     rmse of ARIMA :0.6579524903568574,
+                     sklearn mse of ARIMA: 0.43290147956679054
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_1000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva3-test_test, fig_title basis:PAPER_EVA_3-test_test-sp500_20082017_1000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_1000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_3
+INFO:root:
+                     mse :0.386726888307108,
+                     std of square_err :0.41636487972578545,
+                     rmse :0.6218736916023285,
+                     mae : 0.5085067485679526,
+                     std of abs_err: 0.3620224086973718,
+                     sklearn mse: 0.386726888307108
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.43290147956679054,
+                     std of square_err ARIMA :0.4952190181712898,
+                     rmse of ARIMA :0.6579524903568574,
+                     sklearn mse of ARIMA: 0.43290147956679054
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_300_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva3-test_test, fig_title basis:PAPER_EVA_3-test_test-sp500_20082017_300_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_300_EPOCH_KS_HYPER_LSTM on PAPER_EVA_3
+INFO:root:
+                     mse :0.510889936238614,
+                     std of square_err :0.5598261125279058,
+                     rmse :0.7147656512722292,
+                     mae : 0.5966769719322401,
+                     std of abs_err: 0.3979776642087237,
+                     sklearn mse: 0.510889936238614
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.43290147956679054,
+                     std of square_err ARIMA :0.4952190181712898,
+                     rmse of ARIMA :0.6579524903568574,
+                     sklearn mse of ARIMA: 0.43290147956679054
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva4-test_test, fig_title basis:PAPER_EVA_4-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on PAPER_EVA_4
+INFO:root:
+                     mse :0.5221152028844835,
+                     std of square_err :0.3763886237102478,
+                     rmse :0.7225753959861099,
+                     mae : 0.6694924587198327,
+                     std of abs_err: 0.27490813660199054,
+                     sklearn mse: 0.5221152028844835
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5829582207420333,
+                     std of square_err ARIMA :0.5545925463584637,
+                     rmse of ARIMA :0.7635170075001823,
+                     sklearn mse of ARIMA: 0.5829582207420333
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva4-test_test, fig_title basis:PAPER_EVA_4-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_4
+INFO:root:
+                     mse :0.6039945562889582,
+                     std of square_err :0.5353761695990256,
+                     rmse :0.7771708668555185,
+                     mae : 0.6908282981159801,
+                     std of abs_err: 0.36004377405902005,
+                     sklearn mse: 0.6039945562889582
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5829582207420333,
+                     std of square_err ARIMA :0.5545925463584637,
+                     rmse of ARIMA :0.7635170075001823,
+                     sklearn mse of ARIMA: 0.5829582207420333
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_1000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva4-test_test, fig_title basis:PAPER_EVA_4-test_test-sp500_20082017_1000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_1000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_4
+INFO:root:
+                     mse :0.5477405034456558,
+                     std of square_err :0.4296686626893777,
+                     rmse :0.7400949286717589,
+                     mae : 0.6806921349833928,
+                     std of abs_err: 0.29379733416635523,
+                     sklearn mse: 0.5477405034456558
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5829582207420333,
+                     std of square_err ARIMA :0.5545925463584637,
+                     rmse of ARIMA :0.7635170075001823,
+                     sklearn mse of ARIMA: 0.5829582207420333
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_300_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva4-test_test, fig_title basis:PAPER_EVA_4-test_test-sp500_20082017_300_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_300_EPOCH_KS_HYPER_LSTM on PAPER_EVA_4
+INFO:root:
+                     mse :0.6865655313466531,
+                     std of square_err :0.6896332289224845,
+                     rmse :0.8285925001752388,
+                     mae : 0.7099531018114682,
+                     std of abs_err: 0.43206548340689205,
+                     sklearn mse: 0.6865655313466531
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.5829582207420333,
+                     std of square_err ARIMA :0.5545925463584637,
+                     rmse of ARIMA :0.7635170075001823,
+                     sklearn mse of ARIMA: 0.5829582207420333
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva5-test_test, fig_title basis:PAPER_EVA_5-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on PAPER_EVA_5
+INFO:root:
+                     mse :0.29219803342204875,
+                     std of square_err :0.3609360746061242,
+                     rmse :0.5405534510314857,
+                     mae : 0.4468876301571712,
+                     std of abs_err: 0.30755733296097615,
+                     sklearn mse: 0.2921980334220488
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.35982205649687227,
+                     std of square_err ARIMA :0.4564229773338749,
+                     rmse of ARIMA :0.5998516954188529,
+                     sklearn mse of ARIMA: 0.35982205649687227
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva5-test_test, fig_title basis:PAPER_EVA_5-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_5
+INFO:root:
+                     mse :0.360850227290328,
+                     std of square_err :0.475675854788171,
+                     rmse :0.600708104898151,
+                     mae : 0.47954303592386704,
+                     std of abs_err: 0.36587353998299216,
+                     sklearn mse: 0.360850227290328
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.35982205649687227,
+                     std of square_err ARIMA :0.4564229773338749,
+                     rmse of ARIMA :0.5998516954188529,
+                     sklearn mse of ARIMA: 0.35982205649687227
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_1000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva5-test_test, fig_title basis:PAPER_EVA_5-test_test-sp500_20082017_1000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_1000_EPOCH_KS_HYPER_LSTM on PAPER_EVA_5
+INFO:root:
+                     mse :0.3151001838966,
+                     std of square_err :0.3879007643993133,
+                     rmse :0.5613378518295377,
+                     mae : 0.4538496977778225,
+                     std of abs_err: 0.3340668348876348,
+                     sklearn mse: 0.3151001838966
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.35982205649687227,
+                     std of square_err ARIMA :0.4564229773338749,
+                     rmse of ARIMA :0.5998516954188529,
+                     sklearn mse of ARIMA: 0.35982205649687227
+                  
+INFO:root:===== len(train_set): 150, len(all_set): 446, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_300_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:paper_eva5-test_test, fig_title basis:PAPER_EVA_5-test_test-sp500_20082017_300_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_300_EPOCH_KS_HYPER_LSTM on PAPER_EVA_5
+INFO:root:
+                     mse :0.43864742011536867,
+                     std of square_err :0.5924118850953,
+                     rmse :0.6623046278830979,
+                     mae : 0.5176396481563634,
+                     std of abs_err: 0.4178230286729881,
+                     sklearn mse: 0.43864742011536867
+                  
+INFO:root:--------------------------------------------------
+INFO:root:mse of ARIMA :0.35982205649687227,
+                     std of square_err ARIMA :0.4564229773338749,
+                     rmse of ARIMA :0.5998516954188529,
+                     sklearn mse of ARIMA: 0.35982205649687227
+                  

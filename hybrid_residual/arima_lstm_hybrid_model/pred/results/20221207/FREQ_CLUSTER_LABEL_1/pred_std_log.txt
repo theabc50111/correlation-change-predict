@@ -1,0 +1,161 @@
+INFO:root:===== len(train_set): 66, len(all_set): 76, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_rand_66_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_freq_cluster_label_1-test_test, fig_title basis:SP500_20082017_FREQ_CLUSTER_LABEL_1-test_test-sp500_20082017_rand_66_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+2022-12-07 09:12:51.630456: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.633813: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.633951: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.634269: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-12-07 09:12:51.635095: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.635230: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.635348: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.948936: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.949106: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.949242: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 09:12:51.949346: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 22308 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 3090, pci bus id: 0000:0b:00.0, compute capability: 8.6
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+2022-12-07 09:12:52.970345: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+1/2 [==============>...............] - ETA: 1s2/2 [==============================] - 1s 2ms/step
+INFO:root:Test SP500_20082017_RAND_66_KS_HYPER_LSTM on SP500_20082017_FREQ_CLUSTER_LABEL_1
+INFO:root:
+                     mse :0.40920762396534277,
+                     std of square_err :0.4700910014273718,
+                     rmse :0.6396933827743904,
+                     mae : 0.5340082718877124,
+                     std of abs_err: 0.35617684347544804,
+                     sklearn mse: 0.40920762396534277
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.5007878965989858,
+                     std of square_err ARIMA :0.5411731349377067,
+                     rmse of ARIMA :0.7076636889080757,
+                     sklearn mse of ARIMA: 0.5007878965989858
+                  
+INFO:root:===== len(train_set): 66, len(all_set): 76, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_freq_cluster_label_1_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_freq_cluster_label_1-test_test, fig_title basis:SP500_20082017_FREQ_CLUSTER_LABEL_1-test_test-sp500_20082017_freq_cluster_label_1_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_FREQ_CLUSTER_LABEL_1_KS_HYPER_LSTM on SP500_20082017_FREQ_CLUSTER_LABEL_1
+INFO:root:
+                     mse :0.31593510075202536,
+                     std of square_err :0.36006904575870474,
+                     rmse :0.5620810446475004,
+                     mae : 0.46588325085943477,
+                     std of abs_err: 0.3180178446762127,
+                     sklearn mse: 0.31593510075202536
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.5007878965989858,
+                     std of square_err ARIMA :0.5411731349377067,
+                     rmse of ARIMA :0.7076636889080757,
+                     sklearn mse of ARIMA: 0.5007878965989858
+                  
+INFO:root:===== len(train_set): 66, len(all_set): 76, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_freq_cluster_label_1-test_test, fig_title basis:SP500_20082017_FREQ_CLUSTER_LABEL_1-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on SP500_20082017_FREQ_CLUSTER_LABEL_1
+INFO:root:
+                     mse :0.4195250064263157,
+                     std of square_err :0.4737174133279433,
+                     rmse :0.6477075006716502,
+                     mae : 0.5340245106787747,
+                     std of abs_err: 0.37066976477867664,
+                     sklearn mse: 0.4195250064263157
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.5007878965989858,
+                     std of square_err ARIMA :0.5411731349377067,
+                     rmse of ARIMA :0.7076636889080757,
+                     sklearn mse of ARIMA: 0.5007878965989858
+                  
+INFO:root:===== len(train_set): 66, len(all_set): 76, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_freq_cluster_label_1-test_test, fig_title basis:SP500_20082017_FREQ_CLUSTER_LABEL_1-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on SP500_20082017_FREQ_CLUSTER_LABEL_1
+INFO:root:
+                     mse :0.301596192046083,
+                     std of square_err :0.35563580627395897,
+                     rmse :0.5491777417613382,
+                     mae : 0.45160550093342333,
+                     std of abs_err: 0.3160189098475381,
+                     sklearn mse: 0.30159619204608296
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.5007878965989858,
+                     std of square_err ARIMA :0.5411731349377067,
+                     rmse of ARIMA :0.7076636889080757,
+                     sklearn mse of ARIMA: 0.5007878965989858
+                  

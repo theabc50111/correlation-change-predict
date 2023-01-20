@@ -1,0 +1,2 @@
+items,corr_ser_mean,corr_ser_std,corr_season_period,corr_stl_resid,corr_stl_trend_std,corr_trend_coef,arima_model,arima_aic,arima_arparams,arima_aroots,arima_maparams,arima_maroots,arima_params,arima_pvalues,lstm_pred,arima_pred,ground_truth
+Bitcoin & NVDA,0.23236002295820274,0.6020816608017145,10,0.4599927648509236,0.099610696299027,-0.026106308083013,model_210,39.84597256145044,,[-0.26004577 -0.59007142],[],[],[ 0.08893697 -0.26004577 -0.59007142  0.29456088],[0.61583205 0.18669483 0.02499592 0.00540898],-0.2897611,0.82014990368162,0.8343250361700278

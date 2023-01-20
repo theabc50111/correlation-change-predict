@@ -1,0 +1,74 @@
+# This YAML file only suit for python package: dynamic-yaml
+
+# Directory settings 
+DIRS: 
+    DATASET_DIR: "/tf/correlation-coef-predict/dataset"
+    ARIMA_LSTM_WEIGHT_DIR: "/tf/correlation-coef-predict/models/arima_lstm-lstm_weight"
+
+# loading & implement setting
+DATASETS:
+    TW50_20082018:
+        FILE_PATH: "{DIRS.DATASET_DIR}/tw50_hold_20082018-adj_close-pre.csv"
+        TRAIN_SET: ['萬海_adj_close', '豐泰_adj_close', '友達_adj_close', '欣興_adj_close', '台塑化_adj_close', '和泰車_adj_close', '元大金_adj_close', '南電_adj_close', '台塑_adj_close', '統一超_adj_close', '台泥_adj_close', '瑞昱_adj_close', '彰銀_adj_close', '富邦金_adj_close', '研華_adj_close', '中鋼_adj_close', '鴻海_adj_close', '台新金_adj_close', '遠傳_adj_close', '南亞_adj_close', '台達電_adj_close', '台灣大_adj_close', '台化_adj_close', '聯詠_adj_close', '廣達_adj_close', '聯發科_adj_close', '台積電_adj_close', '統一_adj_close', '中信金_adj_close', '長榮_adj_close']
+        OUTPUT_FILE_BASIS: "tw50_20082018"
+    SP500_19972007:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_19972007-adj_close-pre.csv"
+        TRAIN_SET: ['PXD', 'WAT', 'LH', 'AMGN', 'AOS', 'EFX', 'NEM', 'CTAS', 'MAT', 'VLO', 'APH', 'ADM', 'MLM', 'BK', 'NOV', 'BDX', 'RRC', 'IVZ', 'ED', 'SBUX', 'CI', 'ZION', 'COO', 'FDX', 'GLW', 'GPC', 'HPQ', 'ADI', 'AMG', 'MTB', 'YUM', 'SYK', 'KMX', 'AME', 'BMY', 'KMB', 'JPM', 'AET', 'DLTR', 'MGM', 'FL', 'HD', 'CLX', 'OKE', 'WMB', 'IFF', 'CMS', 'MMC', 'REG', 'ES', 'ITW', 'VRTX', 'QCOM', 'MSI', 'NKTR', 'AMAT', 'BWA', 'ESRX', 'TXT', 'VNO', 'WDC', 'PVH', 'NOC', 'PCAR', 'NSC', 'PHM', 'LUV', 'HUM', 'SPG', 'SJM', 'ABT', 'ALK', 'TAP', 'CAT', 'TMO', 'AES', 'MRK', 'RMD', 'MKC', 'HIG', 'DE', 'ATVI', 'O', 'UNM', 'VMC', 'CMA', 'RHI', 'RE', 'FMC', 'MU', 'CB', 'LNT', 'GE', 'SNA', 'LLY', 'LEN', 'MAA', 'OMC', 'F', 'APA', 'CDNS', 'SLG', 'HP', 'SHW', 'AFL', 'STT', 'PAYX', 'AIG']
+        OUTPUT_FILE_BASIS: "sp500_19972007"
+    SP500_20082017:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TRAIN_SET: ['CELG', 'PXD', 'WAT', 'LH', 'AMGN', 'AOS', 'EFX', 'CRM', 'NEM', 'JNPR', 'LB', 'CTAS', 'MAT', 'MDLZ', 'VLO', 'APH', 'ADM', 'MLM', 'BK', 'NOV', 'BDX', 'RRC', 'IVZ', 'ED', 'SBUX', 'GRMN', 'CI', 'ZION', 'COO', 'TIF', 'RHT', 'FDX', 'LLL', 'GLW', 'GPN', 'IPGP', 'GPC', 'HPQ', 'ADI', 'AMG', 'MTB', 'YUM', 'SYK', 'KMX', 'AME', 'AAP', 'DAL', 'A', 'MON', 'BRK', 'BMY', 'KMB', 'JPM', 'CCI', 'AET', 'DLTR', 'MGM', 'FL', 'HD', 'CLX', 'OKE', 'UPS', 'WMB', 'IFF', 'CMS', 'ARNC', 'VIAB', 'MMC', 'REG', 'ES', 'ITW', 'NDAQ', 'AIZ', 'VRTX', 'CTL', 'QCOM', 'MSI', 'NKTR', 'AMAT', 'BWA', 'ESRX', 'TXT', 'EXR', 'VNO', 'BBT', 'WDC', 'UAL', 'PVH', 'NOC', 'PCAR', 'NSC', 'UAA', 'FFIV', 'PHM', 'LUV', 'HUM', 'SPG', 'SJM', 'ABT', 'CMG', 'ALK', 'ULTA', 'TMK', 'TAP', 'SCG', 'CAT', 'TMO', 'AES', 'MRK', 'RMD', 'MKC', 'WU', 'ACN', 'HIG', 'TEL', 'DE', 'ATVI', 'O', 'UNM', 'VMC', 'ETFC', 'CMA', 'NRG', 'RHI', 'RE', 'FMC', 'MU', 'CB', 'LNT', 'GE', 'CBS', 'ALGN', 'SNA', 'LLY', 'LEN', 'MAA', 'OMC', 'F', 'APA', 'CDNS', 'SLG', 'HP', 'XLNX', 'SHW', 'AFL', 'STT', 'PAYX', 'AIG', 'FOX', 'MA']
+        OUTPUT_FILE_BASIS: "sp500_20082017"
+    TETUAN_POWER:
+        FILE_PATH: "{DIRS.DATASET_DIR}/tetuan_city_power_consumption-pre.csv"
+        TRAIN_SET: ["Temperature", "Humidity", "Wind Speed", "general diffuse flows", "diffuse flows", "Zone 1 Power Consumption", "Zone 2 Power Consumption", "Zone 3 Power Consumption"]
+        OUTPUT_FILE_BASIS: "tetuan_power"
+    BITCOIN_NVDA:
+        FILE_PATH: "{DIRS.DATASET_DIR}/bitcoin_nvda_20122022-pre.csv"
+        TRAIN_SET: []
+        OUTPUT_FILE_BASIS: "bitcoin_nvda_20122022"
+    SP500_20082017_CONSUMER_DISCRETIONARY:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017_consumerDiscretionary-adj_close-pre.csv"
+        TRAIN_SET: ['LKQ', 'LEN', 'TGT', 'YUM', 'TJX', 'GRMN', 'MCD', 'DRI', 'HBI', 'GPS', 'SBUX', 'TSCO', 'WYN', 'MGM', 'MAT', 'ROST', 'IPG', 'PVH', 'VFC', 'EXPE', 'JWN', 'GPC', 'DIS', 'FL', 'AAP', 'KSS', 'TIF', 'HAS', 'DHI', 'MHK', 'UAA', 'KMX', 'BBY', 'CMCSA', 'LEG', 'VIAB', 'CCL', 'LB', 'HOG', 'F', 'AZO', 'RL', 'DISCA', 'FOXA', 'PHM', 'AMZN', 'WHR', 'NKE', 'SNA', 'M', 'FOX', 'ULTA', 'GT', 'CMG', 'LOW', 'TWX', 'HD', 'CBS']
+        OUTPUT_FILE_BASIS: "sp500_20082017_consumDiscretionary"
+    PAPER_EVA_1: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TEST_SET: ['PRGO', 'MRO', 'ADP', 'HCP', 'FITB', 'PEG', 'SYMC', 'EOG', 'MDT', 'NI']
+        OUTPUT_FILE_BASIS: "paper_eva1"
+    PAPER_EVA_2: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TEST_SET: ['STI', 'COP', 'MCD', 'AON', 'JBHT', 'DISH', 'GS', 'LRCX', 'CTXS', 'LEG']
+        OUTPUT_FILE_BASIS: "paper_eva2"
+    PAPER_EVA_3: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TEST_SET: ['TJX', 'EMN', 'JCI', 'C', 'BIIB', 'HOG', 'PX', 'PH', 'XEC', 'JEC']
+        OUTPUT_FILE_BASIS: "paper_eva3"
+    PAPER_EVA_4: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TEST_SET: ['ROP', 'AZO', 'URI', 'TROW', 'CMCSA', 'SLB', 'VZ', 'MAC', 'ADS', 'MCK']
+        OUTPUT_FILE_BASIS: "paper_eva4"
+    PAPER_EVA_5: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
+        TEST_SET: ['RL', 'CVX', 'SRE', 'PFE', 'PCG', 'UTX', 'NTRS', 'INCY', 'COP', 'HRL']
+        OUTPUT_FILE_BASIS: "paper_eva5"
+
+# lstm weight setting
+LSTM_WIGHT:
+  SP500_20082017_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/20220909/sp500_20082017-train-epoch43.h5"
+    LSTM_WEIGHT_NAME: "-sp500_20082017lstm"
+  SP500_20082017_SOURCECODES_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/korea_sourceCodes/epoch247.h5"
+    LSTM_WEIGHT_NAME: "-sp500_20082017sourceCodes_lstm"
+  SP500_20082017_KS_HYPER_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/20220924/kSenneset_hyperParams_lstm/sp500_20082017-train-epoch146.h5"
+    LSTM_WEIGHT_NAME: "-sp500_20082017_kS_hyper_lstm"
+  TW50_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/20220816/tw50_20082017-epoch246.h5"
+    LSTM_WEIGHT_NAME: "-tw50_20082017lstm"
+  TETUAN_POWER_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/20220831/tetuan_power-epoch597.h5"
+    LSTM_WEIGHT_NAME: "-tetuan_power_lstm"
+  SP500_20082017_CONSUM_DISCRETIONARY_KS_HYPER_LSTM:
+    FILE_PATH: "{DIRS.ARIMA_LSTM_WEIGHT_DIR}/20221024/sp500_20082017_consumDiscretionary-kSenneset_hyperParams_lstm/sp500_20082017_consumDiscretionary-train-epoch832.h5"
+    LSTM_WEIGHT_NAME: "-sp500_20082017_consumDiscretionary_kS_hyper_lstm"

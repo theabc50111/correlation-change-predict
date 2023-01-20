@@ -1,0 +1,163 @@
+INFO:root:===== len(train_set): 61, len(all_set): 71, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster-test_test, fig_title basis:SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER-test_test-sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster_kS_hyper_lstm-data_sp_test2 =====
+0it [00:00, ?it/s]45it [00:00, 654.46it/s]
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+0it [00:00, ?it/s]1it [00:00,  5.66it/s]2it [00:00,  5.97it/s]3it [00:00,  6.25it/s]4it [00:00,  5.72it/s]5it [00:00,  5.74it/s]6it [00:01,  5.30it/s]7it [00:01,  5.37it/s]8it [00:01,  5.59it/s]9it [00:01,  5.92it/s]10it [00:01,  5.65it/s]11it [00:01,  5.71it/s]12it [00:02,  5.95it/s]13it [00:02,  6.07it/s]14it [00:02,  5.75it/s]15it [00:02,  5.52it/s]16it [00:02,  5.43it/s]17it [00:03,  5.36it/s]18it [00:03,  5.27it/s]19it [00:03,  5.66it/s]20it [00:03,  6.11it/s]21it [00:03,  5.98it/s]23it [00:03,  6.46it/s]24it [00:04,  6.06it/s]25it [00:04,  5.92it/s]26it [00:04,  5.73it/s]27it [00:04,  5.47it/s]28it [00:04,  5.70it/s]29it [00:05,  5.50it/s]30it [00:05,  5.86it/s]31it [00:05,  5.01it/s]32it [00:05,  5.37it/s]33it [00:05,  5.65it/s]34it [00:05,  5.84it/s]35it [00:06,  5.83it/s]36it [00:06,  5.50it/s]37it [00:06,  5.35it/s]38it [00:06,  5.49it/s]39it [00:06,  5.42it/s]40it [00:07,  5.48it/s]41it [00:07,  5.37it/s]42it [00:07,  5.24it/s]43it [00:07,  5.39it/s]44it [00:07,  5.52it/s]45it [00:08,  5.25it/s]45it [00:08,  5.61it/s]2022-12-07 10:40:24.619196: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.622535: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.622672: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.622969: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-12-07 10:40:24.623807: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.623942: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.624078: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.936066: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.936237: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.936367: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:975] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2022-12-07 10:40:24.936477: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 22308 MB memory:  -> device: 0, name: NVIDIA GeForce RTX 3090, pci bus id: 0000:0b:00.0, compute capability: 8.6
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+2022-12-07 10:40:25.870004: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+1/2 [==============>...............] - ETA: 1s2/2 [==============================] - 1s 2ms/step
+
+INFO:root:Test SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER_KS_HYPER_LSTM on SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER
+INFO:root:
+                     mse :0.3611891437199628,
+                     std of square_err :0.46716784457865346,
+                     rmse :0.6009901361253467,
+                     mae : 0.48874934595555547,
+                     std of abs_err: 0.35368498196774545,
+                     sklearn mse: 0.3611891449590721
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.3551757062148623,
+                     std of square_err ARIMA :0.4464805111047111,
+                     rmse of ARIMA :0.5959661955303021,
+                     sklearn mse of ARIMA: 0.3551757096526727
+                  
+INFO:root:===== len(train_set): 61, len(all_set): 71, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_rand_66_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster-test_test, fig_title basis:SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER-test_test-sp500_20082017_rand_66_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_RAND_66_KS_HYPER_LSTM on SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER
+INFO:root:
+                     mse :0.30578543555842946,
+                     std of square_err :0.35824108575327984,
+                     rmse :0.5529786935845082,
+                     mae : 0.4716209483472601,
+                     std of abs_err: 0.29198226318837794,
+                     sklearn mse: 0.30578543555842946
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.3551757096526727,
+                     std of square_err ARIMA :0.44648051525625637,
+                     rmse of ARIMA :0.5959661984145348,
+                     sklearn mse of ARIMA: 0.3551757096526727
+                  
+INFO:root:===== len(train_set): 61, len(all_set): 71, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_5000_epoch_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster-test_test, fig_title basis:SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER-test_test-sp500_20082017_5000_epoch_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "lstm1_fc1-kS_hyper"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm-kS_hyper (LSTM)        (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 2ms/step
+INFO:root:Test SP500_20082017_TEST_5000_EPOCH_KS_HYPER_LSTM on SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER
+INFO:root:
+                     mse :0.35431495471081303,
+                     std of square_err :0.42605186890847907,
+                     rmse :0.5952436095505882,
+                     mae : 0.4911499582629416,
+                     std of abs_err: 0.3400835557226599,
+                     sklearn mse: 0.354314954710813
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.3551757096526727,
+                     std of square_err ARIMA :0.44648051525625637,
+                     rmse of ARIMA :0.5959661984145348,
+                     sklearn mse of ARIMA: 0.3551757096526727
+                  
+INFO:root:===== len(train_set): 61, len(all_set): 71, len(test_set): 10 =====
+INFO:root:===== len(test set): 10 =====
+INFO:root:===== LSTM weight:-sp500_20082017_kS_hyper_lstm =====
+INFO:root:===== file_name basis:sp500_20082017_corr_ser_abs_corr_mat_hrchy_11_cluster-test_test, fig_title basis:SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER-test_test-sp500_20082017_kS_hyper_lstm-data_sp_test2 =====
+INFO:root:((45, 21), (45, 21), (45, 21), (45, 21))
+Model: "many_one_lstm"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #   
+=================================================================
+ input_1 (InputLayer)        [(None, 20, 1)]           0         
+                                                                 
+ lstm (LSTM)                 (None, 10)                480       
+                                                                 
+ dense (Dense)               (None, 1)                 11        
+                                                                 
+=================================================================
+Total params: 491
+Trainable params: 491
+Non-trainable params: 0
+_________________________________________________________________
+1/2 [==============>...............] - ETA: 0s2/2 [==============================] - 0s 1ms/step
+INFO:root:Test SP500_20082017_KS_HYPER_LSTM on SP500_20082017_CORR_SER_ABS_CORR_MAT_HRCHY_11_CLUSTER
+INFO:root:
+                     mse :0.3325948211017923,
+                     std of square_err :0.41888493012462824,
+                     rmse :0.57671034419524,
+                     mae : 0.47191919119889103,
+                     std of abs_err: 0.3352380230929198,
+                     sklearn mse: 0.33259482110179234
+                  
+INFO:root:--------------------------------------------------
+INFO:root:
+                     mse of ARIMA :0.3551757096526727,
+                     std of square_err ARIMA :0.44648051525625637,
+                     rmse of ARIMA :0.5959661984145348,
+                     sklearn mse of ARIMA: 0.3551757096526727
+                  
