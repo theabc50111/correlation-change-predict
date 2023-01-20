@@ -1,3 +1,17 @@
+# ignore ywt folders
+.ipynb_checkpoints/
+stock_correlation_prediction/
+correlation_record/
+lstm_only_models/
+lstm_only_scores/
+LSTM_ONLY/dataset/
+dataset/
+dataset.csv
+*train_logs/
+save_models/
+pipeline_dataset/
+*__pycache__/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
