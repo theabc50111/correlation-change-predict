@@ -15,3 +15,5 @@ def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: 
         corr_property_df.index.name = "items"
         corr_property_df.to_csv(corr_property_df_path)
     return corr_property_df
+
+

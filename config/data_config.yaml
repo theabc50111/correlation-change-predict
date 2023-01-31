@@ -2,11 +2,11 @@
 
 # Directory settings 
 DIRS: 
-    DATASET_DIR: "/tf/correlation-coef-predict/dataset"
-    ARIMA_LSTM_LSTM_WEIGHT_DIR: "/tf/correlation-coef-predict/models/arima_lstm-lstm_weight"
-    LSTM_LSTM_LSTM_WEIGHT_DIR: "/tf/correlation-coef-predict/models/lstm_lstm-first_and_second_stage_lstm_weight"
-    LSTM_ONLY_LSTM_WEIGHT_DIR: "/tf/correlation-coef-predict/models/lstm_only_lstm_weight"
-    PIPELINE_DATA_DIR: "/tf/correlation-coef-predict/pipeline_dataset"
+    DATASET_DIR: "/workspace/correlation-change-predict/dataset"
+    ARIMA_LSTM_LSTM_WEIGHT_DIR: "/tf/correlation-change-predict/models/arima_lstm-lstm_weight"
+    LSTM_LSTM_LSTM_WEIGHT_DIR: "/workspace/correlation-change-predict/models/lstm_lstm-first_and_second_stage_lstm_weight"
+    LSTM_ONLY_LSTM_WEIGHT_DIR: "/workspace/correlation-change-predict/models/lstm_only_lstm_weight"
+    PIPELINE_DATA_DIR: "/workspace/correlation-change-predict/pipeline_dataset"
    
     
 
