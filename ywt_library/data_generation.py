@@ -2,13 +2,14 @@ from itertools import combinations
 from tqdm import tqdm
 import math
 import re
+import logging
 
 import numpy as np
 import pandas as pd
 
 
-data_gen_cfg = {"CORR_WINDOW": 5,
-                "CORR_STRIDE": 5,
+data_gen_cfg = {"CORR_WINDOW": 10,
+                "CORR_STRIDE": 1,
                 "DATA_DIV_STRIDE": 20,  # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
                 "MAX_DATA_DIV_START_ADD": 0  # value:range(0,80,20);
                                              # 0 is strongly recommnded;
@@ -70,7 +71,14 @@ def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
     return ret_vals
 
 
-def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", output_similarity_mat: bool = True):
+def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_compo: str = "sim"):
+    
+    """
+    out_mat_compo: 
+    - sim : output a matrix with similiarity dat
+    - dist : output a matrix with distance data
+    """
+    
     assert isinstance(data_ser.index, pd.core.indexes.base.Index) and re.match(f".*\ \&\ .*_0", data_ser.index[0]), "Index of input series should be form of \"COM1 & COM2_0'\""
 
     data_ser = data_ser.copy()
@@ -88,8 +96,32 @@ def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", output_simi
     assert set(distance_mat.columns) == set(raw_df.columns) and distance_mat.shape == (len(raw_df.columns),len(raw_df.columns)), f"Error happens during the computation of dissimilarity matrix."
     np.fill_diagonal(distance_mat.values, 1)  # check by: tmp_df = gen_data_corr(["A", "A"], dataset_df, corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind, max_data_div_start_add=max_data_div_start_add); tmp_df.iloc[::, 3:].mean(axis=1)
 
-    if output_similarity_mat:
+    if out_mat_compo == "sim":
         return distance_mat
-    else:
+    elif out_mat_compo == "dist":
         distance_mat = 1 - distance_mat.abs()  # This might get wrong by using abs(), because that would mix up corr = -1 & corr = 1
         return distance_mat
+
+
+def gen_corr_graph(corr_dataset, corr_dist_mat_df, save_dir, graph_mat_compo: str = "sim", save_file: bool = False, show_mat_i_info: int = 1):
+    """
+    corr_dist_mat_df : input the dataset_df which only contains target-items
+    """
+    tmp_graph_list = []
+    for i in range(corr_dataset.shape[1]):
+        corr_spatial = corr_dataset.iloc[::,i]
+        corr_mat = gen_corr_dist_mat(corr_spatial, corr_dist_mat_df, out_mat_compo=graph_mat_compo).to_numpy()
+        tmp_graph_list.append(corr_mat)
+
+    flat_graphs_arr = np.stack(tmp_graph_list, axis=0)
+    if save_file:
+        np.save(save_dir/f"corr_calc_reg-corr_graph", flat_graphs_arr)
+
+    if show_mat_i_info:
+        corr_spatial = corr_dataset.iloc[::,show_mat_i_info]
+        display_corr_mat = gen_corr_dist_mat(corr_spatial, corr_dist_mat_df, out_mat_compo=graph_mat_compo)
+        logging.info(f"correlation graph.shape:{flat_graphs_arr[0].shape}")
+        logging.info(f"number of correlation graph:{len(flat_graphs_arr)}")
+        logging.info(f"\nMin of corr_mat:{display_corr_mat.min()}")
+        logging.info(f"\n{display_corr_mat.shape}")
+        logging.info(f"\n{display_corr_mat.head()}")
