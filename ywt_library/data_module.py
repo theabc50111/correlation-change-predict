@@ -1,14 +1,19 @@
 from itertools import combinations
 from tqdm import tqdm
+from pathlib import Path
 import math
 import re
 import logging
 
 import numpy as np
 import pandas as pd
+import dynamic_yaml
+import yaml
+
+from stl_decompn import stl_decompn
 
 
-data_gen_cfg = {"CORR_WINDOW": 10,
+data_gen_cfg = {"CORR_WINDOW": 50,
                 "CORR_STRIDE": 1,
                 "DATA_DIV_STRIDE": 20,  # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
                 "MAX_DATA_DIV_START_ADD": 0  # value:range(0,80,20);
@@ -71,6 +76,64 @@ def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
     return ret_vals
 
 
+# Prepare data
+def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-data_sp_test2",
+                  train_items_setting: str = "-train_train",
+                  save_corr_data: bool = False):
+    """
+    # Data implement & output setting & testset setting
+          data_implement: data implement setting  # watch options by operate: print(data_cfg["DATASETS"].keys())
+          data_cfg: dict of data info, which is from 「config/data_config.yaml」
+          data_split_setting: data split period setting, only suit for only settings of Korean paper
+          train_items_setting: train set setting  # -train_train|-train_all
+          save_corr_data: setting of output files 
+    """
+    
+    
+    # data loading & implement setting
+    dataset_df = pd.read_csv(data_cfg["DATASETS"][data_implement]['FILE_PATH'])
+    dataset_df = dataset_df.set_index('Date')
+    all_set = list(dataset_df.columns)  # all data
+    train_set = data_cfg["DATASETS"][data_implement]['TRAIN_SET']
+    test_set = data_cfg['DATASETS'][data_implement]['TEST_SET'] if data_cfg['DATASETS'][data_implement].get('TEST_SET') else [p for p in all_set if p not in train_set]  # all data - train data
+    logging.info(f"===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
+
+    # train items implement settings
+    items_implement = train_set if train_items_setting == "-train_train" else all_set
+    target_df = dataset_df.loc[::,items_implement]
+    logging.info(f"===== len(train set): {len(items_implement)} =====")
+
+    # setting of name of output files and pictures title
+    output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
+    logging.info(f"===== file_name basis:{output_file_name} =====")
+    logging.info(f"\n{dataset_df}")
+    
+    # input folder settings
+    corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-corr_data"
+    corr_data_dir.mkdir(parents=True, exist_ok=True)
+
+
+    # Load or Create Correlation Data
+    # DEFAULT SETTING: data_gen_cfg["DATA_DIV_STRIDE"] == 20, data_gen_cfg["CORR_WINDOW"]==100, data_gen_cfg["CORR_STRIDE"]==100
+    s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+    train_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_train.csv"
+    dev_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_dev.csv"
+    test1_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_test1.csv"
+    test2_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_test2.csv"
+    all_corr_df_paths = dict(zip(["train_df", "dev_df", "test1_df", "test2_df"],
+                                 [train_df_path, dev_df_path, test1_df_path, test2_df_path]))
+    if all([df_path.exists() for df_path in all_corr_df_paths.values()]):
+        corr_datasets = [pd.read_csv(df_path, index_col=["items"]) for df_path in all_corr_df_paths.values()]
+    else:
+        corr_datasets = gen_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths, save_file=save_corr_data)
+
+    if data_split_setting == "-data_sp_test2":
+        corr_dataset = corr_datasets[3]
+        logging.info(f"{corr_dataset.head()}")
+    
+    return target_df, corr_dataset, output_file_name
+
+
 def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_compo: str = "sim"):
     
     """
@@ -103,25 +166,54 @@ def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_com
         return distance_mat
 
 
-def gen_corr_graph(corr_dataset, corr_dist_mat_df, save_dir, graph_mat_compo: str = "sim", save_file: bool = False, show_mat_i_info: int = 1):
+def gen_corr_mat_thru_t(corr_dataset, target_df, save_dir: Path = None, graph_mat_compo: str = "sim", show_mat_info_inds: list = []):
     """
-    corr_dist_mat_df : input the dataset_df which only contains target-items
+    corr_dataset: input df consisting of each pair of correlation coefficients over time
+    target_df: input the dataset_df which only contains target-items
+    save_dir: save directory of graph array
+    graph_mat_compo: 
+        - sim : output a matrix with similiarity dat
+        - dist : output a matrix with distance data
+    show_mat_info_inds: input a list of matrix indices to display
     """
+    # output folder settings
+    
+    
     tmp_graph_list = []
     for i in range(corr_dataset.shape[1]):
         corr_spatial = corr_dataset.iloc[::,i]
-        corr_mat = gen_corr_dist_mat(corr_spatial, corr_dist_mat_df, out_mat_compo=graph_mat_compo).to_numpy()
+        corr_mat = gen_corr_dist_mat(corr_spatial, target_df, out_mat_compo=graph_mat_compo).to_numpy()
         tmp_graph_list.append(corr_mat)
 
-    flat_graphs_arr = np.stack(tmp_graph_list, axis=0)
-    if save_file:
-        np.save(save_dir/f"corr_calc_reg-corr_graph", flat_graphs_arr)
+    flat_graphs_arr = np.stack(tmp_graph_list, axis=0)  # concate correlation matrix across time
+    if save_dir:
+        s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_graph", flat_graphs_arr)
 
-    if show_mat_i_info:
-        corr_spatial = corr_dataset.iloc[::,show_mat_i_info]
-        display_corr_mat = gen_corr_dist_mat(corr_spatial, corr_dist_mat_df, out_mat_compo=graph_mat_compo)
+    for i in show_mat_info_inds:
+        corr_spatial = corr_dataset.iloc[::,i]
+        display_corr_mat = gen_corr_dist_mat(corr_spatial, target_df, out_mat_compo=graph_mat_compo)
+        logging.info(f"correlation graph of No.{i} time-step")
         logging.info(f"correlation graph.shape:{flat_graphs_arr[0].shape}")
         logging.info(f"number of correlation graph:{len(flat_graphs_arr)}")
         logging.info(f"\nMin of corr_mat:{display_corr_mat.min()}")
         logging.info(f"\n{display_corr_mat.shape}")
         logging.info(f"\n{display_corr_mat.head()}")
+        logging.info("=" * 70)
+
+
+def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: "pathlib.PosixPath"):
+    if corr_property_df_path.exists():
+        corr_property_df = pd.read_csv(corr_property_df_path).set_index("items")
+    else:
+        corr_mean = corr_dataset.mean(axis=1)
+        corr_std = corr_dataset.std(axis=1)
+        corr_stl_series = corr_dataset.apply(stl_decompn, axis=1)
+        corr_stl_array = [[stl_period, stl_resid, stl_trend_std, stl_trend_coef] for stl_period, stl_resid, stl_trend_std, stl_trend_coef in corr_stl_series.values]
+        corr_property_df = pd.DataFrame(corr_stl_array, index=corr_dataset.index)
+        corr_property_df = pd.concat([corr_property_df, corr_mean, corr_std], axis=1)
+        corr_property_df.columns = ["corr_stl_period", "corr_stl_resid", "corr_stl_trend_std", "corr_stl_trend_coef", "corr_ser_mean", "corr_ser_std"]
+        corr_property_df.index.name = "items"
+        corr_property_df.to_csv(corr_property_df_path)
+    return corr_property_df
+
