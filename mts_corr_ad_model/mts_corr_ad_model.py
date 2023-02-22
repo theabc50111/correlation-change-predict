@@ -63,6 +63,8 @@ data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watc
 train_items_setting = "-train_train"  # -train_train|-train_all
 # setting of name of output files and pictures title
 output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
+# setting of output files
+save_model_info = True
 logging.info(f"===== file_name basis:{output_file_name} =====")
 
 
@@ -85,11 +87,11 @@ model_log_dir.mkdir(parents=True, exist_ok=True)
 gin_enc_cfg = {"num_gin_layers": 1,  # range:1~n, for GIN after the second layer,
                "gin_dim_h": 3,
               }
-data_loader_cfg = {"tr_loader_batch_size": 12,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+data_loader_cfg = {"tr_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                    "val_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                    "test_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                   }
-mts_corr_ad_cfg = {"gru_layers": 1,  # range:1~n, for gru
+mts_corr_ad_cfg = {"gru_layers": 5,  # range:1~n, for gru
                    "gru_dim_out": 8,
                    }
 mts_corr_ad_cfg["dim_out"] = gin_enc_cfg["num_gin_layers"] *  gin_enc_cfg["gin_dim_h"]
@@ -120,10 +122,6 @@ else:
 
 # Create training, validation, and test sets
 train_dataset = dataset[:int(len(dataset)*0.9)]
-
-import pickle
-with open("../../tmp/tmp_torch_graph_dataset.pickle", 'wb') as handle:
-    pickle.dump(train_dataset, handle, protocol=pickle.HIGHEST_PROTOCOL)
 val_dataset   = dataset[int(len(dataset)*0.9):int(len(dataset)*0.95)]
 test_dataset  = dataset[int(len(dataset)*0.95):]
 
@@ -153,7 +151,7 @@ data_x_nodes = next(iter(train_loader)).x.reshape(train_loader.batch_size, -1)
 data_x_edges = next(iter(train_loader)).edge_attr.reshape(train_loader.batch_size, -1)
 data_y_nodes = torch.cat([y.x for y in next(iter(train_loader)).y]).reshape(train_loader.batch_size, -1)
 data_y_edges = torch.cat([y.edge_attr for y in next(iter(train_loader)).y]).reshape(train_loader.batch_size, -1)
-for i in range(12):
+for i in range(data_loader_cfg["tr_loader_batch_size"]):
     logging.debug(f"\n batch0_x{i}.shape: {data_x_nodes[i].shape} \n batch0_x{i}[:5]:{data_x_nodes[i][:5]}")
     logging.debug(f"\n batch0_x{i}_edges.shape: {data_x_edges[i].shape} \n batch0_x{i}_edges[:5]:{data_x_edges[i][:5]}")
     logging.debug(f"\n batch0_y{i}.shape: {data_y_nodes[i].shape} \n batch0_y{i}[:5]:{data_y_nodes[i][:5]}")
@@ -238,7 +236,18 @@ class MTSCorrAD(torch.nn.Module):
         return graph_embed_pred
 
 
+# ## Loss function
+
 # In[7]:
+
+
+def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
+    assert pred.shape == target.shape, "The shape of prediction and target aren't match"
+
+
+# ## Training Model
+
+# In[8]:
 
 
 def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.DataLoader,
@@ -248,6 +257,7 @@ def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.
                        "val_batch": val_loader.batch_size,
                        "optimizer": optimizer.__str__(),
                        "criterion": criterion.__str__(),
+                       "graph_enc_w_grad_history": [],
                        "min_val_loss": float('inf'),
                        "train_loss_history": [],
                        "val_loss_history": [],
@@ -270,28 +280,29 @@ def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.
             loss =  criterion(graph_embeds_pred, y_graph_embeds)
             train_loss += loss / len(train_loader)
             loss.backward()
-            graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad!=None else torch.zeros((1,)).to('cuda'), (-1,)))) for p in islice(model.graph_encoder.parameters(), 0, graph_enc_num_layers))
+            graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad!=None else torch.zeros((1,)).to('cuda'), (-1,)))) for p in islice(model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
             optimizer.step()
 
-        # Check if graph_encoder.parameters() have been updated in each epoch
+        # Check if graph_encoder.parameters() have been updated
         assert graph_enc_w_grad_after>0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
 
         # Validation
         val_loss = test(model, val_loader, criterion)
 
-        # save best model
+        # record training history
+        best_model_info["train_loss_history"].append(train_loss.item())
+        best_model_info["val_loss_history"].append(val_loss.item())
+        best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
+        # record training history and save best model
         if val_loss<best_model_info["min_val_loss"]:
             best_model = model
             best_model_info["best_val_epoch"] = epoch_i
             best_model_info["min_val_loss"] = val_loss.item()
 
-        best_model_info["train_loss_history"].append(train_loss.item())
-        best_model_info["val_loss_history"].append(val_loss.item())
-
         # observe model info in console
         if show_model_info and epoch_i==0:
             best_model_info["model_structure"] = model.__str__() + "\n" + "="*100 + "\n" + summary(model, data.x, data.edge_index, data.batch, max_depth=20).__str__()
-            logging.info(f"\n{best_model_info['model_structure']}")
+            logging.info(f"\nNumber of graphs:{data.num_graphs} in No.{batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
         if(epoch_i % 10 == 0):  # show metrics every 10 epochs
             logging.info(f"Epoch {epoch_i:>3} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} ")
 
@@ -319,6 +330,7 @@ def save_model(model:torch.nn.Module, model_info:dict, data_gen_cfg:dict):
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
     torch.save(model, model_dir/f"epoch_{e_i}-{t}.pt")
     with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
+        print(model_info)
         json_str = json.dumps(model_info)
         f.write(json_str)
     logging.info(f"model has been saved in:{model_dir}")
@@ -329,11 +341,5 @@ model =  MTSCorrAD(**mts_corr_ad_cfg).to("cuda")
 criterion = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters())
 model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=5000, show_model_info=True)
-save_model(model, model_info, data_gen_cfg)
-
-
-# In[ ]:
-
-
-
-
+if save_model_info:
+    save_model(model, model_info, data_gen_cfg)

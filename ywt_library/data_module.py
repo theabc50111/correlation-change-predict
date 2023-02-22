@@ -13,8 +13,8 @@ import yaml
 from stl_decompn import stl_decompn
 
 
-data_gen_cfg = {"CORR_WINDOW": 50,
-                "CORR_STRIDE": 1,
+data_gen_cfg = {"CORR_WINDOW": 10,
+                "CORR_STRIDE": 10,
                 "DATA_DIV_STRIDE": 20,  # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
                 "MAX_DATA_DIV_START_ADD": 0  # value:range(0,80,20);
                                              # 0 is strongly recommnded;

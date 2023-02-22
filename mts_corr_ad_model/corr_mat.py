@@ -42,14 +42,13 @@ if __name__ == "__main__":
     data_split_setting = "-data_sp_test2"
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
-    # setting of output files
-    save_corr_data = True
     # Decide composition of graph_matrix
     #     - sim : output a matrix with similiarity dat
     #     - dist : output a matrix with distance data
     graph_mat_compo = "sim"
     # setting of output files
-    save_corr_graph_arr = True
+    save_corr_graph_arr = False
+    save_corr_data = False
     
     
     # generate correlation matrix across time
