@@ -11,6 +11,7 @@ dataset.csv
 save_models/
 pipeline_dataset/
 *__pycache__/
+*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

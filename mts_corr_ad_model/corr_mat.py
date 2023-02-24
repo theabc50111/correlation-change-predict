@@ -47,8 +47,8 @@ if __name__ == "__main__":
     #     - dist : output a matrix with distance data
     graph_mat_compo = "sim"
     # setting of output files
-    save_corr_graph_arr = False
-    save_corr_data = False
+    save_corr_graph_arr = True
+    save_corr_data = True
     
     
     # generate correlation matrix across time

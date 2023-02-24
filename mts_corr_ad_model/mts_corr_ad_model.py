@@ -13,6 +13,7 @@ from pprint import pformat
 from itertools import product, islice
 import json
 from datetime import datetime
+import argparse
 
 import pandas as pd
 import numpy as np
@@ -31,11 +32,16 @@ sys.path.append("/workspace/correlation-change-predict/ywt_library")
 import data_module
 from data_module import data_gen_cfg, gen_corr_mat_thru_t
 
-
-with open('../config/data_config.yaml') as f:
+current_dir = Path(__file__).parent
+data_config_path = current_dir/"../config/data_config.yaml"
+with open(data_config_path) as f:
     data = dynamic_yaml.load(f)
     data_cfg = yaml.full_load(dynamic_yaml.dump(data))
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--tr_batch", type=int,
+                    help="input the number of training batch")
+args = parser.parse_args()
 warnings.simplefilter("ignore")
 logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
                     level=logging.INFO)
@@ -53,10 +59,6 @@ logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
 
 
 # ## Data implement & output setting & testset setting
-
-# In[2]:
-
-
 # data implement setting
 data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logging.info(data_cfg["DATASETS"].keys())
 # train set setting
@@ -73,8 +75,8 @@ logging.info(f"===== file_name basis:{output_file_name} =====")
 
 s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
 graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
-model_dir = Path(f'./save_models/{output_file_name}/corr_s{s_l}_w{w_l}')
-model_log_dir = Path(f'./save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/')
+model_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
+model_log_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
 model_dir.mkdir(parents=True, exist_ok=True)
 model_log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -87,11 +89,11 @@ model_log_dir.mkdir(parents=True, exist_ok=True)
 gin_enc_cfg = {"num_gin_layers": 1,  # range:1~n, for GIN after the second layer,
                "gin_dim_h": 3,
               }
-data_loader_cfg = {"tr_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+data_loader_cfg = {"tr_loader_batch_size": args.tr_batch if args.tr_batch else 12,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                    "val_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                    "test_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                   }
-mts_corr_ad_cfg = {"gru_layers": 5,  # range:1~n, for gru
+mts_corr_ad_cfg = {"gru_layers": 1,  # range:1~n, for gru
                    "gru_dim_out": 8,
                    }
 mts_corr_ad_cfg["dim_out"] = gin_enc_cfg["num_gin_layers"] *  gin_enc_cfg["gin_dim_h"]
@@ -320,8 +322,7 @@ def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoa
             graph_embeds_pred = model(x, x_edge_index, x_batch_node_id)
             y_graph_embeds = model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id)
             loss = criterion(graph_embeds_pred, y_graph_embeds)
-            # test_loss += loss / len(loader)
-            test_loss += loss
+            test_loss += loss / len(loader)
 
     return test_loss
 
@@ -330,7 +331,6 @@ def save_model(model:torch.nn.Module, model_info:dict, data_gen_cfg:dict):
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
     torch.save(model, model_dir/f"epoch_{e_i}-{t}.pt")
     with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
-        print(model_info)
         json_str = json.dumps(model_info)
         f.write(json_str)
     logging.info(f"model has been saved in:{model_dir}")
@@ -343,3 +343,4 @@ optimizer = torch.optim.Adam(model.parameters())
 model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=5000, show_model_info=True)
 if save_model_info:
     save_model(model, model_info, data_gen_cfg)
+
