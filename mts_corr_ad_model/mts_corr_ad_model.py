@@ -41,7 +41,13 @@ with open(data_config_path) as f:
 parser = argparse.ArgumentParser()
 parser.add_argument("--tr_batch", type=int,
                     help="input the number of training batch")
+parser.add_argument("--stride_len", type=int,
+                    help="input the number of stride length of correlation computing")
+parser.add_argument("--window_len", type=int,
+                    help="input the number of window length of correlation computing")
 args = parser.parse_args()
+data_gen_cfg['CORR_STRIDE'] = args.stride_len if args.stride_len else data_gen_cfg['CORR_STRIDE']
+data_gen_cfg['CORR_WINDOW'] = args.window_len if args.window_len else data_gen_cfg['CORR_WINDOW']
 warnings.simplefilter("ignore")
 logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
                     level=logging.INFO)
@@ -52,11 +58,8 @@ mpl.rcParams['axes.unicode_minus'] = False
 # logger_list = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
 # loggin.debug(logger_list)
 
-# %load_ext pycodestyle_magic
-# %pycodestyle_on --ignore E501
 logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
 logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
-
 
 # ## Data implement & output setting & testset setting
 # data implement setting
@@ -74,6 +77,8 @@ logging.info(f"===== file_name basis:{output_file_name} =====")
 
 
 s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+#s_l = args.stride_len if args.stride_len else data_gen_cfg["CORR_STRIDE"]
+#w_l = args.window_len if args.window_len else data_gen_cfg["CORR_WINDOW"]
 graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
 model_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
 model_log_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
@@ -340,7 +345,7 @@ mts_corr_ad_cfg["graph_encoder"] = gin_encoder
 model =  MTSCorrAD(**mts_corr_ad_cfg).to("cuda")
 criterion = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters())
-model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=5000, show_model_info=True)
+model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=50, show_model_info=True)
 if save_model_info:
     save_model(model, model_info, data_gen_cfg)
 

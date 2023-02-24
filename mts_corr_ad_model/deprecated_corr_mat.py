@@ -53,10 +53,10 @@ if __name__ == "__main__":
     
     # generate correlation matrix across time
     target_df, corr_dataset, output_file_name = set_corr_data(data_implement=data_implement,
-                                                           data_cfg=data_cfg,
-                                                           data_split_setting=data_split_setting,
-                                                           train_items_setting=train_items_setting,
-                                                           save_corr_data=save_corr_data)
+                                                              data_cfg=data_cfg,
+                                                              data_split_setting=data_split_setting,
+                                                              train_items_setting=train_items_setting,
+                                                              save_corr_data=save_corr_data)
     
     res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
     res_dir.mkdir(parents=True, exist_ok=True)

@@ -1,27 +1,63 @@
 from itertools import combinations
 from tqdm import tqdm
 from pathlib import Path
+import warnings
+import sys
 import math
 import re
 import logging
+from pprint import pformat
+import argparse
 
 import numpy as np
 import pandas as pd
 import dynamic_yaml
 import yaml
 
+sys.path.append("/workspace/correlation-change-predict/ywt_library")
 from stl_decompn import stl_decompn
+current_dir = Path(__file__).parent
+data_config_path = current_dir/"../config/data_config.yaml"
+with open(data_config_path) as f:
+    data = dynamic_yaml.load(f)
+    data_cfg = yaml.full_load(dynamic_yaml.dump(data))
 
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
+                    help="input the number of stride length of correlation computing")
+parser.add_argument("--corr_window", type=int, nargs='?', default=10,
+                    help="input the number of window length of correlation computing")
+parser.add_argument("--data_div_stride", type=int, nargs='?', default=20,
+                    help="input the number of stride length of diversifing data")    # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
+parser.add_argument("--max_data_div_start_add", type=int, nargs='?', default=0,
+                    help="input the number of diversifing setting")   # value:range(0,80,20);
+                                                                      # 0 is strongly recommnded;
+                                                                      # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE); 
+                                                                      # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series, 
+                                                                      # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
+parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
+                    help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
+parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
+                    help="input the the setting of which splitting data to be used")
+parser.add_argument("--train_items_setting", type=str, nargs='?', default="-train_train",  # train set setting
+                    help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
+parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
+                    help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
+parser.add_argument("--save_corr_data", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                    help="input --save_corr_data to save correlation data")
+parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                    help="input --save_corr_graph_arr to save correlation graph data")
+args = parser.parse_args()
 
-data_gen_cfg = {"CORR_WINDOW": 10,
-                "CORR_STRIDE": 1,
-                "DATA_DIV_STRIDE": 20,  # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
-                "MAX_DATA_DIV_START_ADD": 0  # value:range(0,80,20);
-                                             # 0 is strongly recommnded;
-                                             # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE); 
-                                             # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series, if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
-                }
+warnings.simplefilter("ignore")
+logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
+                    level=logging.INFO)
 
+data_gen_cfg = {}
+data_gen_cfg['CORR_STRIDE'] = args.corr_stride
+data_gen_cfg['CORR_WINDOW'] = args.corr_window
+data_gen_cfg['DATA_DIV_STRIDE'] = args.data_div_stride
+data_gen_cfg['MAX_DATA_DIV_START_ADD'] = args.max_data_div_start_add
 _data_len = 2519  # only suit for sp500_hold_20082017 dataset 
 _corr_ser_len_max = int((_data_len-data_gen_cfg["CORR_WINDOW"])/data_gen_cfg["CORR_STRIDE"])
 _data_end_init = _corr_ser_len_max * data_gen_cfg["CORR_STRIDE"]
@@ -83,7 +119,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-da
     """
     # Data implement & output setting & testset setting
           data_implement: data implement setting  # watch options by operate: print(data_cfg["DATASETS"].keys())
-          data_cfg: dict of data info, which is from 「config/data_config.yaml」
+          data_cfg: dict of pre-processed-data info, which is from 「config/data_config.yaml」
           data_split_setting: data split period setting, only suit for only settings of Korean paper
           train_items_setting: train set setting  # -train_train|-train_all
           save_corr_data: setting of output files 
@@ -112,7 +148,6 @@ def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-da
     corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-corr_data"
     corr_data_dir.mkdir(parents=True, exist_ok=True)
 
-
     # Load or Create Correlation Data
     # DEFAULT SETTING: data_gen_cfg["DATA_DIV_STRIDE"] == 20, data_gen_cfg["CORR_WINDOW"]==100, data_gen_cfg["CORR_STRIDE"]==100
     s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
@@ -138,8 +173,8 @@ def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_com
     
     """
     out_mat_compo: 
-    - sim : output a matrix with similiarity dat
-    - dist : output a matrix with distance data
+        - sim : output a matrix with similiarity dat
+        - dist : output a matrix with distance data
     """
     
     assert isinstance(data_ser.index, pd.core.indexes.base.Index) and re.match(f".*\ \&\ .*_0", data_ser.index[0]), "Index of input series should be form of \"COM1 & COM2_0'\""
@@ -176,8 +211,6 @@ def gen_corr_mat_thru_t(corr_dataset, target_df, save_dir: Path = None, graph_ma
         - dist : output a matrix with distance data
     show_mat_info_inds: input a list of matrix indices to display
     """
-    # output folder settings
-    
     
     tmp_graph_list = []
     for i in range(corr_dataset.shape[1]):
@@ -217,3 +250,23 @@ def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: 
         corr_property_df.to_csv(corr_property_df_path)
     return corr_property_df
 
+
+if __name__ == "__main__":
+    logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
+    logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
+    
+    # generate correlation matrix across time
+    target_df, corr_dataset, output_file_name = set_corr_data(data_implement=args.data_implement,
+                                                              data_cfg=data_cfg,
+                                                              data_split_setting=args.data_split_setting,
+                                                              train_items_setting=args.train_items_setting,
+                                                              save_corr_data=args.save_corr_data)
+    
+    res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
+    res_dir.mkdir(parents=True, exist_ok=True)
+
+    gen_corr_mat_thru_t(corr_dataset,
+                        target_df,
+                        graph_mat_compo=args.graph_mat_compo,
+                        save_dir=res_dir if args.save_corr_graph_arr else None,
+                        show_mat_info_inds=[0,1,2,12])
