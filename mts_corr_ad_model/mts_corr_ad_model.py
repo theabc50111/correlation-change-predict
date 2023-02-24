@@ -24,7 +24,6 @@ import torch.nn.functional as F
 import torch_geometric
 from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn import GCNConv, GINConv, global_mean_pool, global_add_pool, summary
-# from torchsummary import summary
 import dynamic_yaml
 import yaml
 
@@ -41,13 +40,13 @@ with open(data_config_path) as f:
 parser = argparse.ArgumentParser()
 parser.add_argument("--tr_batch", type=int,
                     help="input the number of training batch")
-parser.add_argument("--stride_len", type=int,
+parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                     help="input the number of stride length of correlation computing")
-parser.add_argument("--window_len", type=int,
+parser.add_argument("--corr_window", type=int, nargs='?', default=10,
                     help="input the number of window length of correlation computing")
 args = parser.parse_args()
-data_gen_cfg['CORR_STRIDE'] = args.stride_len if args.stride_len else data_gen_cfg['CORR_STRIDE']
-data_gen_cfg['CORR_WINDOW'] = args.window_len if args.window_len else data_gen_cfg['CORR_WINDOW']
+data_gen_cfg['CORR_STRIDE'] = args.corr_stride
+data_gen_cfg['CORR_WINDOW'] = args.corr_window
 warnings.simplefilter("ignore")
 logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
                     level=logging.INFO)
@@ -72,13 +71,7 @@ output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'
 save_model_info = True
 logging.info(f"===== file_name basis:{output_file_name} =====")
 
-
-# In[3]:
-
-
 s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
-#s_l = args.stride_len if args.stride_len else data_gen_cfg["CORR_STRIDE"]
-#w_l = args.window_len if args.window_len else data_gen_cfg["CORR_WINDOW"]
 graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
 model_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
 model_log_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
@@ -87,10 +80,6 @@ model_log_dir.mkdir(parents=True, exist_ok=True)
 
 
 # ## model configuration
-
-# In[4]:
-
-
 gin_enc_cfg = {"num_gin_layers": 1,  # range:1~n, for GIN after the second layer,
                "gin_dim_h": 3,
               }
@@ -105,10 +94,6 @@ mts_corr_ad_cfg["dim_out"] = gin_enc_cfg["num_gin_layers"] *  gin_enc_cfg["gin_d
 
 
 # ## Load Graph Data
-
-# In[5]:
-
-
 graph_arr = np.load(graph_data_dir/f"corr_s{s_l}_w{w_l}_graph.npy")  # each graph consist of 66 node & 66^2 edges
 logging.info(f"graph_arr.shape:{graph_arr.shape}")
 graph_time_step = graph_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
@@ -166,10 +151,6 @@ for i in range(data_loader_cfg["tr_loader_batch_size"]):
 
 
 # ## Multi-Dimension Time-Series Correlation Anomly Detection Model
-
-# In[6]:
-
-
 class GinEncoder(torch.nn.Module):
     """
     num_node_features: number of features per node in the graph, in this model every node has same size of features 
@@ -244,19 +225,11 @@ class MTSCorrAD(torch.nn.Module):
 
 
 # ## Loss function
-
-# In[7]:
-
-
 def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
     assert pred.shape == target.shape, "The shape of prediction and target aren't match"
 
 
 # ## Training Model
-
-# In[8]:
-
-
 def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.DataLoader,
           val_loader:torch_geometric.loader.dataloader.DataLoader, optimizer, criterion, epochs:int =5, show_model_info=False):
     best_model_info = {"epochs": epochs,
@@ -331,7 +304,7 @@ def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoa
 
     return test_loss
 
-def save_model(model:torch.nn.Module, model_info:dict, data_gen_cfg:dict):
+def save_model(model:torch.nn.Module, model_info:dict):
     e_i = model_info["best_val_epoch"]
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
     torch.save(model, model_dir/f"epoch_{e_i}-{t}.pt")
@@ -345,7 +318,7 @@ mts_corr_ad_cfg["graph_encoder"] = gin_encoder
 model =  MTSCorrAD(**mts_corr_ad_cfg).to("cuda")
 criterion = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters())
-model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=50, show_model_info=True)
+model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=5000, show_model_info=True)
 if save_model_info:
-    save_model(model, model_info, data_gen_cfg)
+    save_model(model, model_info)
 

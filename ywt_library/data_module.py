@@ -48,11 +48,6 @@ parser.add_argument("--save_corr_data", type=bool, default=False, action=argpars
 parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                     help="input --save_corr_graph_arr to save correlation graph data")
 args = parser.parse_args()
-
-warnings.simplefilter("ignore")
-logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
-                    level=logging.INFO)
-
 data_gen_cfg = {}
 data_gen_cfg['CORR_STRIDE'] = args.corr_stride
 data_gen_cfg['CORR_WINDOW'] = args.corr_window
@@ -65,6 +60,12 @@ _corr_ind_list = []
 for i in range(0, data_gen_cfg["MAX_DATA_DIV_START_ADD"]+1, data_gen_cfg["DATA_DIV_STRIDE"]):
     _corr_ind_list.extend(list(range(data_gen_cfg["CORR_WINDOW"]-1+i, _data_end_init+bool(i)*data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_STRIDE"])))  # only suit for settings of paper
     
+warnings.simplefilter("ignore")
+logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
+                    level=logging.INFO)
+logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
+logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
+logging.info(pformat(args, indent=1, width=100, compact=True))
 
 def _process_index(items):
     item_1 = items[0].strip(" ")
@@ -94,7 +95,7 @@ def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
     for key_df in corr_df_paths:
         locals()[key_df] = pd.DataFrame(dtype="float32")
 
-    for pair in tqdm(combinations(items, 2)):
+    for pair in tqdm(combinations(items, 2), desc="Generating training data"):
         data_df = gen_data_corr([pair[0], pair[1]], raw_data_df,
                                 corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind, max_data_div_start_add= max_data_div_start_add)
         
@@ -252,9 +253,6 @@ def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: 
 
 
 if __name__ == "__main__":
-    logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
-    
     # generate correlation matrix across time
     target_df, corr_dataset, output_file_name = set_corr_data(data_implement=args.data_implement,
                                                               data_cfg=data_cfg,
