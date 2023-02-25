@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# In[1]:
-
-
 from tqdm import tqdm
 from pathlib import Path
 import warnings
 import sys
 import logging
-from pprint import pformat
+from pprint import pformat, pprint
 from itertools import product, islice
 import json
 from datetime import datetime
@@ -28,25 +24,24 @@ import dynamic_yaml
 import yaml
 
 sys.path.append("/workspace/correlation-change-predict/ywt_library")
-import data_module
-from data_module import data_gen_cfg, gen_corr_mat_thru_t
-
 current_dir = Path(__file__).parent
 data_config_path = current_dir/"../config/data_config.yaml"
 with open(data_config_path) as f:
     data = dynamic_yaml.load(f)
     data_cfg = yaml.full_load(dynamic_yaml.dump(data))
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--tr_batch", type=int,
+mts_corr_ad_args_parser = argparse.ArgumentParser()
+mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=12,
                     help="input the number of training batch")
-parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
+mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=5000,
+                    help="input the number of training epochs")
+mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                    help="input --save_model to save model weight and model info")
+mts_corr_ad_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                     help="input the number of stride length of correlation computing")
-parser.add_argument("--corr_window", type=int, nargs='?', default=10,
+mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
                     help="input the number of window length of correlation computing")
-args = parser.parse_args()
-data_gen_cfg['CORR_STRIDE'] = args.corr_stride
-data_gen_cfg['CORR_WINDOW'] = args.corr_window
+args = mts_corr_ad_args_parser.parse_args()
 warnings.simplefilter("ignore")
 logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
                     level=logging.INFO)
@@ -56,9 +51,8 @@ mpl.rcParams[u'font.sans-serif'] = ['simhei']
 mpl.rcParams['axes.unicode_minus'] = False
 # logger_list = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
 # loggin.debug(logger_list)
-
 logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
+logging.info(pformat(f"\n{vars(args)}", indent=1, width=25, compact=True))
 
 # ## Data implement & output setting & testset setting
 # data implement setting
@@ -68,10 +62,10 @@ train_items_setting = "-train_train"  # -train_train|-train_all
 # setting of name of output files and pictures title
 output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
 # setting of output files
-save_model_info = True
+save_model_info = args.save_model
 logging.info(f"===== file_name basis:{output_file_name} =====")
 
-s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+s_l, w_l =  args.corr_stride, args.corr_window
 graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
 model_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
 model_log_dir = current_dir/f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
@@ -200,6 +194,7 @@ class GinEncoder(torch.nn.Module):
 
         return graph_embeds
 
+
 class MTSCorrAD(torch.nn.Module):
     """
     gru_dim_out: The number of output size of GRU and features in the hidden state h of GRU
@@ -304,6 +299,7 @@ def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoa
 
     return test_loss
 
+
 def save_model(model:torch.nn.Module, model_info:dict):
     e_i = model_info["best_val_epoch"]
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
@@ -313,12 +309,25 @@ def save_model(model:torch.nn.Module, model_info:dict):
         f.write(json_str)
     logging.info(f"model has been saved in:{model_dir}")
 
-gin_encoder = GinEncoder(**gin_enc_cfg).to("cuda")
-mts_corr_ad_cfg["graph_encoder"] = gin_encoder
-model =  MTSCorrAD(**mts_corr_ad_cfg).to("cuda")
-criterion = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters())
-model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=5000, show_model_info=True)
-if save_model_info:
-    save_model(model, model_info)
+
+if __name__ == "__main__":
+    keep_training = True
+    gin_encoder = GinEncoder(**gin_enc_cfg).to("cuda")
+    mts_corr_ad_cfg["graph_encoder"] = gin_encoder
+    model =  MTSCorrAD(**mts_corr_ad_cfg).to("cuda")
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters())
+    while keep_training == True:
+        try:
+            model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=args.tr_epochs, show_model_info=True)
+        except AssertionError as err:
+            logging.error(f"\n{err}")
+        except Exception as err:
+            keep_training = False
+            logging.error(f"\n{err}")
+        else:
+            keep_training = False
+            if save_model_info:
+                save_model(model, model_info)
+                
 

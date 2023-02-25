@@ -6,7 +6,7 @@ import sys
 import math
 import re
 import logging
-from pprint import pformat
+from pprint import pformat, pprint
 import argparse
 
 import numpy as np
@@ -22,50 +22,6 @@ with open(data_config_path) as f:
     data = dynamic_yaml.load(f)
     data_cfg = yaml.full_load(dynamic_yaml.dump(data))
 
-parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
-                    help="input the number of stride length of correlation computing")
-parser.add_argument("--corr_window", type=int, nargs='?', default=10,
-                    help="input the number of window length of correlation computing")
-parser.add_argument("--data_div_stride", type=int, nargs='?', default=20,
-                    help="input the number of stride length of diversifing data")    # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
-parser.add_argument("--max_data_div_start_add", type=int, nargs='?', default=0,
-                    help="input the number of diversifing setting")   # value:range(0,80,20);
-                                                                      # 0 is strongly recommnded;
-                                                                      # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE); 
-                                                                      # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series, 
-                                                                      # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
-parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
-                    help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
-parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
-                    help="input the the setting of which splitting data to be used")
-parser.add_argument("--train_items_setting", type=str, nargs='?', default="-train_train",  # train set setting
-                    help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
-parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
-                    help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
-parser.add_argument("--save_corr_data", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
-                    help="input --save_corr_data to save correlation data")
-parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
-                    help="input --save_corr_graph_arr to save correlation graph data")
-args = parser.parse_args()
-data_gen_cfg = {}
-data_gen_cfg['CORR_STRIDE'] = args.corr_stride
-data_gen_cfg['CORR_WINDOW'] = args.corr_window
-data_gen_cfg['DATA_DIV_STRIDE'] = args.data_div_stride
-data_gen_cfg['MAX_DATA_DIV_START_ADD'] = args.max_data_div_start_add
-_data_len = 2519  # only suit for sp500_hold_20082017 dataset 
-_corr_ser_len_max = int((_data_len-data_gen_cfg["CORR_WINDOW"])/data_gen_cfg["CORR_STRIDE"])
-_data_end_init = _corr_ser_len_max * data_gen_cfg["CORR_STRIDE"]
-_corr_ind_list = []
-for i in range(0, data_gen_cfg["MAX_DATA_DIV_START_ADD"]+1, data_gen_cfg["DATA_DIV_STRIDE"]):
-    _corr_ind_list.extend(list(range(data_gen_cfg["CORR_WINDOW"]-1+i, _data_end_init+bool(i)*data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_STRIDE"])))  # only suit for settings of paper
-    
-warnings.simplefilter("ignore")
-logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
-                    level=logging.INFO)
-logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-logging.info(pformat(data_gen_cfg, indent=1, width=100, compact=True))
-logging.info(pformat(args, indent=1, width=100, compact=True))
 
 def _process_index(items):
     item_1 = items[0].strip(" ")
@@ -75,12 +31,12 @@ def _process_index(items):
     return (item_1, item_2)
 
 
-def gen_data_corr(items: list, dataset_df: "pd.DataFrame", corr_ser_len_max: int, corr_ind: list, max_data_div_start_add: int) -> "pd.DataFrame":
+def gen_data_corr(items: list, dataset_df: "pd.DataFrame", corr_ser_len_max: int, corr_ind: list, data_gen_cfg: dict) -> "pd.DataFrame":
     tmp_corr = dataset_df[items[0]].rolling(window=data_gen_cfg["CORR_WINDOW"]).corr(dataset_df[items[1]])
     tmp_corr = tmp_corr.iloc[corr_ind]
     corr_ser_len_max = corr_ser_len_max - max(0, math.ceil((data_gen_cfg["CORR_WINDOW"]-data_gen_cfg["CORR_STRIDE"])/data_gen_cfg["CORR_STRIDE"]))  #  CORR_WINDOW > CORR_STRIDE => slide window
     data_df = pd.DataFrame(tmp_corr.values.reshape(-1, corr_ser_len_max), columns=tmp_corr.index[:corr_ser_len_max], dtype="float32")
-    ind = [f"{items[0]} & {items[1]}_{i}" for i in range(0,  max_data_div_start_add+1, data_gen_cfg["DATA_DIV_STRIDE"])]
+    ind = [f"{items[0]} & {items[1]}_{i}" for i in range(0,  data_gen_cfg["MAX_DATA_DIV_START_ADD"]+1, data_gen_cfg["DATA_DIV_STRIDE"])]
     data_df.index = ind
     data_df.index.name = "items"
     return data_df
@@ -88,17 +44,23 @@ def gen_data_corr(items: list, dataset_df: "pd.DataFrame", corr_ser_len_max: int
 
 def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
                    corr_df_paths: "dict of pathlib.PosixPath",
-                   corr_ser_len_max: int = _corr_ser_len_max,
-                   corr_ind: list = _corr_ind_list,
-                   max_data_div_start_add: int = data_gen_cfg["MAX_DATA_DIV_START_ADD"],
+                    data_gen_cfg: dict,
                    save_file: bool = False) -> "list of pd.DataFrame":
+    # DEFAULT SETTING: data_gen_cfg["DATA_DIV_STRIDE"] == 20, data_gen_cfg["CORR_WINDOW"]==100, data_gen_cfg["CORR_STRIDE"]==100
+    data_len = raw_data_df.shape[0]  # only suit for dateset.shape == [datetime, features], e.g sp500_hold_20082017 dataset 
+    corr_ser_len_max = int((data_len-data_gen_cfg["CORR_WINDOW"])/data_gen_cfg["CORR_STRIDE"])
+    data_end_init = corr_ser_len_max * data_gen_cfg["CORR_STRIDE"]
+    corr_ind_list = []
+    for i in range(0, data_gen_cfg["MAX_DATA_DIV_START_ADD"]+1, data_gen_cfg["DATA_DIV_STRIDE"]):
+        corr_ind_list.extend(list(range(data_gen_cfg["CORR_WINDOW"]-1+i, data_end_init+bool(i)*data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_STRIDE"])))  # only suit for settings of paper
+
     for key_df in corr_df_paths:
         locals()[key_df] = pd.DataFrame(dtype="float32")
 
     for pair in tqdm(combinations(items, 2), desc="Generating training data"):
         data_df = gen_data_corr([pair[0], pair[1]], raw_data_df,
-                                corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind, max_data_div_start_add= max_data_div_start_add)
-        
+                                corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind_list,
+                                data_gen_cfg=data_gen_cfg)
         corr_ser_len = corr_ser_len_max-(len(corr_df_paths)-1)  # dataset needs to be split into len(corr_df_paths) parts which means corr_ser_len will be corr_ser_len_max-(len(corr_df_paths)-1)
         for i, key_df in enumerate(corr_df_paths):  # only suit for settings of Korea paper
             locals()[key_df] = pd.concat([locals()[key_df], data_df.iloc[:, i:corr_ser_len+i]])
@@ -114,13 +76,14 @@ def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
 
 
 # Prepare data
-def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-data_sp_test2",
-                  train_items_setting: str = "-train_train",
+def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
+                  data_split_setting: str = "-data_sp_test2", train_items_setting: str = "-train_train",
                   save_corr_data: bool = False):
     """
     # Data implement & output setting & testset setting
           data_implement: data implement setting  # watch options by operate: print(data_cfg["DATASETS"].keys())
           data_cfg: dict of pre-processed-data info, which is from 「config/data_config.yaml」
+          data_gen_cfg: dict data generation configuration
           data_split_setting: data split period setting, only suit for only settings of Korean paper
           train_items_setting: train set setting  # -train_train|-train_all
           save_corr_data: setting of output files 
@@ -133,24 +96,23 @@ def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-da
     all_set = list(dataset_df.columns)  # all data
     train_set = data_cfg["DATASETS"][data_implement]['TRAIN_SET']
     test_set = data_cfg['DATASETS'][data_implement]['TEST_SET'] if data_cfg['DATASETS'][data_implement].get('TEST_SET') else [p for p in all_set if p not in train_set]  # all data - train data
-    logging.info(f"===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
+    logging.info(f"\n===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
 
     # train items implement settings
     items_implement = train_set if train_items_setting == "-train_train" else all_set
     target_df = dataset_df.loc[::,items_implement]
-    logging.info(f"===== len(train set): {len(items_implement)} =====")
+    logging.info(f"\n===== len(train set): {len(items_implement)} =====")
 
     # setting of name of output files and pictures title
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
-    logging.info(f"===== file_name basis:{output_file_name} =====")
-    logging.info(f"\n{dataset_df}")
+    logging.info(f"\n===== file_name basis:{output_file_name} =====")
+    logging.info(f"\n===== overview dataset_df =====\n{dataset_df}")
     
     # input folder settings
     corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-corr_data"
     corr_data_dir.mkdir(parents=True, exist_ok=True)
 
     # Load or Create Correlation Data
-    # DEFAULT SETTING: data_gen_cfg["DATA_DIV_STRIDE"] == 20, data_gen_cfg["CORR_WINDOW"]==100, data_gen_cfg["CORR_STRIDE"]==100
     s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
     train_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_train.csv"
     dev_df_path = corr_data_dir/f"corr_s{s_l}_w{w_l}_dev.csv"
@@ -161,13 +123,15 @@ def set_corr_data(data_implement, data_cfg: dict, data_split_setting: str = "-da
     if all([df_path.exists() for df_path in all_corr_df_paths.values()]):
         corr_datasets = [pd.read_csv(df_path, index_col=["items"]) for df_path in all_corr_df_paths.values()]
     else:
-        corr_datasets = gen_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths, save_file=save_corr_data)
+        corr_datasets = gen_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths,
+                                       save_file=save_corr_data,  data_gen_cfg= data_gen_cfg)
+        #corr_datasets = gen_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths, save_file=save_corr_data,
+                                      #corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind_list, max_data_div_start_add=max_data_div_start_add)
 
     if data_split_setting == "-data_sp_test2":
         corr_dataset = corr_datasets[3]
-        logging.info(f"{corr_dataset.head()}")
-    
-    return target_df, corr_dataset, output_file_name
+        logging.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
+        return target_df, corr_dataset, output_file_name
 
 
 def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_compo: str = "sim"):
@@ -253,16 +217,53 @@ def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: 
 
 
 if __name__ == "__main__":
+    data_args_parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    data_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
+                        help="input the number of stride length of correlation computing")
+    data_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
+                        help="input the number of window length of correlation computing")
+    data_args_parser.add_argument("--data_div_stride", type=int, nargs='?', default=20,
+                        help="input the number of stride length of diversifing data")    # 20 is ONLY SUIT for data generation setting in that Korea paper. Because each pair need to be diversified to 5 corr_series
+    data_args_parser.add_argument("--max_data_div_start_add", type=int, nargs='?', default=0,
+                        help="input the number of diversifing setting")   # value:range(0,80,20);
+                                                                          # 0 is strongly recommnded;
+                                                                          # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE); 
+                                                                          # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series, 
+                                                                          # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
+    data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
+                        help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
+    data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
+                        help="input the the setting of which splitting data to be used")
+    data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="-train_train",  # train set setting
+                        help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
+    data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
+                        help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
+    data_args_parser.add_argument("--save_corr_data", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                        help="input --save_corr_data to save correlation data")
+    data_args_parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                        help="input --save_corr_graph_arr to save correlation graph data")
+    args = data_args_parser.parse_args()
+    warnings.simplefilter("ignore")
+    logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
+                        level=logging.INFO)
+    logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
+    logging.info(pformat(vars(args), indent=1, width=100, compact=True))
+    # logging.info(pprint(args))
+    
     # generate correlation matrix across time
+    data_gen_cfg = {}
+    data_gen_cfg['CORR_STRIDE'] = args.corr_stride
+    data_gen_cfg['CORR_WINDOW'] = args.corr_window
+    data_gen_cfg['DATA_DIV_STRIDE'] = args.data_div_stride
+    data_gen_cfg['MAX_DATA_DIV_START_ADD'] = args.max_data_div_start_add
     target_df, corr_dataset, output_file_name = set_corr_data(data_implement=args.data_implement,
                                                               data_cfg=data_cfg,
+                                                              data_gen_cfg=data_gen_cfg,
                                                               data_split_setting=args.data_split_setting,
                                                               train_items_setting=args.train_items_setting,
                                                               save_corr_data=args.save_corr_data)
-    
     res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
     res_dir.mkdir(parents=True, exist_ok=True)
-
     gen_corr_mat_thru_t(corr_dataset,
                         target_df,
                         graph_mat_compo=args.graph_mat_compo,
