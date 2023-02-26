@@ -32,15 +32,15 @@ with open(data_config_path) as f:
 
 mts_corr_ad_args_parser = argparse.ArgumentParser()
 mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=12,
-                    help="input the number of training batch")
+                                     help="input the number of training batch")
 mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=5000,
-                    help="input the number of training epochs")
+                                     help="input the number of training epochs")
 mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
-                    help="input --save_model to save model weight and model info")
+                                     help="input --save_model to save model weight and model info")
 mts_corr_ad_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
-                    help="input the number of stride length of correlation computing")
+                                     help="input the number of stride length of correlation computing")
 mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
-                    help="input the number of window length of correlation computing")
+                                     help="input the number of window length of correlation computing")
 args = mts_corr_ad_args_parser.parse_args()
 warnings.simplefilter("ignore")
 logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
@@ -224,9 +224,13 @@ def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
     assert pred.shape == target.shape, "The shape of prediction and target aren't match"
 
 
+# Discrimination test function
+def disc_test(test_model: torch.nn.Module, test_loader: torch_geometric.loader.dataloader.DataLoader, test_mode: str = "node" ):
+    pass
+
 # ## Training Model
-def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.DataLoader,
-          val_loader:torch_geometric.loader.dataloader.DataLoader, optimizer, criterion, epochs:int =5, show_model_info=False):
+def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dataloader.DataLoader,
+          val_loader: torch_geometric.loader.dataloader.DataLoader, optimizer, criterion, epochs: int = 5, show_model_info=False):
     best_model_info = {"epochs": epochs,
                        "train_batch": train_loader.batch_size,
                        "val_batch": val_loader.batch_size,
@@ -237,11 +241,11 @@ def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.
                        "train_loss_history": [],
                        "val_loss_history": [],
                       }
-    model_num_layers = sum(1 for _ in model.parameters())
-    graph_enc_num_layers =  sum(1 for _ in model.graph_encoder.parameters())
+    model_num_layers = sum(1 for _ in train_model.parameters())
+    graph_enc_num_layers =  sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
     for epoch_i in tqdm(range(epochs)):
-        model.train()
+        train_model.train()
         train_loss = 0
 
         # Train on batches
@@ -250,19 +254,19 @@ def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.
             x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
             y, y_edge_index, y_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64).to("cuda"), data.y[-1].edge_attr  # only take y of x with last time-step on training
             optimizer.zero_grad()
-            graph_embeds_pred = model(x, x_edge_index, x_batch_node_id)
-            y_graph_embeds = model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id)
+            graph_embeds_pred = train_model(x, x_edge_index, x_batch_node_id)
+            y_graph_embeds = train_model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id)
             loss =  criterion(graph_embeds_pred, y_graph_embeds)
             train_loss += loss / len(train_loader)
             loss.backward()
-            graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad!=None else torch.zeros((1,)).to('cuda'), (-1,)))) for p in islice(model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
+            graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad!=None else torch.zeros((1,)).to('cuda'), (-1,)))) for p in islice(train_model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
             optimizer.step()
 
         # Check if graph_encoder.parameters() have been updated
         assert graph_enc_w_grad_after>0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
 
         # Validation
-        val_loss = test(model, val_loader, criterion)
+        val_loss = test(train_model, val_loader, criterion)
 
         # record training history
         best_model_info["train_loss_history"].append(train_loss.item())
@@ -270,13 +274,13 @@ def train(model:torch.nn.Module, train_loader:torch_geometric.loader.dataloader.
         best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
         # record training history and save best model
         if val_loss<best_model_info["min_val_loss"]:
-            best_model = model
+            best_model = train_model
             best_model_info["best_val_epoch"] = epoch_i
             best_model_info["min_val_loss"] = val_loss.item()
 
         # observe model info in console
         if show_model_info and epoch_i==0:
-            best_model_info["model_structure"] = model.__str__() + "\n" + "="*100 + "\n" + summary(model, data.x, data.edge_index, data.batch, max_depth=20).__str__()
+            best_model_info["model_structure"] = train_model.__str__() + "\n" + "="*100 + "\n" + summary(train_model, data.x, data.edge_index, data.batch, max_depth=20).__str__()
             logging.info(f"\nNumber of graphs:{data.num_graphs} in No.{batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
         if(epoch_i % 10 == 0):  # show metrics every 10 epochs
             logging.info(f"Epoch {epoch_i:>3} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} ")
