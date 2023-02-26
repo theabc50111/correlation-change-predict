@@ -12,6 +12,7 @@ save_models/
 pipeline_dataset/
 *__pycache__/
 *.log
+cscope*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

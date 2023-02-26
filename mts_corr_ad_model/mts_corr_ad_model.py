@@ -10,6 +10,7 @@ from itertools import product, islice
 import json
 from datetime import datetime
 import argparse
+import traceback
 
 import pandas as pd
 import numpy as np
@@ -78,8 +79,8 @@ gin_enc_cfg = {"num_gin_layers": 1,  # range:1~n, for GIN after the second layer
                "gin_dim_h": 3,
               }
 data_loader_cfg = {"tr_loader_batch_size": args.tr_batch if args.tr_batch else 12,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
-                   "val_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
-                   "test_loader_batch_size": 4,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+                   "val_loader_batch_size": 1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+                   "test_loader_batch_size": 1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                   }
 mts_corr_ad_cfg = {"gru_layers": 1,  # range:1~n, for gru
                    "gru_dim_out": 8,
@@ -91,7 +92,7 @@ mts_corr_ad_cfg["dim_out"] = gin_enc_cfg["num_gin_layers"] *  gin_enc_cfg["gin_d
 graph_arr = np.load(graph_data_dir/f"corr_s{s_l}_w{w_l}_graph.npy")  # each graph consist of 66 node & 66^2 edges
 logging.info(f"graph_arr.shape:{graph_arr.shape}")
 graph_time_step = graph_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
-node_attr = torch.tensor(np.zeros((graph_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
+node_attr = torch.tensor(np.ones((graph_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
 edge_index = torch.tensor(list(product(range(graph_arr.shape[1]), repeat=2)))
 dataset = []
 for g_t in range(graph_time_step):
@@ -225,18 +226,37 @@ def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
 
 
 # Discrimination test function
-def disc_test(test_model: torch.nn.Module, test_loader: torch_geometric.loader.dataloader.DataLoader, test_mode: str = "node" ):
-    pass
+def disc_test(test_model: torch.nn.Module, data_loader: torch_geometric.loader.dataloader.DataLoader,
+        g_t: int, amp: float = 1.5, pct: float = 0.1, test_mode: str = "node" ):
+    assert data_loader.batch_size == 1, "Batch size of data-loader should be 1."
+    if g_t:
+        data = islice(iter(test_loader), g_t, g_t+1).to("cuda")
+        x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+    else:
+        data = next(iter(test_loader)).to("cuda")
+        x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+        change_ind = np.zeros(shape=x.shape, dtype=bool)
+        while change_ind.sum() != int(torch.numel(x)*pct):
+            change_ind = np.random.choice([True, False], size=x.shape, p=[pct, 1-pct])
+        new_x = torch.clone(x).to("cuda")
+        new_x[change_ind] = new_x[change_ind]*amp 
+        x_graph_embeds = test_model.graph_encoder.get_embeddings(x, x_edge_index, x_batch_node_id)
+        new_x_graph_embeds = test_model.graph_encoder.get_embeddings(new_x, x_edge_index, x_batch_node_id)
+    #print(x_graph_embeds, new_x_graph_embeds)
+
 
 # ## Training Model
 def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dataloader.DataLoader,
           val_loader: torch_geometric.loader.dataloader.DataLoader, optimizer, criterion, epochs: int = 5, show_model_info=False):
-    best_model_info = {"epochs": epochs,
+    best_model_info = {"num_training_graphs": len(train_loader.dataset),
+                       "batchs_per_epoch": len(train_loader),
+                       "epochs": epochs,
                        "train_batch": train_loader.batch_size,
                        "val_batch": val_loader.batch_size,
                        "optimizer": optimizer.__str__(),
                        "criterion": criterion.__str__(),
                        "graph_enc_w_grad_history": [],
+                       "graph_embeds_history": {"graph_embeds_pred": [], "y_graph_embeds":[]},
                        "min_val_loss": float('inf'),
                        "train_loss_history": [],
                        "val_loss_history": [],
@@ -247,7 +267,6 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     for epoch_i in tqdm(range(epochs)):
         train_model.train()
         train_loss = 0
-
         # Train on batches
         for batch_i, data in enumerate(train_loader):
             data.to("cuda")
@@ -261,6 +280,8 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
             loss.backward()
             graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad!=None else torch.zeros((1,)).to('cuda'), (-1,)))) for p in islice(train_model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
             optimizer.step()
+            best_model_info["graph_embeds_history"]["graph_embeds_pred"].append(graph_embeds_pred.tolist())
+            best_model_info["graph_embeds_history"]["y_graph_embeds"].append(y_graph_embeds.tolist())
 
         # Check if graph_encoder.parameters() have been updated
         assert graph_enc_w_grad_after>0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
@@ -324,14 +345,22 @@ if __name__ == "__main__":
     while keep_training == True:
         try:
             model, model_info = train(model, train_loader, val_loader, optimizer, criterion, epochs=args.tr_epochs, show_model_info=True)
-        except AssertionError as err:
-            logging.error(f"\n{err}")
-        except Exception as err:
+        except AssertionError as e:
+            logging.error(f"\n{e}")
+        except Exception as e:
             keep_training = False
-            logging.error(f"\n{err}")
+            error_class = e.__class__.__name__  # 取得錯誤類型
+            detail = e.args[0]  # 取得詳細內容
+            cl, exc, tb = sys.exc_info()  # 取得Call Stack
+            last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
+            file_name = last_call_stack[0]  # 取得發生的檔案名稱
+            line_num = last_call_stack[1]  # 取得發生的行號
+            func_name = last_call_stack[2]  # 取得發生的函數名稱
+            err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
+            logging.error(f"===\n{err_msg}")
         else:
             keep_training = False
             if save_model_info:
                 save_model(model, model_info)
-                
 
+    #disc_test(test_model=model, data_loader=test_loader, test_mode="node")
