@@ -4,10 +4,16 @@
 
 ARGUMENT_LIST=(
   "tr_batch"
+  "val_batch"
+  "test_batch"
   "tr_epochs"
   "save_model"
   "corr_window"
   "corr_stride"
+  "graph_l"
+  "graph_h"
+  "gru_l"
+  "gru_h"
 )
 
 
@@ -35,6 +41,16 @@ while [[ $# -gt 0 ]]; do
       shift 2 # The 'shift' eats a commandline argument, i.e. converts $1=a, $2=b, $3=c, $4=d into $1=b, $2=c, $3=d. shift 2 moves it all the way to $1=c, $2=d. It's done since that particular branch uses an argument, so it has to remove two things from the list (the -r and the argument following it) not just one.
       ;;
 
+    --val_batch)
+      val_batch="$2"
+      shift 2
+      ;;
+
+    --test_batch)
+      test_batch="$2"
+      shift 2
+      ;;
+
     --tr_epochs)
       tr_epochs="$2"
       shift 2
@@ -55,6 +71,26 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --graph_l)
+      graph_l="$2"
+      shift 2
+      ;;
+
+    --graph_h)
+      graph_h="$2"
+      shift 2
+      ;;
+
+    --gru_l)
+      gru_l="$2"
+      shift 2
+      ;;
+
+    --gru_h)
+      gru_h="$2"
+      shift 2
+      ;;
+
     *)
       echo 
       break
@@ -64,9 +100,9 @@ done
 
 if [ -n "$save_model" ];
 then
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --graph_l $graph_l --graph_h $graph_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 else
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch  --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --graph_l $graph_l --graph_h $graph_h --gru_l $gru_l --gru_h $gru_h >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 fi
 
 echo "========================== $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
