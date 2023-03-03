@@ -95,7 +95,7 @@ class GineEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINEconv
     gra_enc_h: output size of hidden layer of GINEconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_edge_dim: int, **unused_kwargs):
         super(GineEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gine_convs = torch.nn.ModuleList()
@@ -110,7 +110,7 @@ class GineEncoder(torch.nn.Module):
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h), ReLU())
-            self.gine_convs.append(GINEConv(nn))
+            self.gine_convs.append(GINEConv(nn, edge_dim=gra_enc_edge_dim))
 
 
     def forward(self, x, edge_index, batch_node_id, edge_attr):
@@ -215,7 +215,6 @@ class MTSCorrAD(torch.nn.Module):
     """
     def __init__(self, graph_encoder: torch.nn.Module, gru_l: int, gru_h: int, dim_out: int, **unused_kwargs):
         super(MTSCorrAD, self).__init__()
-        #self.graph_encoder = GinEncoder(**mts_corr_ad_cfg)
         self.graph_encoder = graph_encoder
         gru_input_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(gru_input_size, gru_h, gru_l)
@@ -373,7 +372,6 @@ def save_model(model:torch.nn.Module, model_info:dict):
 
 
 if __name__ == "__main__":
-
     mts_corr_ad_args_parser = argparse.ArgumentParser()
     mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=12,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
@@ -389,9 +387,9 @@ if __name__ == "__main__":
                                          help="input the number of stride length of correlation computing")
     mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
                                          help="input the number of window length of correlation computing")
-    mts_corr_ad_args_parser.add_argument("--graph_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
+    mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
-    mts_corr_ad_args_parser.add_argument("--graph_h", type=int, nargs='?', default=3,
+    mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=3,
                                          help="input the number of graph embedding hidden size of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
                                          help="input the number of stacked-layers of gru")
@@ -400,7 +398,7 @@ if __name__ == "__main__":
     args = mts_corr_ad_args_parser.parse_args()
     warnings.simplefilter("ignore")
     logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
-                        level=logging.INFO)
+                        level=logging.ERROR)
     matplotlib_logger = logging.getLogger("matplotlib")
     matplotlib_logger.setLevel(logging.ERROR)
     mpl.rcParams[u'font.sans-serif'] = ['simhei']
@@ -435,18 +433,19 @@ if __name__ == "__main__":
 
     # ## model configuration
     loader_cfg = {"tr_batch": args.tr_batch,
-                       "val_batch": args.val_batch,
-                       "test_batch": args.test_batch}
-    mts_corr_ad_cfg = {"gra_enc_l": args.graph_l,
-                       "gra_enc_h": args.graph_h,
+                  "val_batch": args.val_batch,
+                  "test_batch": args.test_batch}
+    mts_corr_ad_cfg = {"gra_enc_l": args.gra_enc_l,
+                       "gra_enc_h": args.gra_enc_h,
                        "gru_l": args.gru_l,
                        "gru_h": args.gru_h}
-    mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     keep_training = True
     try_training = 0
     graph_data_arr = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_graph.npy")  # each graph consist of 66 node & 66^2 edges
     train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_arr=graph_data_arr)
-    #gin_encoder = GinEncoder(**mts_corr_ad_cfg)
+    mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
+    mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
+    gin_encoder = GinEncoder(**mts_corr_ad_cfg)
     gine_encoder = GineEncoder(**mts_corr_ad_cfg)
     mts_corr_ad_cfg["graph_encoder"] = gine_encoder
     model =  MTSCorrAD(**mts_corr_ad_cfg)
@@ -469,6 +468,7 @@ if __name__ == "__main__":
             func_name = last_call_stack[2]  # 取得發生的函數名稱
             err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
             logging.error(f"===\n{err_msg}")
+            logging.error(f"===\n{traceback.extract_tb(tb)}")
         else:
             keep_training = False
             if save_model_info:
