@@ -40,6 +40,8 @@ opts=$(getopt \
 # if sending invalid option, stop script
 if [ $? -ne 0 ]; then
   echo "Invalid option provided"
+  echo "Invalid option provided to crontab_mts_corr_ad_model.sh" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
+  echo "========================== $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
   exit 1
 fi
 
@@ -110,6 +112,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+echo "start training !!"
 if [ -n "$save_model" ];
 then
     /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1

@@ -398,7 +398,7 @@ if __name__ == "__main__":
     args = mts_corr_ad_args_parser.parse_args()
     warnings.simplefilter("ignore")
     logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
-                        level=logging.ERROR)
+                        level=logging.INFO)
     matplotlib_logger = logging.getLogger("matplotlib")
     matplotlib_logger.setLevel(logging.ERROR)
     mpl.rcParams[u'font.sans-serif'] = ['simhei']
