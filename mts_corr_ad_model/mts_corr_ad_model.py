@@ -105,11 +105,13 @@ class GineEncoder(torch.nn.Module):
             if i:
                 nn = Sequential(Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h), ReLU())
+                                Linear(gra_enc_h, gra_enc_h), 
+                                BatchNorm1d(gra_enc_h), ReLU())
             else:
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h), ReLU())
+                                Linear(gra_enc_h, gra_enc_h),
+                                BatchNorm1d(gra_enc_h), ReLU())
             self.gine_convs.append(GINEConv(nn, edge_dim=gra_enc_edge_dim))
 
 
@@ -165,11 +167,13 @@ class GinEncoder(torch.nn.Module):
             if i:
                 nn = Sequential(Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h), ReLU())
+                                Linear(gra_enc_h, gra_enc_h),
+                                BatchNorm1d(gra_enc_h), ReLU())
             else:
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h), ReLU())
+                                Linear(gra_enc_h, gra_enc_h),
+                                BatchNorm1d(gra_enc_h), ReLU())
             self.gin_convs.append(GINConv(nn))
 
 
@@ -379,7 +383,7 @@ if __name__ == "__main__":
                                          help="input the number of training batch")
     mts_corr_ad_args_parser.add_argument("--test_batch", type=int, nargs='?', default=1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
-    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=5000,
+    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=350,
                                          help="input the number of training epochs")
     mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                          help="input --save_model to save model weight and model info")
