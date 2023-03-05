@@ -450,7 +450,8 @@ if __name__ == "__main__":
     mts_corr_ad_cfg["graph_encoder"] = gine_encoder
     model =  MTSCorrAD(**mts_corr_ad_cfg)
     loss_fn = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5))))
     while (keep_training == True) and (try_training<100):
         try:
             try_training += 1 
