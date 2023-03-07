@@ -3,7 +3,7 @@
 #EXPORT TZ=Asia/Taipei 
 
 # Default values of arguments
-tr_batch=12
+tr_batch=32
 val_batch=1
 test_batch=1
 tr_epochs=1000

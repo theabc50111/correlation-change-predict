@@ -383,7 +383,7 @@ if __name__ == "__main__":
                                          help="input the number of training batch")
     mts_corr_ad_args_parser.add_argument("--test_batch", type=int, nargs='?', default=1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
-    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=350,
+    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
                                          help="input the number of training epochs")
     mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                          help="input --save_model to save model weight and model info")
@@ -455,10 +455,10 @@ if __name__ == "__main__":
     model =  MTSCorrAD(**mts_corr_ad_cfg)
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5))))
-    while (keep_training == True) and (try_training<100):
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    while (keep_training is True) and (try_training<100):
         try:
-            try_training += 1 
+            try_training += 1
             model, model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fn, epochs=args.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logging.error(f"\n{e}")
