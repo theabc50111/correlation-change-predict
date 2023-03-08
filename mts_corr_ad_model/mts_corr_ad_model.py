@@ -305,6 +305,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
                       }
     graph_enc_num_layers =  sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
+    best_model = []
     for epoch_i in tqdm(range(epochs)):
         train_model.train()
         train_loss = 0
