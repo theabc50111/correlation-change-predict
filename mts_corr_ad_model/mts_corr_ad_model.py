@@ -367,7 +367,7 @@ def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoa
 
 
 def save_model(model:torch.nn.Module, model_info:dict):
-    e_i = model_info["best_val_epoch"]
+    e_i = model_info.get("best_val_epoch")
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
     torch.save(model, model_dir/f"epoch_{e_i}-{t}.pt")
     with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
