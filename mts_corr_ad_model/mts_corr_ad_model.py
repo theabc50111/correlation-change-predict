@@ -23,6 +23,7 @@ from torch_geometric.nn import (GINConv, GINEConv, global_add_pool, summary)
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/ywt_library")
+from discriminate import  DiscriminationTester
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
 with open(data_config_path) as f:
@@ -289,16 +290,20 @@ def disc_test(test_model: torch.nn.Module, data_loader: torch_geometric.loader.d
 
 # ## Training Model
 def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dataloader.DataLoader,
-          val_loader: torch_geometric.loader.dataloader.DataLoader, optimizer, criterion, epochs: int = 5, show_model_info=False):
+          val_loader: torch_geometric.loader.dataloader.DataLoader, optim: torch.optim,
+          criterion: torch.nn.modules.loss, epochs: int = 5, show_model_info=False):
     best_model_info = {"num_training_graphs": len(train_loader.dataset),
                        "batchs_per_epoch": len(train_loader),
                        "epochs": epochs,
                        "train_batch": train_loader.batch_size,
                        "val_batch": val_loader.batch_size,
-                       "optimizer": str(optimizer),
+                       "optimizer": str(optim),
                        "criterion": str(criterion),
                        "graph_enc_w_grad_history": [],
-                       "graph_embeds_history": {"graph_embeds_pred": [], "y_graph_embeds":[]},
+                       "graph_embeds_history": {"graph_embeds_pred": [],
+                                                "y_graph_embeds":[],
+                                                "graph_embeds_disparity": {"train": {"min_disp": [], "median_disp": [], "max_disp": []},
+                                                                           "val": {"min_disp": [], "median_disp": [], "max_disp": []}}},
                        "min_val_loss": float('inf'),
                        "train_loss_history": [],
                        "val_loss_history": [],
@@ -306,6 +311,8 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     graph_enc_num_layers =  sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
     best_model = []
+    train_disc_tester = DiscriminationTester(criterion=criterion, data_loader=train_loader)
+    val_disc_tester = DiscriminationTester(criterion=criterion, data_loader=val_loader)
     for epoch_i in tqdm(range(epochs)):
         train_model.train()
         train_loss = 0
@@ -313,16 +320,17 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         for batch_i, data in enumerate(train_loader):
             x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
             y, y_edge_index, y_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-            optimizer.zero_grad()
+            optim.zero_grad()
             graph_embeds_pred = train_model(x, x_edge_index, x_batch_node_id, x_edge_attr)
             y_graph_embeds = train_model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id, y_edge_attr)
             loss =  criterion(graph_embeds_pred, y_graph_embeds)
             train_loss += loss / len(train_loader)
             loss.backward()
             graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad is not None else torch.zeros((1,)), (-1,)))) for p in islice(train_model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
-            optimizer.step()
+            optim.step()
             best_model_info["graph_embeds_history"]["graph_embeds_pred"].append(graph_embeds_pred.tolist())
             best_model_info["graph_embeds_history"]["y_graph_embeds"].append(y_graph_embeds.tolist())
+
 
         # Check if graph_encoder.parameters() have been updated
         assert graph_enc_w_grad_after>0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
@@ -334,6 +342,14 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         best_model_info["train_loss_history"].append(train_loss.item())
         best_model_info["val_loss_history"].append(val_loss.item())
         best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
+        tr_gra_embeds_disp = train_disc_tester.real_disc_test(train_model)
+        val_gra_embeds_disp = val_disc_tester.real_disc_test(train_model)
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["min_disp"].append(tr_gra_embeds_disp[0])
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["median_disp"].append(tr_gra_embeds_disp[1])
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["max_disp"].append(tr_gra_embeds_disp[2])
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["min_disp"].append(val_gra_embeds_disp[0])
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["median_disp"].append(val_gra_embeds_disp[1])
+        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["max_disp"].append(val_gra_embeds_disp[2])
         # record training history and save best model
         if val_loss<best_model_info["min_val_loss"]:
             best_model = train_model
@@ -350,7 +366,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     return best_model, best_model_info
 
 
-def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoader, criterion):
+def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss):
     model.eval()
     test_loss = 0
     with torch.no_grad():
@@ -394,7 +410,7 @@ if __name__ == "__main__":
                                          help="input the number of window length of correlation computing")
     mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
-    mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=3,
+    mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                                          help="input the number of graph embedding hidden size of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
                                          help="input the number of stacked-layers of gru")
