@@ -248,46 +248,6 @@ def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
     assert pred.shape == target.shape, "The shape of prediction and target aren't match"  # TODO
 
 
-def find_diff_t(data_loader: torch_geometric.loader.dataloader.DataLoader):
-    for batch_i, data in enumerate(data_loader):
-        logging.debug(f"batch_i: {batch_i}, type(data.dataset): {type(data.dataset)}, data.dataset.y[-1].x .shape: {data.dataset.y[-1].x.shape}, data.y[-1].edge_attr.shape:{data.y[-1].edge_attr.shape}")  # TODO
-
-
-# Discrimination test function
-def disc_test(test_model: torch.nn.Module, data_loader: torch_geometric.loader.dataloader.DataLoader,
-              amp: float = 1.5, pct: float = 0.1, test_mode: str = "real", artif_mode: str = "node" ):
-    if test_mode=="real":
-        find_diff_t(data_loader)  # TODO
-        #max_diff_t, min_diff_t = find_min_max_diff_t(data_loader)
-        #max_diff_data = islice(iter(test_loader), max_diff_t, max_diff_t+1)
-        #min_diff_data = islice(iter(test_loader), min_diff_t, min_diff_t+1)
-        #x, x_edge_index, x_batch_node_id, x_edge_attr = min_diff_data.x, min_diff_data.edge_index, min_diff_data.batch, min_diff_data.edge_attr
-        #new_x, new_x_edge_index, new_x_batch_node_id, new_x_edge_attr = max_diff_data.x, max_diff_data.edge_index, max_diff_data.batch, max_diff_data.edge_attr
-    elif test_mode=="artificial":
-        assert data_loader.batch_size == 1, "Batch size of data-loader should be 1."
-        data = next(iter(data_loader))
-        x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-        change_ind = np.zeros(shape=x.shape, dtype=bool)
-        while change_ind.sum() != int(torch.numel(x)*pct):
-            change_ind = np.random.choice([True, False], size=x.shape, p=[pct, 1-pct])
-        new_x, new_x_edge_index, new_x_batch_node_id, new_x_edge_attr = torch.clone(x), torch.clone(x_edge_index),\
-                                                                        torch.clone(x_batch_node_id), torch.clone(x_edge_attr)
-        #logging.info(f"change_ind.shape: {change_ind.shape}, new_x.shape:{new_x.shape}, new_x_edge_attr.shape: {new_x_edge_attr.shape}")
-        if artif_mode=="nodes":
-            new_x[change_ind] = new_x[change_ind]*amp
-        elif artif_mode=="edges":
-            #new_x_edge_index[change_ind] = new_x_edge_index[change_ind]*amp  # FIXME
-            pass
-        else:
-            new_x[change_ind] = new_x[change_ind]*amp
-            #new_x_edge_index[change_ind] = new_x_edge_index[change_ind]*amp
-
-
-    #x_graph_embeds = test_model.graph_encoder.get_embeddings(x, x_edge_index, x_batch_node_id)
-    #new_x_graph_embeds = test_model.graph_encoder.get_embeddings(new_x, x_edge_index, x_batch_node_id)
-    # check difference between (x_graph_embeds, new_x_graph_embeds)
-    #logging.info(loss(x_graph_embeds, new_x_graph_embeds))
-
 # ## Training Model
 def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dataloader.DataLoader,
           val_loader: torch_geometric.loader.dataloader.DataLoader, optim: torch.optim,
