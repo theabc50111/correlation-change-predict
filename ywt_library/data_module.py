@@ -22,6 +22,13 @@ with open(data_config_path) as f:
     data = dynamic_yaml.load(f)
     data_cfg = yaml.full_load(dynamic_yaml.dump(data))
 
+logger = logging.getLogger(__name__)
+logger_console = logging.StreamHandler()
+logger_formatter = logging.Formatter('%(levelname)-8s [%(filename)s] %(message)s')
+logger_console.setFormatter(logger_formatter)
+logger.addHandler(logger_console)
+logger.setLevel(logging.INFO)
+warnings.simplefilter("ignore")
 
 def _process_index(items):
     item_1 = items[0].strip(" ")
@@ -243,9 +250,6 @@ if __name__ == "__main__":
     data_args_parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                         help="input --save_corr_graph_arr to save correlation graph data")
     args = data_args_parser.parse_args()
-    warnings.simplefilter("ignore")
-    logging.basicConfig(format='%(levelname)-8s [%(filename)s] \n%(message)s',
-                        level=logging.INFO)
     logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
     logging.info(pformat(vars(args), indent=1, width=100, compact=True))
     # logging.info(pprint(args))

@@ -1,3 +1,4 @@
+import logging
 from itertools import product
 
 import numpy as np
@@ -5,7 +6,12 @@ import torch
 import torch_geometric
 from torch_geometric.utils import unbatch, unbatch_edge_index
 
-
+logger = logging.getLogger(__name__)
+logger_console = logging.StreamHandler()
+logger_formatter = logging.Formatter('%(levelname)-8s [%(filename)s] %(message)s')
+logger_console.setFormatter(logger_formatter)
+logger.addHandler(logger_console)
+logger.setLevel(logging.INFO)
 
 # set devide of pytorch
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -37,18 +43,24 @@ class DiscriminationTester:
         graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[[0, int(len(graphs_disparity)/2), -1]] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
         output_graph_idx = [0] + graph_disp_min_med_max_idx.tolist()
 
-        return [{"x": x_list[i], "x_edge_attr": x_edge_attr_list[i], "graph_disp": criterion(x_edge_attr_list[0], x_edge_attr_list[i]).item()} for i in output_graph_idx]
+        return [{"x": x_list[i], "x_edge_attr": x_edge_attr_list[i], "graph_disp": criterion(x_list[0], x_list[i]).item() + criterion(x_edge_attr_list[0], x_edge_attr_list[i]).item() } for i in output_graph_idx]
 
 
-    def test_real_disc(self, test_model: torch.nn.Module):
+    def gen_real_disc(self, test_model: torch.nn.Module):
         """
-        Use real data to test discirmination power
+        Use real data to test discirmination power of graph embeds
         """
         first_batch_data = next(iter(self.data_loader))
         num_nodes = unbatch(first_batch_data.x, first_batch_data.batch)[0].shape[0]
         first_edge_index = unbatch_edge_index(first_batch_data.edge_index, first_batch_data.batch)[0]
         first_batch_node_id = first_batch_data.batch[:num_nodes]
         graphs_info = self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info
-        graph_embeds_list = [test_model.graph_encoder.get_embeddings(g_info["x"], first_edge_index, first_batch_node_id, g_info["x_edge_attr"]) for g_info in graphs_info]
 
-        return tuple([self.criterion(gra_emb[0], gra_emb[1]).item() for gra_emb in product(graph_embeds_list[0], graph_embeds_list[1:])])
+        for i, g_info in enumerate(graphs_info):
+            if i == 0:
+                comp_gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], first_edge_index, first_batch_node_id, g_info["x_edge_attr"])
+            else:
+                gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], first_edge_index, first_batch_node_id, g_info["x_edge_attr"])
+                real_gra_dispiraty = self.criterion(comp_gra_embeds, gra_embeds).item()
+                logger.debug(f"No.{i}, graph_embeds_dispiraty: {real_gra_dispiraty}, graph_dispiraty: {g_info['graph_disp']}")
+                yield real_gra_dispiraty

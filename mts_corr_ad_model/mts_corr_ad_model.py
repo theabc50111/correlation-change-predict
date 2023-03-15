@@ -30,9 +30,23 @@ with open(data_config_path) as f:
     data_cfg_yaml = dynamic_yaml.load(f)
     data_cfg = yaml.full_load(dynamic_yaml.dump(data_cfg_yaml))
 
+logger = logging.getLogger(__name__)
+logger_console = logging.StreamHandler()
+logger_formatter = logging.Formatter('%(levelname)-8s [%(filename)s] %(message)s')
+logger_console.setFormatter(logger_formatter)
+logger.addHandler(logger_console)
+discriminate_logger = logging.getLogger("discriminate")
+matplotlib_logger = logging.getLogger("matplotlib")
+logger.setLevel(logging.INFO)
+discriminate_logger.setLevel(logging.INFO)
+matplotlib_logger.setLevel(logging.ERROR)
+mpl.rcParams[u'font.sans-serif'] = ['simhei']
+mpl.rcParams['axes.unicode_minus'] = False
+warnings.simplefilter("ignore")
+
 # ## Load Graph Data
 def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.ndarray):
-    logging.info(f"graph_arr.shape:{graph_arr.shape}")
+    logger.info(f"graph_arr.shape:{graph_arr.shape}")
     graph_time_step = graph_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     node_attr = torch.tensor(np.ones((graph_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
     edge_index = torch.tensor(list(product(range(graph_arr.shape[1]), repeat=2)))
@@ -46,8 +60,8 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.nd
     else:
         #model_cfg["dim_out"] = data.y.shape[0]  # turn on this if the input of loss-function graphs
         model_cfg["num_node_features"] = data.num_node_features
-        logging.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}; ")
-        logging.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
+        logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}; ")
+        logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
     # Create training, validation, and test sets
     train_dataset = dataset[:int(len(dataset) * 0.9)]
@@ -60,31 +74,31 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.nd
     test_loader = DataLoader(test_dataset, batch_size=data_loader_cfg["test_batch"], shuffle=False)
 
     # show info
-    logging.info(f'Training set   = {len(train_dataset)} graphs')
-    logging.info(f'Validation set = {len(val_dataset)} graphs')
-    logging.info(f'Test set       = {len(test_dataset)} graphs')
-    logging.debug('Train loader:')
+    logger.info(f'Training set   = {len(train_dataset)} graphs')
+    logger.info(f'Validation set = {len(val_dataset)} graphs')
+    logger.info(f'Test set       = {len(test_dataset)} graphs')
+    logger.debug('Train loader:')
     for i, subgraph in enumerate(train_loader):
-        logging.debug(f' - Subgraph {i}: {subgraph} ; Subgraph {i}.num_graphs:{subgraph.num_graphs}')
+        logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph {i}.num_graphs:{subgraph.num_graphs}')
 
-    logging.debug('Validation loader:')
+    logger.debug('Validation loader:')
     for i, subgraph in enumerate(val_loader):
-        logging.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs}')
+        logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs}')
 
-    logging.debug('Test loader:')
+    logger.debug('Test loader:')
     for i, subgraph in enumerate(test_loader):
-        logging.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs}')
+        logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs}')
 
-    logging.debug('Peeking Train data:')
+    logger.debug('Peeking Train data:')
     data_x_nodes = next(iter(train_loader)).x.reshape(train_loader.batch_size, -1)
     data_x_edges = next(iter(train_loader)).edge_attr.reshape(train_loader.batch_size, -1)
     data_y_nodes = torch.cat([y.x for y in next(iter(train_loader)).y]).reshape(train_loader.batch_size, -1)
     data_y_edges = torch.cat([y.edge_attr for y in next(iter(train_loader)).y]).reshape(train_loader.batch_size, -1)
     for i in range(data_loader_cfg["tr_batch"]):
-        logging.debug(f"\n batch0_x{i}.shape: {data_x_nodes[i].shape} \n batch0_x{i}[:5]:{data_x_nodes[i][:5]}")
-        logging.debug(f"\n batch0_x{i}_edges.shape: {data_x_edges[i].shape} \n batch0_x{i}_edges[:5]:{data_x_edges[i][:5]}")
-        logging.debug(f"\n batch0_y{i}.shape: {data_y_nodes[i].shape} \n batch0_y{i}[:5]:{data_y_nodes[i][:5]}")
-        logging.debug(f"\n batch0_y{i}_edges.shape: {data_y_edges[i].shape} \n batch0_y{i}_edges[:5]:{data_y_edges[i][:5]}")
+        logger.debug(f"\n batch0_x{i}.shape: {data_x_nodes[i].shape} \n batch0_x{i}[:5]:{data_x_nodes[i][:5]}")
+        logger.debug(f"\n batch0_x{i}_edges.shape: {data_x_edges[i].shape} \n batch0_x{i}_edges[:5]:{data_x_edges[i][:5]}")
+        logger.debug(f"\n batch0_y{i}.shape: {data_y_nodes[i].shape} \n batch0_y{i}[:5]:{data_y_nodes[i][:5]}")
+        logger.debug(f"\n batch0_y{i}_edges.shape: {data_y_edges[i].shape} \n batch0_y{i}_edges[:5]:{data_y_edges[i][:5]}")
 
     return train_loader, val_loader, test_loader
 
@@ -302,14 +316,20 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         best_model_info["train_loss_history"].append(train_loss.item())
         best_model_info["val_loss_history"].append(val_loss.item())
         best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
-        tr_gra_embeds_disp = train_disc_tester.test_real_disc(train_model)
-        val_gra_embeds_disp = val_disc_tester.test_real_disc(train_model)
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["min_disp"].append(tr_gra_embeds_disp[0])
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["median_disp"].append(tr_gra_embeds_disp[1])
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["max_disp"].append(tr_gra_embeds_disp[2])
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["min_disp"].append(val_gra_embeds_disp[0])
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["median_disp"].append(val_gra_embeds_disp[1])
-        best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["max_disp"].append(val_gra_embeds_disp[2])
+        tr_gra_embeds_disp_iter = train_disc_tester.gen_real_disc(train_model)
+        val_gra_embeds_disp_iter = val_disc_tester.gen_real_disc(train_model)
+        for k, tr_gra_embeds_disp, val_gra_embeds_disp in zip(["min_disp", "median_disp", "max_disp"], tr_gra_embeds_disp_iter, val_gra_embeds_disp_iter):
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"][k].append(tr_gra_embeds_disp)
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"][k].append(val_gra_embeds_disp)
+            logger.debug(f"{k} of train graph: {tr_gra_embeds_disp}, {k} of val graph: {val_gra_embeds_disp}")
+        #tr_gra_embeds_disp = train_disc_tester.gen_real_disc(train_model)
+        #val_gra_embeds_disp = val_disc_tester.gen_real_disc(train_model)
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["min_disp"].append(tr_gra_embeds_disp[0])
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["median_disp"].append(tr_gra_embeds_disp[1])
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"]["max_disp"].append(tr_gra_embeds_disp[2])
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["min_disp"].append(val_gra_embeds_disp[0])
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["median_disp"].append(val_gra_embeds_disp[1])
+        #best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"]["max_disp"].append(val_gra_embeds_disp[2])
         # record training history and save best model
         if val_loss<best_model_info["min_val_loss"]:
             best_model = train_model
@@ -319,9 +339,9 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         # observe model info in console
         if show_model_info and epoch_i==0:
             best_model_info["model_structure"] = str(train_model) + "\n" + "="*100 + "\n" + str(summary(train_model, data.x, data.edge_index, data.batch, data.edge_attr, max_depth=20))
-            logging.info(f"\nNumber of graphs:{data.num_graphs} in No.{batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
+            logger.info(f"\nNumber of graphs:{data.num_graphs} in No.{batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
         if epoch_i % 10 == 0:  # show metrics every 10 epochs
-            logging.info(f"Epoch {epoch_i:>3} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} ")
+            logger.info(f"Epoch {epoch_i:>3} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} ")
 
     return best_model, best_model_info
 
@@ -349,7 +369,7 @@ def save_model(model:torch.nn.Module, model_info:dict):
     with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
         json_str = json.dumps(model_info)
         f.write(json_str)
-    logging.info(f"model has been saved in:{model_dir}")
+    logger.info(f"model has been saved in:{model_dir}")
 
 
 if __name__ == "__main__":
@@ -377,21 +397,12 @@ if __name__ == "__main__":
     mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=8,
                                          help="input the number of gru hidden size")
     args = mts_corr_ad_args_parser.parse_args()
-    warnings.simplefilter("ignore")
-    logging.basicConfig(format='%(levelname)-8s [%(filename)s] %(message)s',
-                        level=logging.INFO)
-    matplotlib_logger = logging.getLogger("matplotlib")
-    matplotlib_logger.setLevel(logging.ERROR)
-    mpl.rcParams[u'font.sans-serif'] = ['simhei']
-    mpl.rcParams['axes.unicode_minus'] = False
-    # logger_list = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-    # loggin.debug(logger_list)
-    logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logging.info(pformat(f"\n{vars(args)}", indent=1, width=25, compact=True))
+    logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
+    logger.info(pformat(f"\n{vars(args)}", indent=1, width=25, compact=True))
 
     # ## Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logging.info(data_cfg["DATASETS"].keys())
+    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
@@ -402,8 +413,8 @@ if __name__ == "__main__":
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
     torch.set_default_tensor_type(torch.cuda.FloatTensor)
-    logging.info(f"===== file_name basis:{output_file_name} =====")
-    logging.info(f"===== pytorch running on:{device} =====")
+    logger.info(f"===== file_name basis:{output_file_name} =====")
+    logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = args.corr_stride, args.corr_window
     graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}-graph_data"
@@ -438,7 +449,7 @@ if __name__ == "__main__":
             try_training += 1
             model, model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fn, epochs=args.tr_epochs, show_model_info=True)
         except AssertionError as e:
-            logging.error(f"\n{e}")
+            logger.error(f"\n{e}")
         except Exception as e:
             keep_training = False
             error_class = e.__class__.__name__  # 取得錯誤類型
@@ -449,12 +460,9 @@ if __name__ == "__main__":
             line_num = last_call_stack[1]  # 取得發生的行號
             func_name = last_call_stack[2]  # 取得發生的函數名稱
             err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
-            logging.error(f"===\n{err_msg}")
-            logging.error(f"===\n{traceback.extract_tb(tb)}")
+            logger.error(f"===\n{err_msg}")
+            logger.error(f"===\n{traceback.extract_tb(tb)}")
         else:
             keep_training = False
             if save_model_info:
                 save_model(model, model_info)
-
-    #disc_test(test_model=model, data_loader=test_loader, test_mode="artificial")
-    #disc_test(test_model=model, data_loader=train_loader, test_mode="real")
