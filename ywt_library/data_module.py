@@ -103,17 +103,17 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
     all_set = list(dataset_df.columns)  # all data
     train_set = data_cfg["DATASETS"][data_implement]['TRAIN_SET']
     test_set = data_cfg['DATASETS'][data_implement]['TEST_SET'] if data_cfg['DATASETS'][data_implement].get('TEST_SET') else [p for p in all_set if p not in train_set]  # all data - train data
-    logging.info(f"\n===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
+    logger.info(f"\n===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
 
     # train items implement settings
     items_implement = train_set if train_items_setting == "-train_train" else all_set
     target_df = dataset_df.loc[::,items_implement]
-    logging.info(f"\n===== len(train set): {len(items_implement)} =====")
+    logger.info(f"\n===== len(train set): {len(items_implement)} =====")
 
     # setting of name of output files and pictures title
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
-    logging.info(f"\n===== file_name basis:{output_file_name} =====")
-    logging.info(f"\n===== overview dataset_df =====\n{dataset_df}")
+    logger.info(f"\n===== file_name basis:{output_file_name} =====")
+    logger.info(f"\n===== overview dataset_df =====\n{dataset_df}")
     
     # input folder settings
     corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-corr_data"
@@ -137,7 +137,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
 
     if data_split_setting == "-data_sp_test2":
         corr_dataset = corr_datasets[3]
-        logging.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
+        logger.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
         return target_df, corr_dataset, output_file_name
 
 
@@ -198,16 +198,54 @@ def gen_corr_mat_thru_t(corr_dataset, target_df, save_dir: Path = None, graph_ma
     for i in show_mat_info_inds:
         corr_spatial = corr_dataset.iloc[::,i]
         display_corr_mat = gen_corr_dist_mat(corr_spatial, target_df, out_mat_compo=graph_mat_compo)
-        logging.info(f"correlation graph of No.{i} time-step")
-        logging.info(f"correlation graph.shape:{flat_graphs_arr[0].shape}")
-        logging.info(f"number of correlation graph:{len(flat_graphs_arr)}")
-        logging.info(f"\nMin of corr_mat:{display_corr_mat.min()}")
-        logging.info(f"\n{display_corr_mat.shape}")
-        logging.info(f"\n{display_corr_mat.head()}")
-        logging.info("=" * 70)
+        logger.info(f"correlation graph of No.{i} time-step")
+        logger.info(f"correlation graph.shape:{flat_graphs_arr[0].shape}")
+        logger.info(f"number of correlation graph:{len(flat_graphs_arr)}")
+        logger.info(f"\nMin of corr_mat:{display_corr_mat.min()}")
+        logger.info(f"\n{display_corr_mat.shape}")
+        logger.info(f"\n{display_corr_mat.head()}")
+        logger.info("=" * 70)
 
+def gen_filtered_corr_mat_thru_t(src_dir: Path, filter_mode: str = None, quantile: float = 0, save_dir: Path = None):
+    """
+    Create filttered correlation matrix by given conditions.
+    """
+    is_filter_centered_zero = False
+    s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+    corr_mats = np.load(src_dir/f"corr_s{s_l}_w{w_l}_graph.npy")
+    res_mats = corr_mats.copy()
+    if filter_mode == "keep_positive":
+        mask = corr_mats < 0
+        res_mats[mask] = np.NaN
+    elif filter_mode == "keep_abs":
+        res_mats = np.absolute(res_mats)
+    elif filter_mode == "keep_strong":
+        assert quantile != 0, "Need to set quantile in keep_strong mode"
+        is_filter_centered_zero = True
 
-def calc_corr_ser_property(corr_dataset: "pd.DataFrame", corr_property_df_path: "pathlib.PosixPath"):
+    if is_filter_centered_zero:
+        mask_begin = np.quantile(res_mats[res_mats<=0], 1-quantile)
+        mask_end = np.quantile(res_mats[res_mats>=0], quantile)
+    else:
+        mask_begin = 0
+        mask_end = np.quantile(res_mats[~np.isnan(res_mats)], quantile)
+    logger.info(f"==================== mask range: {mask_begin} ~ {mask_end} ======================")
+
+    if quantile:
+        num_ele_bf_quan_mask = res_mats[~np.isnan(res_mats)].size
+        mask = np.logical_and(res_mats > mask_begin, res_mats < mask_end)
+        res_mats[mask] = np.NaN
+        logger.debug(f"Keeping percentage of filtered data: {res_mats[~np.isnan(res_mats)].size / num_ele_bf_quan_mask}")
+        logger.debug(f"Keeping percentage of all data: {res_mats[~np.isnan(res_mats)].size / res_mats.size}")
+        logger.debug(f"res_mats.shape:{res_mats.shape}, res_mats.size: {res_mats.size}, res_mats[~np.isnan(res_mats)].size: {res_mats[~np.isnan(res_mats)].size}")
+        logger.debug(f"quantiles of res_mats:{[np.quantile(res_mats[~np.isnan(res_mats)], i/4) for i in range(5)]}")
+    if save_dir:
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_filt_graph.npy", res_mats)
+
+def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Path):
+    """
+    Produce property of correlation series in form of dataframe
+    """
     if corr_property_df_path.exists():
         corr_property_df = pd.read_csv(corr_property_df_path).set_index("items")
     else:
@@ -234,8 +272,8 @@ if __name__ == "__main__":
     data_args_parser.add_argument("--max_data_div_start_add", type=int, nargs='?', default=0,
                         help="input the number of diversifing setting")   # value:range(0,80,20);
                                                                           # 0 is strongly recommnded;
-                                                                          # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE); 
-                                                                          # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series, 
+                                                                          # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE);
+                                                                          # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series,
                                                                           # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
     data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
                         help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
@@ -245,15 +283,18 @@ if __name__ == "__main__":
                         help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
     data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
                         help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
+    data_args_parser.add_argument("--filt_gra_mode", type=str, nargs='?', default="keep_positive",
+                        help="Decide filtering mode of graph_matrix\n    - keep_positive : remove all negative correlation \n    - keep_strong : remove weak correlation \n    - keep_abs : transform all negative correlation to positive")
+    data_args_parser.add_argument("--filt_gra_quan", type=float, nargs='?', default=0.5,
+                        help="Decide filtering quantile")
     data_args_parser.add_argument("--save_corr_data", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                         help="input --save_corr_data to save correlation data")
     data_args_parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                         help="input --save_corr_graph_arr to save correlation graph data")
     args = data_args_parser.parse_args()
-    logging.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logging.info(pformat(vars(args), indent=1, width=100, compact=True))
-    # logging.info(pprint(args))
-    
+    logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
+    logger.info(pformat(vars(args), indent=1, width=100, compact=True))
+
     # generate correlation matrix across time
     data_gen_cfg = {}
     data_gen_cfg['CORR_STRIDE'] = args.corr_stride
@@ -266,10 +307,13 @@ if __name__ == "__main__":
                                                               data_split_setting=args.data_split_setting,
                                                               train_items_setting=args.train_items_setting,
                                                               save_corr_data=args.save_corr_data)
-    res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
-    res_dir.mkdir(parents=True, exist_ok=True)
+    gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
+    filtered_gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-filtered_graph_data/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
+    gra_res_dir.mkdir(parents=True, exist_ok=True)
+    filtered_gra_res_dir.mkdir(parents=True, exist_ok=True)
     gen_corr_mat_thru_t(corr_dataset,
                         target_df,
                         graph_mat_compo=args.graph_mat_compo,
-                        save_dir=res_dir if args.save_corr_graph_arr else None,
+                        save_dir=gra_res_dir if args.save_corr_graph_arr else None,
                         show_mat_info_inds=[0,1,2,12])
+    gen_filtered_corr_mat_thru_t(gra_res_dir, filter_mode=args.filt_gra_mode, quantile=args.filt_gra_quan, save_dir=filtered_gra_res_dir if args.save_corr_graph_arr else None)

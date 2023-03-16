@@ -46,7 +46,7 @@ class DiscriminationTester:
         return [{"x": x_list[i], "x_edge_attr": x_edge_attr_list[i], "graph_disp": criterion(x_list[0], x_list[i]).item() + criterion(x_edge_attr_list[0], x_edge_attr_list[i]).item() } for i in output_graph_idx]
 
 
-    def gen_real_disc(self, test_model: torch.nn.Module):
+    def yield_real_disc(self, test_model: torch.nn.Module):
         """
         Use real data to test discirmination power of graph embeds
         """
