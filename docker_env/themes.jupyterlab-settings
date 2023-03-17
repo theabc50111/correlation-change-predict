@@ -1,0 +1,22 @@
+{
+    // Theme
+    // @jupyterlab/apputils-extension:themes
+    // Theme manager settings.
+    // *************************************
+
+    // Theme CSS Overrides
+    // Override theme CSS variables by setting key-value pairs here
+    "overrides": {
+        "content-font-size1": "18px",
+        "code-font-size": "18px",
+        "ui-font-size1": "16px"
+    },
+
+    // Selected Theme
+    // Application-level visual styling theme
+    "theme": "JupyterLab Dark",
+
+    // Scrollbar Theming
+    // Enable/disable styling of the application scrollbars
+    "theme-scrollbars": false
+}

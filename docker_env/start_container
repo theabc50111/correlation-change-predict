@@ -1,0 +1,61 @@
+#! /bin/bash
+set -u
+
+execution=true;
+
+while getopts p:f:n:g:d:h flag
+do
+    case "${flag}" in
+        f) folder_path=${OPTARG};;
+        p) port=${OPTARG};;
+        n) container_name=${OPTARG};;
+        g) gpu=${OPTARG};;
+	    d) deamon=${OPTARG};;
+        h)       
+           echo "-f : folder_path
+-p : port number of release port
+-n : container name
+-g : container run with gpu or not
+-d : container run in deamon style or not
+" 
+    execution=false;;
+    esac
+done
+
+
+
+if $execution ;
+then
+    if [ -n "$deamon" ];
+    then
+        if [ -n "$gpu" ];
+        then
+            echo "Run contianer in deamon!!!!!!!!!"
+            docker container run --gpus all -it --rm -d -p $port:8888 \
+            --mount type=bind,source=$folder_path,target=/workspace \
+            --name $container_name \
+            abc50111/pytorch:thesis
+        else
+            echo "Run contianer in deamon!!!!!!!!!"
+            docker container run -it --rm -d -p $port:8888 \
+            --mount type=bind,source=$folder_path,target=/workspace \
+            --name $container_name \
+            abc50111/pytorch:thesis
+        fi
+    else
+        if [ -n "$gpu" ];
+        then
+            docker container run --gpus all -it --rm -p $port:8888 \
+            --mount type=bind,source=$folder_path,target=/workspace \
+            --name $container_name \
+            abc50111/pytorch:thesis
+        else
+            docker container run -it --rm -p $port:8888 \
+            --mount type=bind,source=$folder_path,target=/workspace \
+            --name $container_name \
+            abc50111/pytorch:thesis
+        fi
+    fi
+else
+    echo "When help documents show, Not execute docker"
+fi
