@@ -7,7 +7,7 @@ import sys
 import traceback
 import warnings
 from datetime import datetime
-from itertools import islice, product
+from itertools import islice
 from pathlib import Path
 from pprint import pformat
 
@@ -24,7 +24,8 @@ from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/ywt_library")
-from discriminate import  DiscriminationTester
+from discriminate import DiscriminationTester
+
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
 with open(data_config_path) as f:
@@ -38,10 +39,10 @@ logger_console.setFormatter(logger_formatter)
 logger.addHandler(logger_console)
 discriminate_logger = logging.getLogger("discriminate")
 matplotlib_logger = logging.getLogger("matplotlib")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 discriminate_logger.setLevel(logging.INFO)
 matplotlib_logger.setLevel(logging.ERROR)
-mpl.rcParams[u'font.sans-serif'] = ['simhei']
+mpl.rcParams['font.sans-serif'] = ['simhei']
 mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
@@ -50,29 +51,19 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.nd
     logger.info(f"graph_arr.shape:{graph_arr.shape}")
     graph_time_step = graph_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     node_attr = torch.tensor(np.ones((graph_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
-    #edge_index = torch.tensor(list(product(range(graph_arr.shape[1]), repeat=2)))
     dataset = []
     for g_t in range(graph_time_step):
-
         edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_arr[g_t])), axis=1))
-        edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_arr[g_t])), axis=1))
-
-
+        edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_arr[g_t + 1])), axis=1))
         edge_attr = torch.tensor(graph_arr[g_t][~np.isnan(graph_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
         edge_attr_next_t = torch.tensor(graph_arr[g_t + 1][~np.isnan(graph_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
-        #edge_attr = torch.tensor(np.hstack(graph_arr[g_t]).reshape(-1, 1), dtype=torch.float32)
-        #edge_attr_next_t = torch.tensor(np.hstack(graph_arr[g_t + 1]).reshape(-1, 1), dtype=torch.float32)
-
         data_y = Data(x=node_attr, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
-        #data_y = Data(x=node_attr, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr_next_t)
-
         data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         dataset.append(data)
-    else:
-        #model_cfg["dim_out"] = data.y.shape[0]  # turn on this if the input of loss-function graphs
-        model_cfg["num_node_features"] = data.num_node_features
-        logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}; ")
-        logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
+    #model_cfg["dim_out"] = data.y.shape[0]  # turn on this if the input of loss-function graphs
+    model_cfg["num_node_features"] = data.num_node_features
+    logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
+    logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
     # Create training, validation, and test sets
     train_dataset = dataset[:int(len(dataset) * 0.9)]
@@ -102,24 +93,26 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.nd
 
     logger.debug('Peeking Train data:')
     first_batch_data = next(iter(train_loader))
-    data_x_nodes = unbatch(first_batch_data.x, first_batch_data.batch)
-    data_x_edges_ind = unbatch_edge_index(first_batch_data.edge_index, first_batch_data.batch)
+    data_x_nodes_list = unbatch(first_batch_data.x, first_batch_data.batch)
+    data_x_edges_ind_list = unbatch_edge_index(first_batch_data.edge_index, first_batch_data.batch)
     batch_edge_attr_start_ind = 0
 
     for i in range(data_loader_cfg["tr_batch"]):
-        batch_edge_attr_end_ind = data_x_edges_ind[i].shape[1]
+        batch_edge_attr_end_ind = data_x_edges_ind_list[i].shape[1] + batch_edge_attr_start_ind
+        data_x_nodes = data_x_nodes_list[i]
+        data_x_edges_ind = data_x_edges_ind_list[i]
         data_x_edges = first_batch_data.edge_attr[batch_edge_attr_start_ind: batch_edge_attr_end_ind]
-        batch_edge_attr_start_ind = batch_edge_attr_end_ind
         data_y = first_batch_data.y[i]
         data_y_nodes = data_y.x
         data_y_edges = data_y.edge_attr
         data_y_edges_ind = data_y.edge_index
-        logger.debug(f"\n batch0_x{i}.shape: {data_x_nodes[i].shape} \n batch0_x{i}[:5]:{data_x_nodes[i][:5]}")
+        logger.debug(f"\n batch0_x{i}.shape: {data_x_nodes.shape} \n batch0_x{i}[:5]:{data_x_nodes[:5]}")
         logger.debug(f"\n batch0_x{i}_edges.shape: {data_x_edges.shape} \n batch0_x{i}_edges[:5]:{data_x_edges[:5]}")
-        logger.debug(f"\n batch0_x{i}_edges_ind.shape: {data_x_edges_ind[i].shape} \n batch0_x{i}_edges_ind[:5]:{data_x_edges_ind[i][::, :5]}")
+        logger.debug(f"\n batch0_x{i}_edges_ind.shape: {data_x_edges_ind.shape} \n batch0_x{i}_edges_ind[:5]:{data_x_edges_ind[::, :5]}")
         logger.debug(f"\n batch0_y{i}.shape: {data_y_nodes.shape} \n batch0_y{i}[:5]:{data_y_nodes[:5]}")
         logger.debug(f"\n batch0_y{i}_edges.shape: {data_y_edges.shape} \n batch0_y{i}_edges[:5]:{data_y_edges[:5]}")
         logger.debug(f"\n batch0_y{i}_edges_ind.shape: {data_y_edges_ind.shape} \n batch0_y{i}_edges_ind[:5]:{data_y_edges_ind[::, :5]}")
+        batch_edge_attr_start_ind = batch_edge_attr_end_ind
 
     return train_loader, val_loader, test_loader
 
@@ -141,7 +134,7 @@ class GineEncoder(torch.nn.Module):
             if i:
                 nn = Sequential(Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h), 
+                                Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU())
             else:
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
@@ -306,15 +299,15 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     graph_enc_num_layers =  sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
     best_model = []
-    train_disc_tester = DiscriminationTester(criterion=criterion, data_loader=train_loader)
-    val_disc_tester = DiscriminationTester(criterion=criterion, data_loader=val_loader)
+    train_disc_tester = DiscriminationTester(criterion=criterion, data_loader=train_loader, x_edge_attr_mats=gra_edges_data_mats[:int((len(gra_edges_data_mats) - 1) * 0.9)])  # the graph of last "t" can't be used as train data
+    val_disc_tester = DiscriminationTester(criterion=criterion, data_loader=val_loader, x_edge_attr_mats=gra_edges_data_mats[int((len(gra_edges_data_mats) - 1) * 0.9):int((len(gra_edges_data_mats) - 1) * 0.95)])  # the graph of last "t" can't be used as train data
     for epoch_i in tqdm(range(epochs)):
         train_model.train()
         train_loss = 0
         # Train on batches
-        for batch_i, data in enumerate(train_loader):
-            x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-            y, y_edge_index, y_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
+        for batch_i, batched_data in enumerate(train_loader):
+            x, x_edge_index, x_batch_node_id, x_edge_attr = batched_data.x, batched_data.edge_index, batched_data.batch, batched_data.edge_attr
+            y, y_edge_index, y_batch_node_id, y_edge_attr = batched_data.y[-1].x, batched_data.y[-1].edge_index, torch.zeros(batched_data.y[-1].x.shape[0], dtype=torch.int64), batched_data.y[-1].edge_attr  # only take y of x with last time-step on training
             optim.zero_grad()
             graph_embeds_pred = train_model(x, x_edge_index, x_batch_node_id, x_edge_attr)
             y_graph_embeds = train_model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id, y_edge_attr)
@@ -325,6 +318,9 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
             optim.step()
             best_model_info["graph_embeds_history"]["graph_embeds_pred"].append(graph_embeds_pred.tolist())
             best_model_info["graph_embeds_history"]["y_graph_embeds"].append(y_graph_embeds.tolist())
+        else:
+            log_model_info_data = batched_data
+            log_model_info_batch_i = batch_i
 
 
         # Check if graph_encoder.parameters() have been updated
@@ -352,34 +348,33 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
 
         # observe model info in console
         if show_model_info and epoch_i==0:
-            best_model_info["model_structure"] = str(train_model) + "\n" + "="*100 + "\n" + str(summary(train_model, data.x, data.edge_index, data.batch, data.edge_attr, max_depth=20))
-            logger.info(f"\nNumber of graphs:{data.num_graphs} in No.{batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
+            best_model_info["model_structure"] = str(train_model) + "\n" + "="*100 + "\n" + str(summary(train_model, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, max_depth=20))
+            logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
         if epoch_i % 10 == 0:  # show metrics every 10 epochs
             logger.info(f"Epoch {epoch_i:>3} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f} ")
 
     return best_model, best_model_info
 
 
-def test(model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss):
-    model.eval()
+def test(test_model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss):
+    test_model.eval()
     test_loss = 0
     with torch.no_grad():
-        for batch_i, data in enumerate(loader):
-            data
-            x, x_edge_index, x_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-            y, y_edge_index, y_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-            graph_embeds_pred = model(x, x_edge_index, x_batch_node_id, x_edge_attr)
-            y_graph_embeds = model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id, y_edge_attr)
+        for batched_data in loader:
+            x, x_edge_index, x_batch_node_id, x_edge_attr = batched_data.x, batched_data.edge_index, batched_data.batch, batched_data.edge_attr
+            y, y_edge_index, y_batch_node_id, y_edge_attr = batched_data.y[-1].x, batched_data.y[-1].edge_index, torch.zeros(batched_data.y[-1].x.shape[0], dtype=torch.int64), batched_data.y[-1].edge_attr  # only take y of x with last time-step on training
+            graph_embeds_pred = test_model(x, x_edge_index, x_batch_node_id, x_edge_attr)
+            y_graph_embeds = test_model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id, y_edge_attr)
             loss = criterion(graph_embeds_pred, y_graph_embeds)
             test_loss += loss / len(loader)
 
     return test_loss
 
 
-def save_model(model:torch.nn.Module, model_info:dict):
+def save_model(unsaved_model:torch.nn.Module, model_info:dict):
     e_i = model_info.get("best_val_epoch")
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
-    torch.save(model, model_dir/f"epoch_{e_i}-{t}.pt")
+    torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t}.pt")
     with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
         json_str = json.dumps(model_info)
         f.write(json_str)
@@ -402,6 +397,10 @@ if __name__ == "__main__":
                                          help="input the number of stride length of correlation computing")
     mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
                                          help="input the number of window length of correlation computing")
+    mts_corr_ad_args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
+                                         help="input the filtered mode of graph edges")
+    mts_corr_ad_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
+                                         help="input the filtered quantile of graph edges")
     mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
@@ -412,7 +411,7 @@ if __name__ == "__main__":
                                          help="input the number of gru hidden size")
     args = mts_corr_ad_args_parser.parse_args()
     logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logger.info(pformat(f"\n{vars(args)}", indent=1, width=25, compact=True))
+    logger.info(pformat(f"\n{vars(args)}", indent=1, width=40, compact=True))
 
     # ## Data implement & output setting & testset setting
     # data implement setting
@@ -431,8 +430,7 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = args.corr_stride, args.corr_window
-    graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}-graph_data"
-    filtered_graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}-filtered_graph_data/keep_strong-quan05"
+    graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}-filtered_graph_data/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}-graph_data"
     model_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
     model_log_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -446,39 +444,37 @@ if __name__ == "__main__":
                        "gra_enc_h": args.gra_enc_h,
                        "gru_l": args.gru_l,
                        "gru_h": args.gru_h}
-    keep_training = True
-    try_training = 0
-    graph_data_arr = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_graph.npy")  # each graph consist of 66 node & 66^2 edges
-    filtered_graph_data_arr = np.load(filtered_graph_data_dir / f"corr_s{s_l}_w{w_l}_filt_graph.npy")  # each graph consist of 66 node & 66^2 edges
-    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_arr=filtered_graph_data_arr)
-    #mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
-    #mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
-    #gin_encoder = GinEncoder(**mts_corr_ad_cfg)
-    #gine_encoder = GineEncoder(**mts_corr_ad_cfg)
-    #mts_corr_ad_cfg["graph_encoder"] = gine_encoder
-    #model =  MTSCorrAD(**mts_corr_ad_cfg)
-    #loss_fn = torch.nn.MSELoss()
-    #optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    #while (keep_training is True) and (try_training<100):
-    #    try:
-    #        try_training += 1
-    #        model, model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fn, epochs=args.tr_epochs, show_model_info=True)
-    #    except AssertionError as e:
-    #        logger.error(f"\n{e}")
-    #    except Exception as e:
-    #        keep_training = False
-    #        error_class = e.__class__.__name__  # 取得錯誤類型
-    #        detail = e.args[0]  # 取得詳細內容
-    #        cl, exc, tb = sys.exc_info()  # 取得Call Stack
-    #        last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
-    #        file_name = last_call_stack[0]  # 取得發生的檔案名稱
-    #        line_num = last_call_stack[1]  # 取得發生的行號
-    #        func_name = last_call_stack[2]  # 取得發生的函數名稱
-    #        err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
-    #        logger.error(f"===\n{err_msg}")
-    #        logger.error(f"===\n{traceback.extract_tb(tb)}")
-    #    else:
-    #        keep_training = False
-    #        if save_model_info:
-    #            save_model(model, model_info)
+    is_training, train_count = True, 0
+    gra_edges_data_mats = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_graph.npy")  # each graph consist of 66 node & 66^2 edges
+    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_arr=gra_edges_data_mats)
+    mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
+    mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
+    gin_encoder = GinEncoder(**mts_corr_ad_cfg)
+    gine_encoder = GineEncoder(**mts_corr_ad_cfg)
+    mts_corr_ad_cfg["graph_encoder"] = gine_encoder
+    model =  MTSCorrAD(**mts_corr_ad_cfg)
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    while (is_training is True) and (train_count<100):
+        try:
+            train_count += 1
+            model, model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fn, epochs=args.tr_epochs, show_model_info=True)
+        except AssertionError as e:
+            logger.error(f"\n{e}")
+        except Exception as e:
+            is_training = False
+            error_class = e.__class__.__name__  # 取得錯誤類型
+            detail = e.args[0]  # 取得詳細內容
+            cl, exc, tb = sys.exc_info()  # 取得Call Stack
+            last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
+            file_name = last_call_stack[0]  # 取得發生的檔案名稱
+            line_num = last_call_stack[1]  # 取得發生的行號
+            func_name = last_call_stack[2]  # 取得發生的函數名稱
+            err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
+            logger.error(f"===\n{err_msg}")
+            logger.error(f"===\n{traceback.extract_tb(tb)}")
+        else:
+            is_training = False
+            if save_model_info:
+                save_model(model, model_info)

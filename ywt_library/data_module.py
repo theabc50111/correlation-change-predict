@@ -240,7 +240,7 @@ def gen_filtered_corr_mat_thru_t(src_dir: Path, filter_mode: str = None, quantil
         logger.debug(f"res_mats.shape:{res_mats.shape}, res_mats.size: {res_mats.size}, res_mats[~np.isnan(res_mats)].size: {res_mats[~np.isnan(res_mats)].size}")
         logger.debug(f"quantiles of res_mats:{[np.quantile(res_mats[~np.isnan(res_mats)], i/4) for i in range(5)]}")
     if save_dir:
-        np.save(save_dir/f"corr_s{s_l}_w{w_l}_filt_graph.npy", res_mats)
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_graph.npy", res_mats)
 
 def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Path):
     """
