@@ -34,7 +34,7 @@ class DiscriminationTester:
         """
         Output three graphs based on the data_loader. These graphs should show the greatest difference, median difference, and least difference compared to the first graph.
         """
-        x_list,  x_edge_ind_list, x_batch_node_id_list = [], [], []
+        x_list,  x_edge_ind_list,  = [], []
         criterion = self.criterion
         for batched_data in self.data_loader:
             x_list.extend(unbatch(batched_data.x, batched_data.batch))
@@ -54,7 +54,7 @@ class DiscriminationTester:
         Use real data to test discirmination power of graph embeds
         """
         graphs_info = self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info
-        logger.info(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, graphs_info)))
+        logger.debug(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, graphs_info)))
 
         for i, g_info in enumerate(graphs_info):
             if i == 0:
