@@ -9,6 +9,8 @@ test_batch=1
 tr_epochs=1000
 corr_window=10
 corr_stride=1
+filt_quan=0.5
+gra_enc="gine"
 gra_enc_l=1
 gra_enc_h=4
 gru_l=1
@@ -22,6 +24,9 @@ ARGUMENT_LIST=(
   "save_model"
   "corr_window"
   "corr_stride"
+  "filt_mode"
+  "filt_quan"
+  "gra_enc"
   "gra_enc_l"
   "gra_enc_h"
   "gru_l"
@@ -84,6 +89,21 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --filt_mode)
+      filt_mode="$2"
+      shift 2
+      ;;
+
+    --filt_quan)
+      filt_quan="$2"
+      shift 2
+      ;;
+
+    --gra_enc)
+      gra_enc="$2"
+      shift 2
+      ;;
+
     --gra_enc_l)
       gra_enc_l="$2"
       shift 2
@@ -114,9 +134,9 @@ done
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
 if [ -n "$save_model" ];
 then
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 else
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 fi
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log

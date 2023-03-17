@@ -401,6 +401,8 @@ if __name__ == "__main__":
                                          help="input the filtered mode of graph edges")
     mts_corr_ad_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
                                          help="input the filtered quantile of graph edges")
+    mts_corr_ad_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
+                                         help="input the type of graph encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
@@ -451,7 +453,7 @@ if __name__ == "__main__":
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)
     gine_encoder = GineEncoder(**mts_corr_ad_cfg)
-    mts_corr_ad_cfg["graph_encoder"] = gine_encoder
+    mts_corr_ad_cfg["graph_encoder"] = gine_encoder if args.gra_enc == "gine" else gin_encoder
     model =  MTSCorrAD(**mts_corr_ad_cfg)
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
