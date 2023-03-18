@@ -40,12 +40,13 @@ class DiscriminationTester:
             x_list.extend(unbatch(batched_data.x, batched_data.batch))
             x_edge_ind_list.extend(unbatch_edge_index(batched_data.edge_index, batched_data.batch))
 
-        x_edge_attr_mats = torch.tensor(np.nan_to_num(self.x_edge_attr_mats, nan=0), dtype=torch.float32)
+        x_edge_attr_mats = torch.tensor(np.nan_to_num(self.x_edge_attr_mats, nan=0), dtype=torch.float32)  # To compute the L2-loss between x_edge_attr_mats, fill any null values with 0.
         criterion = self.criterion
         graphs_disparity = np.array(list(map(lambda x: (criterion(x_list[0], x[0]) + criterion(x_edge_attr_mats[0], x[1])).cpu().numpy(), zip(x_list[1:], x_edge_attr_mats[1:]))))
         graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[[0, int(len(graphs_disparity)/2), -1]] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
         output_graph_idx = [0] + graph_disp_min_med_max_idx.tolist()
 
+        # Since there are not null values in x_edge_attr_mats, use self.x_edge_attr_mats[i] to find the index of non-null values. This can be done by x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].
         return [{"gra_time_pt":i, "graph_disp": criterion(x_list[0], x_list[i]).item() + criterion(x_edge_attr_mats[0], x_edge_attr_mats[i]).item(), "x": x_list[i], "x_edge_attr": x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].reshape(-1, 1), "x_edge_ind": x_edge_ind_list[i]} for i in output_graph_idx]
 
 
