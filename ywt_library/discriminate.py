@@ -30,7 +30,7 @@ class DiscriminationTester:
         self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info = self.set_diff_graphs()
 
 
-    def set_diff_graphs(self):
+    def set_diff_graphs(self, num_intv):
         """
         Output three graphs based on the data_loader. These graphs should show the greatest difference, median difference, and least difference compared to the first graph.
         """
@@ -43,7 +43,8 @@ class DiscriminationTester:
         x_edge_attr_mats = torch.tensor(np.nan_to_num(self.x_edge_attr_mats, nan=0), dtype=torch.float32)  # To compute the L2-loss between x_edge_attr_mats, fill any null values with 0.
         criterion = self.criterion
         graphs_disparity = np.array(list(map(lambda x: (criterion(x_list[0], x[0]) + criterion(x_edge_attr_mats[0], x[1])).cpu().numpy(), zip(x_list[1:], x_edge_attr_mats[1:]))))
-        graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[[0, int(len(graphs_disparity)/2), -1]] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
+        intv_inds = np.linspace(0, len(graphs_disparity), num=num_intv, endpoint=True).astype(int).tolist()
+        graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[intv_inds] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
         output_graph_idx = [0] + graph_disp_min_med_max_idx.tolist()
 
         # Since there are not null values in x_edge_attr_mats, use self.x_edge_attr_mats[i] to find the index of non-null values. This can be done by x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].
@@ -54,7 +55,7 @@ class DiscriminationTester:
         """
         Use real data to test discirmination power of graph embeds
         """
-        graphs_info = self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info
+        #graphs_info = self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info
         logger.debug(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, graphs_info)))
 
         for i, g_info in enumerate(graphs_info):
