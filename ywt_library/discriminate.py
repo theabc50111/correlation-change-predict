@@ -23,11 +23,12 @@ class DiscriminationTester:
     """
     def __init__(self, criterion: torch.nn.modules.loss,
                  data_loader: torch_geometric.loader.dataloader.DataLoader,
-                x_edge_attr_mats: np.ndarray):
+                 x_edge_attr_mats: np.ndarray, num_diff_graphs: int = 5):
         self.data_loader = data_loader
         self.x_edge_attr_mats = x_edge_attr_mats
         self.criterion = criterion
-        self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info = self.set_diff_graphs()
+        self.num_diff_graphs = num_diff_graphs
+        self.graphs_info = self.set_diff_graphs(num_intv=num_diff_graphs)
 
 
     def set_diff_graphs(self, num_intv):
@@ -43,7 +44,7 @@ class DiscriminationTester:
         x_edge_attr_mats = torch.tensor(np.nan_to_num(self.x_edge_attr_mats, nan=0), dtype=torch.float32)  # To compute the L2-loss between x_edge_attr_mats, fill any null values with 0.
         criterion = self.criterion
         graphs_disparity = np.array(list(map(lambda x: (criterion(x_list[0], x[0]) + criterion(x_edge_attr_mats[0], x[1])).cpu().numpy(), zip(x_list[1:], x_edge_attr_mats[1:]))))
-        intv_inds = np.linspace(0, len(graphs_disparity), num=num_intv, endpoint=True).astype(int).tolist()
+        intv_inds = np.linspace(0, len(graphs_disparity)-1, num=num_intv, endpoint=True).astype(int).tolist()
         graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[intv_inds] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
         output_graph_idx = [0] + graph_disp_min_med_max_idx.tolist()
 
@@ -55,10 +56,9 @@ class DiscriminationTester:
         """
         Use real data to test discirmination power of graph embeds
         """
-        #graphs_info = self.__comp_graph_info, self.__min_diff_graph_info, self.__med_diff_graph_info, self.__max_diff_graph_info
-        logger.debug(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, graphs_info)))
+        logger.debug(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, self.graphs_info)))
 
-        for i, g_info in enumerate(graphs_info):
+        for i, g_info in enumerate(self.graphs_info):
             if i == 0:
                 comp_gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], g_info["x_edge_ind"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
             else:
