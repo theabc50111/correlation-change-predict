@@ -293,15 +293,16 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
                        "graph_enc_w_grad_history": [],
                        "graph_embeds_history": {"graph_embeds_pred": [], 
                                                 "y_graph_embeds":[],
-                                                "graph_embeds_disparity": {"train": None,
-                                                                           "val": None}},
+                                                "graph_embeds_disparity": dict()},
                        "min_val_loss": float('inf'),
                        "train_loss_history": [],
                        "val_loss_history": [],
                       }
     gra_embeds_disp_rec_keys = [str(i/(num_diff_graphs-1))+"_disp" for i in range(num_diff_graphs)]
-    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"] = {k: [] for k in gra_embeds_disp_rec_keys}
-    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"] = {k: [] for k in gra_embeds_disp_rec_keys}
+    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_gra_enc"] = {k: [] for k in gra_embeds_disp_rec_keys}
+    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_pred"] = {k: [] for k in gra_embeds_disp_rec_keys}
+    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val_gra_enc"] = {k: [] for k in gra_embeds_disp_rec_keys}
+    best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val_pred"] = {k: [] for k in gra_embeds_disp_rec_keys}
     graph_enc_num_layers = sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
     best_model = []
@@ -342,8 +343,10 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         tr_gra_embeds_disp_iter = train_disc_tester.yield_real_disc(train_model)
         val_gra_embeds_disp_iter = val_disc_tester.yield_real_disc(train_model)
         for k, tr_gra_embeds_disp, val_gra_embeds_disp in zip(gra_embeds_disp_rec_keys, tr_gra_embeds_disp_iter, val_gra_embeds_disp_iter):
-            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train"][k].append(tr_gra_embeds_disp)
-            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val"][k].append(val_gra_embeds_disp)
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_gra_enc"][k].append(tr_gra_embeds_disp["gra_enc_emb"])
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_pred"][k].append(tr_gra_embeds_disp["pred_emb"])
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val_gra_enc"][k].append(val_gra_embeds_disp["gra_enc_emb"])
+            best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["val_pred"][k].append(val_gra_embeds_disp["pred_emb"])
             logger.debug(f"{k} of train graph: {tr_gra_embeds_disp}, {k} of val graph: {val_gra_embeds_disp}")
 
         # record training history and save best model
