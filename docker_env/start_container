@@ -10,13 +10,13 @@ do
         p) port=${OPTARG};;
         n) container_name=${OPTARG};;
         g) gpu=${OPTARG};;
-	    d) deamon=${OPTARG};;
+        d) deamon=${OPTARG};;
         h)       
            echo "-f : folder_path
 -p : port number of release port
 -n : container name
--g : container run with gpu or not
--d : container run in deamon style or not
+-g : input true/false to decide whether container run with gpu or not 
+-d : input true/false to decide whether container run in deamon style or not
 " 
     execution=false;;
     esac
@@ -26,31 +26,31 @@ done
 
 if $execution ;
 then
-    if [ -n "$deamon" ];
+    if [ "$deamon" = "true" ];
     then
-        if [ -n "$gpu" ];
+        if [ "$gpu" = "true" ];
         then
             echo "Run contianer in deamon!!!!!!!!!"
-            docker container run --gpus all -it --rm -d -p $port:8888 \
+            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it --rm -d -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
         else
             echo "Run contianer in deamon!!!!!!!!!"
-            docker container run -it --rm -d -p $port:8888 \
+            docker container run -v /etc/localtime:/etc/localtime:ro -it --rm -d -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
         fi
     else
-        if [ -n "$gpu" ];
+        if [ "$gpu" = "true"];
         then
-            docker container run --gpus all -it --rm -p $port:8888 \
+            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it --rm -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
         else
-            docker container run -it --rm -p $port:8888 \
+            docker container run -it -v /etc/localtime:/etc/localtime:ro --rm -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis

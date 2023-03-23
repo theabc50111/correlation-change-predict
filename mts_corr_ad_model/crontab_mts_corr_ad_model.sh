@@ -2,20 +2,6 @@
 
 #EXPORT TZ=Asia/Taipei 
 
-# Default values of arguments
-tr_batch=32
-val_batch=1
-test_batch=1
-tr_epochs=1000
-corr_window=10
-corr_stride=1
-filt_quan=0.5
-gra_enc="gine"
-gra_enc_l=1
-gra_enc_h=4
-gru_l=1
-gru_h=8
-
 ARGUMENT_LIST=(
   "tr_batch"
   "val_batch"
@@ -26,6 +12,11 @@ ARGUMENT_LIST=(
   "corr_stride"
   "filt_mode"
   "filt_quan"
+  "discr_loss"
+  "discr_loss_r"
+  "discr_pred_disp_r"
+  "drop_pos"
+  "drop_p"
   "gra_enc"
   "gra_enc_l"
   "gra_enc_h"
@@ -33,24 +24,40 @@ ARGUMENT_LIST=(
   "gru_h"
 )
 
-
 # read arguments
 opts=$(getopt \
   --longoptions "$(printf "%s:," "${ARGUMENT_LIST[@]}")" \
   --name "$(basename "$0")" \
   --options "" \
-  -- "$@"
-)
+  -- "$@" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1)
 
 # if sending invalid option, stop script
 if [ $? -ne 0 ]; then
-  echo "Invalid option provided"
   echo "========================== Error:Invalid option provided to crontab_mts_corr_ad_model.sh at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
   exit 1
 fi
 
-eval set --$opts
 # The eval in eval set --$opts is required as arguments returned by getopt are quoted.
+eval set --$opts
+
+# Default values of arguments
+tr_batch=32
+val_batch=1
+test_batch=1
+tr_epochs=1000
+corr_window=10
+corr_stride=1
+filt_quan=0.5
+discr_loss=""
+discr_loss_r=3
+discr_pred_disp_r=7
+drop_pos=()
+drop_p=0
+gra_enc_l=1
+gra_enc_h=4
+gru_l=3
+gru_h=24
+save_model=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,7 +82,7 @@ while [[ $# -gt 0 ]]; do
       ;;
 
     --save_model)
-      save_model="$2"
+      save_model="--save_model"
       shift 2
       ;;
 
@@ -96,6 +103,31 @@ while [[ $# -gt 0 ]]; do
 
     --filt_quan)
       filt_quan="$2"
+      shift 2
+      ;;
+
+    --discr_loss)
+      discr_loss="--discr_loss"
+      shift 2
+      ;;
+
+    --discr_loss_r)
+      discr_loss_r="$2"
+      shift 2
+      ;;
+
+    --discr_pred_disp_r)
+      discr_pred_disp_r="$2"
+      shift 2
+      ;;
+
+    --drop_pos)
+      drop_pos+=("$2")
+      shift 2
+      ;;
+
+    --drop_p)
+      drop_p="$2"
       shift 2
       ;;
 
@@ -124,19 +156,30 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
-    *)
-      echo 
+    --)
+      # if getopt reached the end of options, exit loop
+      shift
       break
       ;;
+
+    *)
+      # if sending invalid option, stop script
+      echo "========================== Error:Invalid option: $1 provided to crontab_mts_corr_ad_model.sh at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
+      exit 1
+      ;;
+
   esac
 done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
-if [ -n "$save_model" ];
-then
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
-else
-    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
-fi
+
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan $discr_loss --discr_loss_r $discr_loss_r --discr_pred_disp_r $discr_pred_disp_r --drop_pos ${drop_pos[@]} --drop_p $drop_p --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+
+#if [ -n "$save_model" ];
+#then
+#    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan $discr_loss --discr_loss_r $discr_loss_r --discr_pred_disp_r $discr_pred_disp_r --drop_pos ${drop_pos[@]} --drop_p $drop_p --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h --save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+#else
+#    /usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py --tr_batch $tr_batch --val_batch $val_batch --test_batch $test_batch --tr_epochs $tr_epochs --corr_window $corr_window --corr_stride $corr_stride --filt_mode $filt_mode --filt_quan $filt_quan $discr_loss --gra_enc $gra_enc --gra_enc_l $gra_enc_l --gra_enc_h $gra_enc_h --gru_l $gru_l --gru_h $gru_h >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+#fi
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log

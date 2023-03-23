@@ -21,12 +21,11 @@ class DiscriminationTester:
     """
     Use the instance of this class to test the discrimination power of graph encoder and graphs
     """
-    def __init__(self, criterion: torch.nn.modules.loss,
-                 data_loader: torch_geometric.loader.dataloader.DataLoader,
+    def __init__(self, data_loader: torch_geometric.loader.dataloader.DataLoader,
                  x_edge_attr_mats: np.ndarray, num_diff_graphs: int = 5):
         self.data_loader = data_loader
         self.x_edge_attr_mats = x_edge_attr_mats
-        self.criterion = criterion
+        self.criterion = torch.nn.MSELoss()
         self.num_diff_graphs = num_diff_graphs
         self.graphs_info = self.set_diff_graphs(num_intv=num_diff_graphs)
 
