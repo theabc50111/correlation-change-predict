@@ -29,7 +29,8 @@ opts=$(getopt \
   --longoptions "$(printf "%s:," "${ARGUMENT_LIST[@]}")" \
   --name "$(basename "$0")" \
   --options "" \
-  -- "$@" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1)
+  -- "$@" 2>> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log)
+#  -- "$@")
 
 # if sending invalid option, stop script
 if [ $? -ne 0 ]; then
@@ -164,7 +165,7 @@ while [[ $# -gt 0 ]]; do
 
     *)
       # if sending invalid option, stop script
-      echo "========================== Error:Invalid option: $1 provided to crontab_mts_corr_ad_model.sh at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
+      echo "========================== Error:Unrecognized option: $1 provided to crontab_mts_corr_ad_model.sh at $(/usr/bin/date) ================================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
       exit 1
       ;;
 

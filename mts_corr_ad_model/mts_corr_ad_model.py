@@ -399,7 +399,6 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         if epoch_i % 10 == 0:  # show metrics every 10 epochs
             logger.info(f"Epoch {epoch_i:>3} | Train Loss: {epoch_loss['tr'].item():.5f} | Train L2 Loss: {epoch_loss['MSELoss()'].item():.5f} | Train graph emb disparity Loss: {epoch_loss['discr_loss'].item():.5f} | Val Loss: {epoch_loss['val'].item():.5f} ")
 
-        logger.info(f"{best_model_info['discr_loss_r']}")
     return best_model, best_model_info
 
 

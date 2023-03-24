@@ -35,8 +35,8 @@ model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in m
 assert len(args_list) == len(model_timedelta_list), "The order of elements of model_timedelta_list should comply with the order of comply with args_list"
 print(f"# len of experiments: {len(args_list)}")
 
-start_t = datetime.now() + timedelta(minutes = 10)
-#start_t = datetime.now() - timedelta(minutes = 25)
+#start_t = datetime.now() + timedelta(minutes = 10)
+start_t = datetime.now() - timedelta(minutes = 55)
 for i, (t_delta, model_args) in enumerate(zip(model_timedelta_list, args_list)):
     # print(t_delta, model_args)
     t = start_t if i==0 else t+t_delta
