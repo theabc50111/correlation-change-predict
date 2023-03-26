@@ -30,7 +30,7 @@ args_list = sorted(args_list, key=lambda x:x[2])
 
 num_models = sum([1 for x in args_list if x[2]=="--discr_loss true" and  x[8]==5 and x[9]==16])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
 model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=45), timedelta(hours=1), timedelta(hours=1, minutes=20),  # The order of elements of model_timedelta_list should comply with the order of comply with args_list
-                        timedelta(hours=2, minutes=30), timedelta(hours=3, minutes=35), timedelta(hours=7, minutes=30), timedelta(hours=8)]
+                        timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=7, minutes=30), timedelta(hours=8)]
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
 model_timedelta_list.pop()
@@ -38,7 +38,7 @@ assert len(args_list) == len(model_timedelta_list), "The order of elements of mo
 print(f"# len of experiments: {len(args_list)}")
 
 #experiments_start_t = datetime.now() + timedelta(minutes = 10)
-experiments_start_t = datetime.now() - timedelta(hours=18, minutes=35)
+experiments_start_t = datetime.now() - timedelta(hours=39, minutes=55)
 for i, (prev_model_time_len, model_args) in enumerate(zip(model_timedelta_list, args_list)):
     # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
     model_start_t = experiments_start_t if i==0 else model_start_t + prev_model_time_len
