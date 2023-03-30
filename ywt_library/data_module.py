@@ -277,10 +277,10 @@ if __name__ == "__main__":
                                                                           # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
     data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
                         help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
-    data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
-                        help="input the the setting of which splitting data to be used")
     data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="-train_train",  # train set setting
                         help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
+    data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
+                        help="input the the setting of which splitting data to be used")
     data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
                         help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
     data_args_parser.add_argument("--filt_gra_mode", type=str, nargs='?', default="keep_positive",
