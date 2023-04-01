@@ -84,7 +84,7 @@ def gen_train_data(items: list, raw_data_df: "pd.DataFrame",
 
 # Prepare data
 def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
-                  data_split_setting: str = "-data_sp_test2", train_items_setting: str = "-train_train",
+                  data_split_setting: str = "data_sp_test2", train_items_setting: str = "train_train",
                   save_corr_data: bool = False):
     """
     # Data implement & output setting & testset setting
@@ -92,7 +92,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
           data_cfg: dict of pre-processed-data info, which is from 「config/data_config.yaml」
           data_gen_cfg: dict data generation configuration
           data_split_setting: data split period setting, only suit for only settings of Korean paper
-          train_items_setting: train set setting  # -train_train|-train_all
+          train_items_setting: train set setting  # train_train|train_all
           save_corr_data: setting of output files 
     """
     
@@ -106,12 +106,12 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
     logger.info(f"\n===== len(train_set): {len(train_set)}, len(all_set): {len(all_set)}, len(test_set): {len(test_set)} =====")
 
     # train items implement settings
-    items_implement = train_set if train_items_setting == "-train_train" else all_set
+    items_implement = train_set if train_items_setting == "train_train" else all_set
     target_df = dataset_df.loc[::,items_implement]
     logger.info(f"\n===== len(train set): {len(items_implement)} =====")
 
     # setting of name of output files and pictures title
-    output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
+    output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + "-" + train_items_setting
     logger.info(f"\n===== file_name basis:{output_file_name} =====")
     logger.info(f"\n===== overview dataset_df =====\n{dataset_df}")
     
@@ -135,7 +135,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
         #corr_datasets = gen_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths, save_file=save_corr_data,
                                       #corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind_list, max_data_div_start_add=max_data_div_start_add)
 
-    if data_split_setting == "-data_sp_test2":
+    if data_split_setting == "data_sp_test2":
         corr_dataset = corr_datasets[3]
         logger.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
         return target_df, corr_dataset, output_file_name
@@ -277,9 +277,9 @@ if __name__ == "__main__":
                                                                           # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
     data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER",  # data implement setting
                         help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
-    data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="-train_train",  # train set setting
-                        help="input the setting of training items, options:\n    - '-train_train'\n    - '-train_all'")
-    data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="-data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
+    data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="train_train",  # train set setting
+                        help="input the setting of training items, options:\n    - 'train_train'\n    - 'train_all'")
+    data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
                         help="input the the setting of which splitting data to be used")
     data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
                         help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")

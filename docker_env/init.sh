@@ -29,4 +29,4 @@ pip install torch-geometric
 
 # add torch_geometric summary()
 cp /root/summary.py /opt/conda/lib/python3\.10/site-packages/torch_geometric/nn
-cp /root/__init__.py /opt/conda/lib/python3\.10/site-packages/torch_geometric/nn
+#cp /root/__init__.py /opt/conda/lib/python3\.10/site-packages/torch_geometric/nn
