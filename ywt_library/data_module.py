@@ -95,8 +95,8 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
           train_items_setting: train set setting  # train_train|train_all
           save_corr_data: setting of output files 
     """
-    
-    
+
+
     # data loading & implement setting
     dataset_df = pd.read_csv(data_cfg["DATASETS"][data_implement]['FILE_PATH'])
     dataset_df = dataset_df.set_index('Date')
@@ -114,9 +114,9 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + "-" + train_items_setting
     logger.info(f"\n===== file_name basis:{output_file_name} =====")
     logger.info(f"\n===== overview dataset_df =====\n{dataset_df}")
-    
+
     # input folder settings
-    corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-corr_data"
+    corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"corr_data"
     corr_data_dir.mkdir(parents=True, exist_ok=True)
 
     # Load or Create Correlation Data
@@ -142,13 +142,12 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
 
 
 def gen_corr_dist_mat(data_ser: "pd.Series", raw_df: "pd.DataFrame", out_mat_compo: str = "sim"):
-    
     """
     out_mat_compo: 
         - sim : output a matrix with similiarity dat
         - dist : output a matrix with distance data
     """
-    
+
     assert isinstance(data_ser.index, pd.core.indexes.base.Index) and re.match(f".*\ \&\ .*_0", data_ser.index[0]), "Index of input series should be form of \"COM1 & COM2_0'\""
 
     data_ser = data_ser.copy()
@@ -307,8 +306,8 @@ if __name__ == "__main__":
                                                               data_split_setting=args.data_split_setting,
                                                               train_items_setting=args.train_items_setting,
                                                               save_corr_data=args.save_corr_data)
-    gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-graph_data"
-    filtered_gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}-filtered_graph_data/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
+    gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_data"
+    filtered_gra_res_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"filtered_graph_data/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
     gra_res_dir.mkdir(parents=True, exist_ok=True)
     filtered_gra_res_dir.mkdir(parents=True, exist_ok=True)
     gen_corr_mat_thru_t(corr_dataset,
