@@ -182,7 +182,7 @@ def gen_corr_mat_thru_t(corr_dataset, target_df, save_dir: Path = None, graph_ma
         - dist : output a matrix with distance data
     show_mat_info_inds: input a list of matrix indices to display
     """
-    
+
     tmp_graph_list = []
     for i in range(corr_dataset.shape[1]):
         corr_spatial = corr_dataset.iloc[::,i]
@@ -192,7 +192,7 @@ def gen_corr_mat_thru_t(corr_dataset, target_df, save_dir: Path = None, graph_ma
     flat_graphs_arr = np.stack(tmp_graph_list, axis=0)  # concate correlation matrix across time
     if save_dir:
         s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
-        np.save(save_dir/f"corr_s{s_l}_w{w_l}_graph", flat_graphs_arr)
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_adj_mat", flat_graphs_arr)
 
     for i in show_mat_info_inds:
         corr_spatial = corr_dataset.iloc[::,i]
@@ -211,7 +211,7 @@ def gen_filtered_corr_mat_thru_t(src_dir: Path, filter_mode: str = None, quantil
     """
     is_filter_centered_zero = False
     s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
-    corr_mats = np.load(src_dir/f"corr_s{s_l}_w{w_l}_graph.npy")
+    corr_mats = np.load(src_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     res_mats = corr_mats.copy()
     if filter_mode == "keep_positive":
         mask = corr_mats < 0
@@ -239,7 +239,7 @@ def gen_filtered_corr_mat_thru_t(src_dir: Path, filter_mode: str = None, quantil
         logger.debug(f"res_mats.shape:{res_mats.shape}, res_mats.size: {res_mats.size}, res_mats[~np.isnan(res_mats)].size: {res_mats[~np.isnan(res_mats)].size}")
         logger.debug(f"quantiles of res_mats:{[np.quantile(res_mats[~np.isnan(res_mats)], i/4) for i in range(5)]}")
     if save_dir:
-        np.save(save_dir/f"corr_s{s_l}_w{w_l}_graph.npy", res_mats)
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy", res_mats)
 
 def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Path):
     """
