@@ -94,6 +94,9 @@ DATASETS:
         TRAIN_SET: ['ROP', 'AZO', 'URI', 'TROW', 'CMCSA', 'SLB', 'VZ', 'MAC', 'ADS', 'MCK']
         TEST_SET: ['RL', 'CVX', 'SRE', 'PFE', 'PCG', 'UTX', 'NTRS', 'INCY', 'COP', 'HRL']
         OUTPUT_FILE_NAME_BASIS: "test_case"
+    ARTIF_PARTICLE: 
+        FILE_PATH: "{DIRS.DATASET_DIR}/artif_particle_adj_mat.npy"
+        OUTPUT_FILE_NAME_BASIS: "artif_particle"
 
 
 # arima_lstm  lstm weight setting

@@ -473,7 +473,8 @@ if __name__ == "__main__":
 
     # ## Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    #data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
@@ -505,7 +506,7 @@ if __name__ == "__main__":
                        "gru_l": args.gru_l,
                        "gru_h": args.gru_h}
     is_training, train_count = True, 0
-    gra_edges_data_mats = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")  # each graph consist of 66 node & 66^2 edges
+    gra_edges_data_mats = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_arr=gra_edges_data_mats)
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
