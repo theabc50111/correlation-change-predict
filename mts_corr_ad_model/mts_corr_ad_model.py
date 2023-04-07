@@ -68,9 +68,9 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.nd
     logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
     # Create training, validation, and test sets
-    train_dataset = dataset[:int(len(dataset) * 0.9)]
-    val_dataset = dataset[int(len(dataset) * 0.9):int(len(dataset) * 0.95)]
-    test_dataset = dataset[int(len(dataset) * 0.95):]
+    train_dataset = dataset[:int(len(dataset) * 0.833333333334)]
+    val_dataset = dataset[int(len(dataset) * 0.833333333334):int(len(dataset) * 0.91666667)]
+    test_dataset = dataset[int(len(dataset) * 0.91666667):]
 
     # Create mini-batches
     train_loader = DataLoader(train_dataset, batch_size=data_loader_cfg["tr_batch"], shuffle=False)

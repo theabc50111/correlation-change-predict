@@ -47,8 +47,18 @@ class DiscriminationTester:
         graph_disp_min_med_max_idx = np.argsort(graphs_disparity)[intv_inds] + 1  # +1 to make offset, because ignoring the first graph when computing graphs_disparity
         output_graph_idx = [0] + graph_disp_min_med_max_idx.tolist()
 
-        # Since there are not null values in x_edge_attr_mats, use self.x_edge_attr_mats[i] to find the index of non-null values. This can be done by x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].
-        return [{"gra_time_pt":i, "graph_disp": criterion(x_list[0], x_list[i]).item() + criterion(x_edge_attr_mats[0], x_edge_attr_mats[i]).item(), "x": x_list[i], "x_edge_attr": x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].reshape(-1, 1), "x_edge_ind": x_edge_ind_list[i]} for i in output_graph_idx]
+        ret_list = []
+        for i in output_graph_idx:
+            # Since there are not null values in x_edge_attr_mats, use self.x_edge_attr_mats[i] to find the index of non-null values. This can be done by x_edge_attr_mats[i][~np.isnan(self.x_edge_attr_mats[i])].
+            non_null_idx = torch.tensor(~np.isnan(self.x_edge_attr_mats[i]), dtype=torch.bool)
+            graph_dixp_info = {"gra_time_pt": i,
+                               "graph_disp": criterion(x_list[0], x_list[i]).item() + criterion(x_edge_attr_mats[0], x_edge_attr_mats[i]).item(),
+                               "x": x_list[i],
+                               "x_edge_attr": x_edge_attr_mats[i][non_null_idx].reshape(-1, 1),
+                               "x_edge_ind": x_edge_ind_list[i]}
+
+            ret_list.append(graph_dixp_info)
+        return ret_list
 
 
     def yield_real_disc(self, test_model: torch.nn.Module):
