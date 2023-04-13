@@ -1,9 +1,9 @@
-from tqdm import tqdm
 import logging
 
 import numpy as np
 import pandas as pd
 from pmdarima.arima import ARIMA, auto_arima
+from tqdm import tqdm
 
 
 def arima_err_logger_init(log_file_path: "pathlib.PosixPath"):
