@@ -61,7 +61,7 @@ def gen_corr_train_data(items: list, raw_data_df: pd.DataFrame,
                         data_gen_cfg: dict,
                         save_file: bool = False) -> List[pd.DataFrame]:
     """
-    Generate correlation of item-pairs of `raw_data_df`
+    Generate correlation of item-pairs which are subset of `raw_data_df`
     This function moving start date by stride-20 to diversified data, so it return four dataframe.
     """
     # DEFAULT SETTING: data_gen_cfg["DATA_DIV_STRIDE"] == 20, data_gen_cfg["CORR_WINDOW"]==100, data_gen_cfg["CORR_STRIDE"]==100
@@ -124,11 +124,14 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + "-" + train_items_setting
     logger.info(f"\n===== file_name basis:{output_file_name} =====")
     logger.info(f"\n===== overview dataset_df =====\n{dataset_df}")
-    logger.info(f"\n===== head of dataset_df['ABT', 'ADI'] =====\n{dataset_df.loc[:'2008-01-30', ['ABT', 'ADI']]}")
-    logger.info(f"\n===== corr of dataset_df['ABT', 'ADI']  ====="
-                f"\n--- arround 2008/01/07~2008/01/18 ---\n{dataset_df.loc['2008-01-07':'2008-01-18', ['ABT', 'ADI']].corr()}"
-                f"\n--- arround 2008/01/08~2008/01/22 ---\n{dataset_df.loc['2008-01-08':'2008-01-22', ['ABT', 'ADI']].corr()}"
-                f"\n--- arround 2008/01/09~2008/01/23 ---\n{dataset_df.loc['2008-01-09':'2008-01-23', ['ABT', 'ADI']].corr()}")
+    logger.debug(f"\n===== head of dataset_df['ABT', 'ADI'] =====\n{dataset_df.loc[:'2008-01-30', ['ABT', 'ADI']]}")
+    logger.debug(f"\n===== corr of dataset_df['ABT', 'ADI']  ====="
+                 f"\n--- arround 2008/01/02~2008/01/15 ---\n{dataset_df.loc['2008-01-02':'2008-01-15', ['ABT', 'ADI']].corr()}"
+                 f"\n--- arround 2008/01/03~2008/01/16 ---\n{dataset_df.loc['2008-01-03':'2008-01-16', ['ABT', 'ADI']].corr()}"
+                 f"\n--- arround 2008/01/04~2008/01/17 ---\n{dataset_df.loc['2008-01-04':'2008-01-17', ['ABT', 'ADI']].corr()}"
+                 f"\n--- arround 2008/01/07~2008/01/18 ---\n{dataset_df.loc['2008-01-07':'2008-01-18', ['ABT', 'ADI']].corr()}"
+                 f"\n--- arround 2008/01/08~2008/01/22 ---\n{dataset_df.loc['2008-01-08':'2008-01-22', ['ABT', 'ADI']].corr()}"
+                 f"\n--- arround 2008/01/09~2008/01/23 ---\n{dataset_df.loc['2008-01-09':'2008-01-23', ['ABT', 'ADI']].corr()}")
 
     # input folder settings
     corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"corr_data"
@@ -190,13 +193,14 @@ def gen_corr_dist_mat(data_ser: pd.Series, raw_df: pd.DataFrame, out_mat_compo: 
 
 def gen_corr_mat_thru_t(corr_dataset, target_df, data_gen_cfg: dict, save_dir: Path = None, graph_mat_compo: str = "sim", show_mat_info_inds: list = None):
     """
-    corr_dataset: input df consisting of each pair of correlation coefficients over time
-    target_df: input the dataset_df which only contains target-items
-    save_dir: save directory of graph array
-    graph_mat_compo:
-        - sim : output a matrix with similiarity dat
-        - dist : output a matrix with distance data
-    show_mat_info_inds: input a list of matrix indices to display
+    - corr_dataset: input df consisting of each pair of correlation coefficients over time
+    - target_df: input the dataset_df which only contains target-items
+    - data_gen_cfg: dict of data generation config, used to write config on file name
+    - save_dir: save directory of graph array
+    - graph_mat_compo:
+          - sim : output a matrix with similiarity dat
+          - dist : output a matrix with distance data
+    - show_mat_info_inds: input a list of matrix indices to display
     """
 
     tmp_graph_list = []
@@ -214,18 +218,18 @@ def gen_corr_mat_thru_t(corr_dataset, target_df, data_gen_cfg: dict, save_dir: P
     for i in show_mat_info_inds:
         corr_spatial = corr_dataset.iloc[::, i]
         display_corr_mat = gen_corr_dist_mat(corr_spatial, target_df, out_mat_compo=graph_mat_compo)
-        logger.info(f"correlation graph of No.{i} time-step")
-        logger.info(f"correlation graph.shape:{flat_graphs_arr[0].shape}")
-        logger.info(f"number of correlation graph:{len(flat_graphs_arr)}")
-        logger.info(f"\nMin of corr_mat:{display_corr_mat.min()}")
-        logger.info(f"\n{display_corr_mat.shape}")
-        logger.info(f"\n{display_corr_mat.head()}")
-        logger.info("=" * 70)
+        logger.info(f"\ncorrelation graph of No.{i} time-step"
+                    f"correlation graph.shape:{flat_graphs_arr[0].shape}"
+                    f"number of correlation graph:{len(flat_graphs_arr)}"
+                    f"\nMin of corr_mat:{display_corr_mat.min()}"
+                    f"\n{display_corr_mat.head()}"
+                    f"\n==================================================")
 
 
 def gen_filtered_corr_mat_thru_t(src_dir: Path, data_gen_cfg: dict, filter_mode: str = None, quantile: float = 0, save_dir: Path = None):
     """
     Create filttered correlation matrix by given conditions.
+    - data_gen_cfg: dict of data generation config, used to write config on file name
     """
     is_filter_centered_zero = False
     s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
@@ -258,6 +262,58 @@ def gen_filtered_corr_mat_thru_t(src_dir: Path, data_gen_cfg: dict, filter_mode:
         logger.debug(f"quantiles of res_mats:{[np.quantile(res_mats[~np.isnan(res_mats)], i/4) for i in range(5)]}")
     if save_dir:
         np.save(save_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy", res_mats)
+
+
+def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, nodes_v_mode: str = "all_values", save_dir: Path = None):
+    """
+    Generate nodes' values matrix through time points
+    - target_df: input the dataset_df which only contains target-items
+    - data_gen_cfg: dict of data generation config, used to write config on file name
+    - save_dir: save directory of graph array
+    """
+    s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+    corr_begin_idx = target_df.index.get_loc(corr_dates[0]) - 9
+    corr_end_idx = target_df.index.get_loc(corr_dates[-1]) + 1
+    logger.debug(f"\nbegin idx of target_df:{corr_begin_idx}, end idx of target_df:{corr_end_idx}"
+                 f"\nselected dates of setted_corr_dataset:{corr_dates}")
+    logger.debug(f"\nFirst 20 row of target_df:\n{target_df.head(20)}"
+                 f"\nLast 20 row of target_df:\n{target_df.tail(20)}"
+                 f"\nselected dates for target_df:\n{target_df.iloc[corr_begin_idx:corr_end_idx, ::]}")
+
+    num_nodes = target_df.shape[1]  # number of nodes
+    num_mats = (corr_end_idx - corr_begin_idx - w_l + s_l) // s_l  # calculate the number of output matrices
+    computing_mats = np.empty((num_mats, w_l, num_nodes))  # create an array to store the output matrices
+    # fill the output array by slicing the input array
+    for i in range(num_mats):
+        sp_begin_idx = corr_begin_idx + i*s_l
+        sp_end_idx = sp_begin_idx + w_l
+        computing_mats[i] = target_df.iloc[sp_begin_idx:sp_end_idx, :].values
+
+    logger.debug(f"\nNodes matrices.shape:{computing_mats.shape}"
+                 f"\nValues of 2 nodes in first 10 day of first 3 window:"
+                 f"\n{computing_mats[:3, :10, :2]}")
+
+    assert nodes_v_mode in ["all_values", "mean", "std", "mean_std", "min", "max"], "The given mode of nodes values is not in the options"
+    if nodes_v_mode == "all_values":
+        ret_mats = computing_mats
+    elif nodes_v_mode == "mean":
+        ret_mats = np.mean(computing_mats, axis=1).reshape(num_mats, -1, num_nodes)
+    elif nodes_v_mode == "std":
+        ret_mats = np.std(computing_mats, axis=1).reshape(num_mats, -1, num_nodes)
+    elif nodes_v_mode == "mean_std":
+        ret_mats = np.stack([np.mean(computing_mats, axis=1), np.std(computing_mats, axis=1)], axis=1)
+    elif nodes_v_mode == "min":
+        ret_mats = np.min(computing_mats, axis=1).reshape(num_mats, -1, num_nodes)
+    elif nodes_v_mode == "max":
+        ret_mats = np.max(computing_mats, axis=1).reshape(num_mats, -1, num_nodes)
+
+    logger.info(f"\nReturn nodes's matrices.shape:{ret_mats.shape}"
+                f"\n5 nodes's matrices in first 3 window of first 10 day:\n{ret_mats[:3, :10, :5]}'")
+
+    if save_dir:
+        np.save(save_dir/f"{nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy", ret_mats)
+
+    return ret_mats
 
 
 def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Path):
@@ -300,11 +356,24 @@ if __name__ == "__main__":
     data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
                                   help="input the the setting of which splitting data to be used")
     data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
-                                  help="Decide composition of graph_matrix\n    - sim : output a matrix with similiarity dat\n    - dist : output a matrix with distance data")
+                                  help=f"Decide composition of graph_adjacency_matrix\n"
+                                       f"    - sim : output a matrix with similiarity dat\n"
+                                       f"    - dist : output a matrix with distance data")
     data_args_parser.add_argument("--filt_gra_mode", type=str, nargs='?', default="keep_positive",
-                                  help="Decide filtering mode of graph_matrix\n    - keep_positive : remove all negative correlation \n    - keep_strong : remove weak correlation \n    - keep_abs : transform all negative correlation to positive")
+                                  help=f"Decide filtering mode of graph_adjacency_matrix\n"
+                                       f"    - keep_positive : remove all negative correlation \n"
+                                       f"    - keep_strong : remove weak correlation \n"
+                                       f"    - keep_abs : transform all negative correlation to positive")
     data_args_parser.add_argument("--filt_gra_quan", type=float, nargs='?', default=0.5,
                                   help="Decide filtering quantile")
+    data_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default="all_values",
+                                  help=f"Decide mode of nodes' vaules of graph_nodes_matrix\n"
+                                       f"    - all_values : use all values inside window as nodes' values\n"
+                                       f"    - mean: use average of all values inside window as nodes' values\n"
+                                       f"    - std: use std of all values inside window as nodes' values\n"
+                                       f"    - mean_std: use both mean and std of all values inside window as nodes' values\n"
+                                       f"    - min: use min of all values inside window as nodes' values\n"
+                                       f"    - max: use max of all values inside window as nodes' values\n")
     data_args_parser.add_argument("--save_corr_data", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                   help="input --save_corr_data to save correlation data")
     data_args_parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
@@ -334,11 +403,14 @@ if __name__ == "__main__":
                         data_gen_cfg=DATA_GEN_CFG,
                         graph_mat_compo=args.graph_mat_compo,
                         save_dir=gra_res_dir if args.save_corr_graph_arr else None,
-                        show_mat_info_inds=[])
-                        #show_mat_info_inds=[0, 1, 2, 12])
-
+                        show_mat_info_inds=[0, 1, 2, 12])
     gen_filtered_corr_mat_thru_t(src_dir=gra_res_dir,
                                  data_gen_cfg=DATA_GEN_CFG,
                                  filter_mode=args.filt_gra_mode,
                                  quantile=args.filt_gra_quan,
                                  save_dir=filtered_gra_res_dir if args.save_corr_graph_arr else None)
+    gen_nodes_mat_thru_t(target_df=aimed_target_df,
+                         corr_dates=setted_corr_dataset.columns,
+                         data_gen_cfg=DATA_GEN_CFG,
+                         nodes_v_mode=args.graph_nodes_v_mode,
+                         save_dir=gra_res_dir if args.save_corr_graph_arr else None)
