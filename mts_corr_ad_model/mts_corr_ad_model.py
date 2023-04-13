@@ -49,16 +49,16 @@ mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 # ## Load Graph Data
-def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_arr: np.ndarray):
-    logger.info(f"graph_arr.shape:{graph_arr.shape}")
-    graph_time_step = graph_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
-    node_attr = torch.tensor(np.ones((graph_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
+def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray = None):
+    logger.info(f"graph_adj_arr.shape:{graph_adj_arr.shape}")
+    graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
+    node_attr = torch.tensor(np.ones((graph_adj_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
     dataset = []
     for g_t in range(graph_time_step):
-        edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_arr[g_t])), axis=1))
-        edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_arr[g_t + 1])), axis=1))
-        edge_attr = torch.tensor(graph_arr[g_t][~np.isnan(graph_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
-        edge_attr_next_t = torch.tensor(graph_arr[g_t + 1][~np.isnan(graph_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
+        edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t])), axis=1))
+        edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t + 1])), axis=1))
+        edge_attr = torch.tensor(graph_adj_arr[g_t][~np.isnan(graph_adj_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
+        edge_attr_next_t = torch.tensor(graph_adj_arr[g_t + 1][~np.isnan(graph_adj_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
         data_y = Data(x=node_attr, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
         data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         dataset.append(data)
@@ -507,7 +507,7 @@ if __name__ == "__main__":
                        "gru_h": args.gru_h}
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_arr=gra_edges_data_mats)
+    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=gra_edges_data_mats)
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)
