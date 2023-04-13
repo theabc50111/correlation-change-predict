@@ -394,23 +394,25 @@ if __name__ == "__main__":
                                                                            data_split_setting=args.data_split_setting,
                                                                            train_items_setting=args.train_items_setting,
                                                                            save_corr_data=args.save_corr_data)
-    gra_res_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_data"
-    filtered_gra_res_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"filtered_graph_data/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
-    gra_res_dir.mkdir(parents=True, exist_ok=True)
-    filtered_gra_res_dir.mkdir(parents=True, exist_ok=True)
+    gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_adj_mat"
+    filtered_gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"filtered_graph_adj_mat/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
+    gra_node_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_node_mat"
+    gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
+    filtered_gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
+    gra_node_mat_dir.mkdir(parents=True, exist_ok=True)
     gen_corr_mat_thru_t(corr_dataset=setted_corr_dataset,
                         target_df=aimed_target_df,
                         data_gen_cfg=DATA_GEN_CFG,
                         graph_mat_compo=args.graph_mat_compo,
-                        save_dir=gra_res_dir if args.save_corr_graph_arr else None,
+                        save_dir=gra_adj_mat_dir if args.save_corr_graph_arr else None,
                         show_mat_info_inds=[0, 1, 2, 12])
-    gen_filtered_corr_mat_thru_t(src_dir=gra_res_dir,
+    gen_filtered_corr_mat_thru_t(src_dir=gra_adj_mat_dir,
                                  data_gen_cfg=DATA_GEN_CFG,
                                  filter_mode=args.filt_gra_mode,
                                  quantile=args.filt_gra_quan,
-                                 save_dir=filtered_gra_res_dir if args.save_corr_graph_arr else None)
+                                 save_dir=filtered_gra_adj_mat_dir if args.save_corr_graph_arr else None)
     gen_nodes_mat_thru_t(target_df=aimed_target_df,
                          corr_dates=setted_corr_dataset.columns,
                          data_gen_cfg=DATA_GEN_CFG,
                          nodes_v_mode=args.graph_nodes_v_mode,
-                         save_dir=gra_res_dir if args.save_corr_graph_arr else None)
+                         save_dir=gra_node_mat_dir if args.save_corr_graph_arr else None)
