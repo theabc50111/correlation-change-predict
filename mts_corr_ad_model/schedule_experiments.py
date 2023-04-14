@@ -29,8 +29,8 @@ args_list = sorted(args_list, key=lambda x: x[9])
 args_list = sorted(args_list, key=lambda x: x[3])
 
 num_models = sum([1 for x in args_list if x[3] == "--discr_loss" and x[9] == "--gra_enc_l 5" and x[10] == "--gra_enc_h 16"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
-model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1), timedelta(hours=1, minutes=20),  # The order of elements of model_timedelta_list should comply with the order of comply with args_list
-                        timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=3, minutes=5), timedelta(hours=3, minutes=20)]
+model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1),  # The order of elements of model_timedelta_list should comply with the order of comply with args_list
+                        timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=3, minutes=20), timedelta(hours=3, minutes=5)]
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
 model_timedelta_list.pop()
