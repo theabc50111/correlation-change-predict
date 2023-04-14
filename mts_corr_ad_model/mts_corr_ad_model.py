@@ -52,13 +52,13 @@ warnings.simplefilter("ignore")
 def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray = None):
     logger.info(f"graph_adj_arr.shape:{graph_adj_arr.shape}")
     graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
-    node_attr = torch.tensor(np.ones((graph_adj_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
     dataset = []
     for g_t in range(graph_time_step):
         edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t])), axis=1))
         edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t + 1])), axis=1))
         edge_attr = torch.tensor(graph_adj_arr[g_t][~np.isnan(graph_adj_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
         edge_attr_next_t = torch.tensor(graph_adj_arr[g_t + 1][~np.isnan(graph_adj_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
+        node_attr = torch.tensor(np.ones((graph_adj_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
         data_y = Data(x=node_attr, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
         data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         dataset.append(data)
@@ -444,9 +444,11 @@ if __name__ == "__main__":
     mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
                                          help="input the number of window length of correlation computing")
     mts_corr_ad_args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
-                                         help="input the filtered mode of graph edges")
+                                         help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
     mts_corr_ad_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
                                          help="input the filtered quantile of graph edges")
+    mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default="all_values",
+                                         help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     mts_corr_ad_args_parser.add_argument("--discr_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,
                                          help="input --discr_loss to add discrimination loss during training")
     mts_corr_ad_args_parser.add_argument("--discr_loss_r", type=float, nargs='?', default=0,
@@ -473,8 +475,8 @@ if __name__ == "__main__":
 
     # ## Data implement & output setting & testset setting
     # data implement setting
-    #data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
-    data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    #data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
@@ -489,7 +491,8 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = args.corr_stride, args.corr_window
-    graph_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_data/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_data"
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
+    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
     model_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
     model_log_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -506,7 +509,8 @@ if __name__ == "__main__":
                        "gru_l": args.gru_l,
                        "gru_h": args.gru_h}
     is_training, train_count = True, 0
-    gra_edges_data_mats = np.load(graph_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.node}_s{s_l}_w{w_l}_nodes_mat.npy")
     train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=gra_edges_data_mats)
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
