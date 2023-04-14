@@ -48,18 +48,20 @@ mpl.rcParams['font.sans-serif'] = ['simhei']
 mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
+
 # ## Load Graph Data
-def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray = None):
-    logger.info(f"graph_adj_arr.shape:{graph_adj_arr.shape}")
+def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray):
+    graph_node_arr = graph_node_arr.transpose(0, 2, 1)
     graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     dataset = []
     for g_t in range(graph_time_step):
-        edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t])), axis=1))
         edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t + 1])), axis=1))
-        edge_attr = torch.tensor(graph_adj_arr[g_t][~np.isnan(graph_adj_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
         edge_attr_next_t = torch.tensor(graph_adj_arr[g_t + 1][~np.isnan(graph_adj_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
-        node_attr = torch.tensor(np.ones((graph_adj_arr.shape[1], 1)), dtype=torch.float32)  # each node has only one attribute
-        data_y = Data(x=node_attr, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
+        node_attr_next_t = torch.tensor(graph_node_arr[g_t + 1], dtype=torch.float32)
+        data_y = Data(x=node_attr_next_t, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
+        edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t])), axis=1))
+        edge_attr = torch.tensor(graph_adj_arr[g_t][~np.isnan(graph_adj_arr[g_t])].reshape(-1, 1), dtype=torch.float32)
+        node_attr = torch.tensor(graph_node_arr[g_t], dtype=torch.float32)
         data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
         dataset.append(data)
     #model_cfg["dim_out"] = data.y.shape[0]  # turn on this if the input of loss-function graphs
@@ -68,9 +70,9 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: n
     logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
     # Create training, validation, and test sets
-    train_dataset = dataset[:int(len(dataset) * 0.833333333334)]
-    val_dataset = dataset[int(len(dataset) * 0.833333333334):int(len(dataset) * 0.91666667)]
-    test_dataset = dataset[int(len(dataset) * 0.91666667):]
+    train_dataset = dataset[:int(len(dataset) * 0.9)]
+    val_dataset = dataset[int(len(dataset) * 0.9):int(len(dataset) * 0.95)]
+    test_dataset = dataset[int(len(dataset) * 0.95):]
 
     # Create mini-batches
     train_loader = DataLoader(train_dataset, batch_size=data_loader_cfg["tr_batch"], shuffle=False)
@@ -429,7 +431,7 @@ def save_model(unsaved_model:torch.nn.Module, model_info:dict):
 
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
-    mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=12,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+    mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=32,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
     mts_corr_ad_args_parser.add_argument("--val_batch", type=int, nargs='?', default=1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
@@ -447,7 +449,7 @@ if __name__ == "__main__":
                                          help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
     mts_corr_ad_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
                                          help="input the filtered quantile of graph edges")
-    mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default="all_values",
+    mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                          help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     mts_corr_ad_args_parser.add_argument("--discr_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,
                                          help="input --discr_loss to add discrimination loss during training")
@@ -465,9 +467,9 @@ if __name__ == "__main__":
                                          help="input the number of graph laryers of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                                          help="input the number of graph embedding hidden size of graph_encoder")
-    mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
+    mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
                                          help="input the number of stacked-layers of gru")
-    mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=8,
+    mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
                                          help="input the number of gru hidden size")
     args = mts_corr_ad_args_parser.parse_args()
     logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
@@ -510,8 +512,10 @@ if __name__ == "__main__":
                        "gru_h": args.gru_h}
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.node}_s{s_l}_w{w_l}_nodes_mat.npy")
-    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=gra_edges_data_mats)
+    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if args.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
+
+    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=gra_edges_data_mats,  graph_node_arr=gra_nodes_data_mats)
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)
