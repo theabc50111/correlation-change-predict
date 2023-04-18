@@ -308,6 +308,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     best_model_info = {"num_training_graphs": len(train_loader.dataset),
                        "filt_mode": args.filt_mode,
                        "filt_quan": args.filt_quan,
+                       "graph_nodes_v_mode": args.graph_nodes_v_mode,
                        "batchs_per_epoch": len(train_loader),
                        "epochs": epochs,
                        "train_batch": train_loader.batch_size,
