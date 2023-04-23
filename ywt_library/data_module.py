@@ -153,10 +153,17 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
         #corr_datasets = gen_corr_train_data(items_implement, raw_data_df=dataset_df, corr_df_paths=all_corr_df_paths, save_file=save_corr_data,
                                       #corr_ser_len_max=corr_ser_len_max, corr_ind=corr_ind_list, max_data_div_start_add=max_data_div_start_add)
 
-    if data_split_setting == "data_sp_test2":
+    if data_split_setting == "data_sp_train":
+        corr_dataset = corr_datasets[0]
+    elif data_split_setting == "data_sp_valid":
+        corr_dataset = corr_datasets[2]
+    elif data_split_setting == "data_sp_test1":
+        corr_dataset = corr_datasets[2]
+    elif data_split_setting == "data_sp_test2":
         corr_dataset = corr_datasets[3]
-        logger.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
-        return target_df, corr_dataset, output_file_name
+
+    logger.info(f"\n===== overview corr_dataset =====\n{corr_dataset.head()}")
+    return target_df, corr_dataset, output_file_name
 
 
 def gen_corr_dist_mat(data_ser: pd.Series, raw_df: pd.DataFrame, out_mat_compo: str = "sim"):
@@ -354,7 +361,11 @@ if __name__ == "__main__":
     data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="train_train",  # train set setting
                                   help="input the setting of training items, options:\n    - 'train_train'\n    - 'train_all'")
     data_args_parser.add_argument("--data_split_setting", type=str, nargs='?', default="data_sp_test2",  # data split period setting, only suit for only settings of Korean paper
-                                  help="input the the setting of which splitting data to be used")
+                                  help=f"input the the setting of which splitting data to be used\n"
+                                       f"    - data_sp_train\n"
+                                       f"    - data_sp_valid\n"
+                                       f"    - data_sp_test1\n"
+                                       f"    - data_sp_test2")
     data_args_parser.add_argument("--graph_mat_compo", type=str, nargs='?', default="sim",
                                   help=f"Decide composition of graph_adjacency_matrix\n"
                                        f"    - sim : output a matrix with similiarity dat\n"
