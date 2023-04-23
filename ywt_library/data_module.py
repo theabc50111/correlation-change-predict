@@ -13,8 +13,9 @@ import dynamic_yaml
 import numpy as np
 import pandas as pd
 import yaml
-from stl_decompn import stl_decompn
 from tqdm import tqdm
+
+from stl_decompn import stl_decompn
 
 sys.path.append("/workspace/correlation-change-predict/ywt_library")
 

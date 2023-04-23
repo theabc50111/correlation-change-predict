@@ -8,6 +8,8 @@ def stl_decompn(corr_series: "pd.Series", overview: bool = False) -> (float, flo
     output_resid = 100000
     output_trend = None
     output_period = None
+    corr_series.name = corr_series.iloc[0]
+    corr_series = corr_series.iloc[1:]
     for p in range(2, 11):
         decompose_result_mult = seasonal_decompose(corr_series, period=p)
         resid_sum = np.abs(decompose_result_mult.resid).sum()
