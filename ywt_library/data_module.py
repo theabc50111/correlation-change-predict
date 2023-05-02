@@ -124,14 +124,16 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + "-" + train_items_setting
     logger.info(f"\n===== file_name basis:{output_file_name} =====")
     logger.info(f"\n===== overview dataset_df =====\n{dataset_df}")
-    logger.debug(f"\n===== head of dataset_df['ABT', 'ADI'] =====\n{dataset_df.loc[:'2008-01-30', ['ABT', 'ADI']]}")
-    logger.debug(f"\n===== corr of dataset_df['ABT', 'ADI']  ====="
-                 f"\n--- arround 2008/01/02~2008/01/15 ---\n{dataset_df.loc['2008-01-02':'2008-01-15', ['ABT', 'ADI']].corr()}"
-                 f"\n--- arround 2008/01/03~2008/01/16 ---\n{dataset_df.loc['2008-01-03':'2008-01-16', ['ABT', 'ADI']].corr()}"
-                 f"\n--- arround 2008/01/04~2008/01/17 ---\n{dataset_df.loc['2008-01-04':'2008-01-17', ['ABT', 'ADI']].corr()}"
-                 f"\n--- arround 2008/01/07~2008/01/18 ---\n{dataset_df.loc['2008-01-07':'2008-01-18', ['ABT', 'ADI']].corr()}"
-                 f"\n--- arround 2008/01/08~2008/01/22 ---\n{dataset_df.loc['2008-01-08':'2008-01-22', ['ABT', 'ADI']].corr()}"
-                 f"\n--- arround 2008/01/09~2008/01/23 ---\n{dataset_df.loc['2008-01-09':'2008-01-23', ['ABT', 'ADI']].corr()}")
+    if (col_1 := 'ABT') not in dataset_df.columns or (col_2 := 'ADI') not in dataset_df.columns:
+        col_1, col_2 = dataset_df.columns[0], dataset_df.columns[1],
+    logger.debug(f"\n===== head of dataset_df[col_1, col_2] =====\n{dataset_df.loc[:'2008-01-30', [col_1, col_2]]}")
+    logger.debug(f"\n===== corr of dataset_df[col_1, col_2]  ====="
+                 f"\n--- arround 2008/01/02~2008/01/15 ---\n{dataset_df.loc['2008-01-02':'2008-01-15', [col_1, col_2]].corr()}"
+                 f"\n--- arround 2008/01/03~2008/01/16 ---\n{dataset_df.loc['2008-01-03':'2008-01-16', [col_1, col_2]].corr()}"
+                 f"\n--- arround 2008/01/04~2008/01/17 ---\n{dataset_df.loc['2008-01-04':'2008-01-17', [col_1, col_2]].corr()}"
+                 f"\n--- arround 2008/01/07~2008/01/18 ---\n{dataset_df.loc['2008-01-07':'2008-01-18', [col_1, col_2]].corr()}"
+                 f"\n--- arround 2008/01/08~2008/01/22 ---\n{dataset_df.loc['2008-01-08':'2008-01-22', [col_1, col_2]].corr()}"
+                 f"\n--- arround 2008/01/09~2008/01/23 ---\n{dataset_df.loc['2008-01-09':'2008-01-23', [col_1, col_2]].corr()}")
 
     # input folder settings
     corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"corr_data"

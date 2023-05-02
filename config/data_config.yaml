@@ -60,6 +60,10 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-corr_ser_calc_reg-corr_mat_hrchy_11_cluster-pre.csv"
         TRAIN_SET: ['ABT', 'ADI', 'ADS', 'AFL', 'AMP', 'AMT', 'ANTM', 'AON', 'AZO', 'BWA', 'CMCSA', 'CNP', 'COF', 'COST', 'CTL', 'DHR', 'DISCA', 'EIX', 'EL', 'EMN', 'EMR', 'EQIX', 'ES', 'ETFC', 'FE', 'FIS', 'FLIR', 'FOXA', 'HBAN', 'HRL', 'HST', 'IFF', 'IRM', 'ISRG', 'IT', 'JCI', 'KIM', 'KMB', 'KSS', 'LEG', 'LLL', 'LRCX', 'MAA', 'MHK', 'MON', 'MTB', 'MU', 'NFLX', 'NI', 'NKTR', 'NOV', 'NVDA', 'RMD', 'ROK', 'SBUX', 'SNA', 'TROW', 'TWX', 'UNP', 'URI', 'WDC', 'WHR', 'WU', 'WYN', 'XEC', 'XRX']
         OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_corr_mat_hrchy_11_cluster"
+    SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER_LABEL_LAST:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-corr_ser_calc_reg-corr_mat_hrchy_11_cluster_label_last-pre.csv"
+        TRAIN_SET: ['BLL', 'CHD', 'OMC', 'SBUX', 'WHR']
+        OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_corr_mat_hrchy_11_cluster_label_last"
     SP500_20082017_RANDOM_66:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
         TRAIN_SET: ['L', 'CBS', 'LNC', 'DISCA', 'UPS', 'GD', 'JNPR', 'SYY', 'XOM', 'DVN', 'MSFT', 'RHI', 'REG', 'CMI', 'AET', 'BEN', 'EQR', 'HRB', 'RRC', 'NVDA', 'FLS', 'FE', 'FLR', 'UNH', 'AEE', 'BAX', 'SJM', 'D', 'MGM', 'CAH', 'SCG', 'ANSS', 'GE', 'PX', 'MDLZ', 'AMD', 'DISH', 'PHM', 'NBL', 'COP', 'RJF', 'TWX', 'IR', 'DHR', 'AZO', 'DRI', 'CCI', 'GPN', 'CSCO', 'VLO', 'MET', 'DFS', 'ILMN', 'MON', 'NEM', 'GILD', 'ED', 'ZBH', 'LRCX', 'INTU', 'SHW', 'ROP', 'BDX', 'BBT', 'GPC', 'NKTR']
