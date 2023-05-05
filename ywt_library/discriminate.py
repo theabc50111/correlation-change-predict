@@ -1,3 +1,4 @@
+import inspect
 import logging
 
 import numpy as np
@@ -65,8 +66,10 @@ class DiscriminationTester:
         """
         Use real data to test discirmination power of graph embeds
         """
+        frame = inspect.currentframe().f_back
+        instance_name = [var_name for var_name, var_val in frame.f_locals.items() if var_val is self][0]
+        logger.debug(f"For {instance_name}〔called in {inspect.stack()[1][3]}() at [{frame.f_code.co_filename}:{frame.f_lineno}]〕")
         logger.debug(list(map(lambda x: {"gra_time_pt": x["gra_time_pt"], "graph_disp": x["graph_disp"]}, self.graphs_info)))
-
         for i, g_info in enumerate(self.graphs_info):
             if i == 0:
                 comp_gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], g_info["x_edge_ind"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
@@ -76,5 +79,5 @@ class DiscriminationTester:
                 pred_embeds = test_model(g_info["x"], g_info["x_edge_ind"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
                 real_gra_embeds_dispiraty = self.criterion(comp_gra_embeds, gra_embeds).item()
                 real_pred_embeds_dispiraty = self.criterion(comp_pred_embeds, pred_embeds).item()
-                logger.debug(f"Time:{g_info['gra_time_pt']}, graph_dispiraty: {g_info['graph_disp']}, graph_embeds_dispiraty: {real_gra_embeds_dispiraty}, pred_embeds_disparity: {real_pred_embeds_dispiraty}")
+                logger.debug(f"[{instance_name}]-- Time:{g_info['gra_time_pt']}, graph_dispiraty: {g_info['graph_disp']}, graph_embeds_dispiraty: {real_gra_embeds_dispiraty}, pred_embeds_disparity: {real_pred_embeds_dispiraty}")
                 yield {"gra_enc_emb": real_gra_embeds_dispiraty, "pred_emb": real_pred_embeds_dispiraty}

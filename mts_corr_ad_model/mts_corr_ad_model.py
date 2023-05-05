@@ -102,6 +102,8 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: n
         logger.debug(f"\n batch0_y{i}_edges_ind.shape: {data_y_edges_ind.shape} \n batch0_y{i}_edges_ind[:5]:{data_y_edges_ind[::, :5]}")
         batch_edge_attr_start_ind = batch_edge_attr_end_ind
 
+    logger.info("="*80)
+
     return data_loader
 
 
