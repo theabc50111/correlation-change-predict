@@ -43,9 +43,7 @@ fi
 eval set --$opts
 
 # Default values of arguments
-tr_batch="--tr_batch 32"
-val_batch="--val_batch 1"
-test_batch="--test_batch 1"
+batch_size="--batch_size 32"
 tr_epochs="--tr_epochs 1000"
 corr_window="--corr_window 10"
 corr_stride="--corr_stride 1"
@@ -66,19 +64,9 @@ save_model=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --tr_batch)
-      tr_batch="--tr_batch $2" # Note: In order to handle the argument containing space, the quotes around '$2': they are essential!
+    --batch_size)
+      batch_size="--batch_size $2" # Note: In order to handle the argument containing space, the quotes around '$2': they are essential!
       shift 2 # The 'shift' eats a commandline argument, i.e. converts $1=a, $2=b, $3=c, $4=d into $1=b, $2=c, $3=d. shift 2 moves it all the way to $1=c, $2=d. It's done since that particular branch uses an argument, so it has to remove two things from the list (the -r and the argument following it) not just one.
-      ;;
-
-    --val_batch)
-      val_batch="--val_batch $2"
-      shift 2
-      ;;
-
-    --test_batch)
-      test_batch="--test_batch $2"
-      shift 2
       ;;
 
     --tr_epochs)
@@ -183,7 +171,7 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py $tr_batch $val_batch $test_batch $tr_epochs $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $discr_loss $discr_loss_r $discr_pred_disp_r ${drop_pos[@]} $drop_p $gra_enc  $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py $batch_size $tr_epochs $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $discr_loss $discr_loss_r $discr_pred_disp_r ${drop_pos[@]} $drop_p $gra_enc  $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 
 #if [ -n "$save_model" ];
 #then

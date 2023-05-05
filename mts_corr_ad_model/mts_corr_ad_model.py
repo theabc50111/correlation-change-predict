@@ -18,6 +18,7 @@ import numpy as np
 import torch
 import torch_geometric
 import yaml
+from sklearn.preprocessing import StandardScaler
 from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU,
                       Sequential)
 from torch_geometric.data import Data, DataLoader
@@ -50,10 +51,11 @@ warnings.simplefilter("ignore")
 
 
 # ## Load Graph Data
-def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray):
+def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray, is_discr: bool = False):
     graph_node_arr = graph_node_arr.transpose(0, 2, 1)
     graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     dataset = []
+    loader_batch_size = data_loader_cfg["batch_size"] if not is_discr else 1
     for g_t in range(graph_time_step):
         edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t + 1])), axis=1))
         edge_attr_next_t = torch.tensor(graph_adj_arr[g_t + 1][~np.isnan(graph_adj_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
@@ -66,42 +68,24 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: n
         dataset.append(data)
     #model_cfg["dim_out"] = data.y.shape[0]  # turn on this if the input of loss-function graphs
     model_cfg["num_node_features"] = data.num_node_features
+    logger.info(f"This DataLoader contains {len(dataset)} graphs")
     logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
     logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
-    # Create training, validation, and test sets
-    train_dataset = dataset[:int(len(dataset) * 0.9)]
-    val_dataset = dataset[int(len(dataset) * 0.9):int(len(dataset) * 0.95)]
-    test_dataset = dataset[int(len(dataset) * 0.95):]
-
     # Create mini-batches
-    train_loader = DataLoader(train_dataset, batch_size=data_loader_cfg["tr_batch"], shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=data_loader_cfg["val_batch"], shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=data_loader_cfg["test_batch"], shuffle=False)
+    data_loader = DataLoader(dataset, batch_size=loader_batch_size, shuffle=False)
 
-    # show info
-    logger.info(f'Training set   = {len(train_dataset)} graphs')
-    logger.info(f'Validation set = {len(val_dataset)} graphs')
-    logger.info(f'Test set       = {len(test_dataset)} graphs')
-    logger.debug('Train loader:')
-    for i, subgraph in enumerate(train_loader):
+    logger.debug('{data_loader.batch_size} graphs in batched data:')
+    for i, subgraph in enumerate(data_loader):
         logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph {i}.num_graphs:{subgraph.num_graphs} ; Subgraph {i}.edge_index[::, 10:15]: {subgraph.edge_index[::, 10:15]}')
 
-    logger.debug('Validation loader:')
-    for i, subgraph in enumerate(val_loader):
-        logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs} ; Subgraph {i}.edge_index[::, 10:15]: {subgraph.edge_index[::, 10:15]}')
-
-    logger.debug('Test loader:')
-    for i, subgraph in enumerate(test_loader):
-        logger.debug(f' - Subgraph {i}: {subgraph} ; Subgraph{i}.num_graphs:{subgraph.num_graphs} ; Subgraph {i}.edge_index[::, 10:15]: {subgraph.edge_index[::, 10:15]}')
-
-    logger.debug('Peeking Train data:')
-    first_batch_data = next(iter(train_loader))
+    logger.debug('Peeking data info of first batch:')
+    first_batch_data = next(iter(data_loader))
     data_x_nodes_list = unbatch(first_batch_data.x, first_batch_data.batch)
     data_x_edges_ind_list = unbatch_edge_index(first_batch_data.edge_index, first_batch_data.batch)
     batch_edge_attr_start_ind = 0
 
-    for i in range(data_loader_cfg["tr_batch"]):
+    for i in range(loader_batch_size):
         batch_edge_attr_end_ind = data_x_edges_ind_list[i].shape[1] + batch_edge_attr_start_ind
         data_x_nodes = data_x_nodes_list[i]
         data_x_edges_ind = data_x_edges_ind_list[i]
@@ -118,7 +102,7 @@ def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: n
         logger.debug(f"\n batch0_y{i}_edges_ind.shape: {data_y_edges_ind.shape} \n batch0_y{i}_edges_ind[:5]:{data_y_edges_ind[::, :5]}")
         batch_edge_attr_start_ind = batch_edge_attr_end_ind
 
-    return train_loader, val_loader, test_loader
+    return data_loader
 
 
 # ## Multi-Dimension Time-Series Correlation Anomly Detection Model
@@ -327,8 +311,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
                        "train_loss_history": [],
                        "tr_l2_loss_history": [],
                        "tr_discr_loss_history": [],
-                       "val_loss_history": [],
-                      }
+                       "val_loss_history": []}
     gra_embeds_disp_rec_keys = [str(i/(num_diff_graphs-1))+"_disp" for i in range(num_diff_graphs)]
     best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_gra_enc"] = {k: [] for k in gra_embeds_disp_rec_keys}
     best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_pred"] = {k: [] for k in gra_embeds_disp_rec_keys}
@@ -337,8 +320,8 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     graph_enc_num_layers = sum(1 for _ in train_model.graph_encoder.parameters())
     graph_enc_w_grad_after = 0
     best_model = []
-    train_disc_tester = DiscriminationTester(num_diff_graphs=num_diff_graphs, data_loader=train_loader, x_edge_attr_mats=gra_edges_data_mats[:int((len(gra_edges_data_mats) - 1) * 0.9)])  # the graph of last "t" can't be used as train data
-    val_disc_tester = DiscriminationTester(num_diff_graphs=num_diff_graphs, data_loader=val_loader, x_edge_attr_mats=gra_edges_data_mats[int((len(gra_edges_data_mats) - 1) * 0.9):int((len(gra_edges_data_mats) - 1) * 0.95)])  # the graph of last "t" can't be used as train data
+    train_disc_tester = DiscriminationTester(num_diff_graphs=num_diff_graphs, data_loader=train_loader, x_edge_attr_mats=norm_train_dataset['edges'])  # the graph of last "t" can't be used as train data
+    val_disc_tester = DiscriminationTester(num_diff_graphs=num_diff_graphs, data_loader=val_loader, x_edge_attr_mats=norm_val_dataset['edges'])  # the graph of last "t" can't be used as train data
     for epoch_i in tqdm(range(epochs)):
         train_model.train()
         #epoch_discr_loss, epoch_l2_loss, epoch_tr_loss = 0, 0, 0
@@ -382,6 +365,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
         best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
         tr_gra_embeds_disp_ylds = train_disc_tester.yield_real_disc(train_model)
         val_gra_embeds_disp_ylds = val_disc_tester.yield_real_disc(train_model)
+
         for k, tr_gra_embeds_disp, val_gra_embeds_disp in zip(gra_embeds_disp_rec_keys, tr_gra_embeds_disp_ylds, val_gra_embeds_disp_ylds):
             best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_gra_enc"][k].append(tr_gra_embeds_disp["gra_enc_emb"])
             best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_pred"][k].append(tr_gra_embeds_disp["pred_emb"])
@@ -405,7 +389,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
     return best_model, best_model_info
 
 
-def test(test_model:torch.nn.Module, loader:torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss = MSELoss()):
+def test(test_model: torch.nn.Module, loader: torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss = MSELoss()):
     test_model.eval()
     test_loss = 0
     with torch.no_grad():
@@ -420,7 +404,7 @@ def test(test_model:torch.nn.Module, loader:torch_geometric.loader.dataloader.Da
     return test_loss
 
 
-def save_model(unsaved_model:torch.nn.Module, model_info:dict):
+def save_model(unsaved_model: torch.nn.Module, model_info: dict):
     e_i = model_info.get("best_val_epoch")
     t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
     torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t}.pt")
@@ -430,13 +414,45 @@ def save_model(unsaved_model:torch.nn.Module, model_info:dict):
     logger.info(f"model has been saved in:{model_dir}")
 
 
+def split_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray):
+    """
+    split dataset to train, validation, test
+    normalize these dataset
+    """
+    assert len(edges_mats) == len(nodes_mats), "Check the whether gra_edges_data_mats match gra_nodes_data_mats"
+    num_graphs = len(nodes_mats)
+
+    # Create training, validation, and test sets
+    train_dataset = {"edges": edges_mats[:int(num_graphs * 0.9)], "nodes": nodes_mats[:int(num_graphs * 0.9)]}
+    val_dataset = {"edges": edges_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)], "nodes": nodes_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]}
+    test_dataset = {"edges": edges_mats[int(num_graphs * 0.95):], "nodes": nodes_mats[int(num_graphs * 0.95):]}
+    sc = StandardScaler()
+
+    if (train_dataset["nodes"] == 1).all() or (train_dataset["nodes"] == 0).all():
+        return train_dataset, val_dataset, test_dataset, sc
+
+    # normalize dataset
+    all_timesteps, num_features, num_nodes = nodes_mats.shape
+    val_timesteps = val_dataset['nodes'].shape[0]
+    stacked_tr_nodes_arr = train_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
+    stacked_val_nodes_arr = val_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
+    stacked_test_nodes_arr = test_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
+
+    norm_train_nodes_arr = sc.fit_transform(stacked_tr_nodes_arr)
+    norm_val_nodes_arr = sc.transform(stacked_val_nodes_arr)
+    norm_test_nodes_arr = sc.transform(stacked_test_nodes_arr)
+    revers_norm_val_nodes_arr = sc.inverse_transform(norm_val_nodes_arr).reshape(val_timesteps, num_nodes, num_features).transpose(0, 2, 1)
+    assert np.allclose(val_dataset["nodes"], revers_norm_val_nodes_arr), "Check the normalization process"
+    train_dataset['nodes'] = norm_train_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
+    val_dataset['nodes'] = norm_val_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
+    test_dataset['nodes'] = norm_test_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
+
+    return train_dataset, val_dataset, test_dataset, sc
+
+
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
-    mts_corr_ad_args_parser.add_argument("--tr_batch", type=int, nargs='?', default=32,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
-                                         help="input the number of training batch")
-    mts_corr_ad_args_parser.add_argument("--val_batch", type=int, nargs='?', default=1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
-                                         help="input the number of training batch")
-    mts_corr_ad_args_parser.add_argument("--test_batch", type=int, nargs='?', default=1,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+    mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=32,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                          help="input the number of training batch")
     mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
                                          help="input the number of training epochs")
@@ -502,9 +518,7 @@ if __name__ == "__main__":
     model_log_dir.mkdir(parents=True, exist_ok=True)
 
     # ## model configuration
-    loader_cfg = {"tr_batch": args.tr_batch,
-                  "val_batch": args.val_batch,
-                  "test_batch": args.test_batch}
+    loader_cfg = {"batch_size": args.batch_size}
     mts_corr_ad_cfg = {"drop_pos": args.drop_pos,
                        "drop_p": args.drop_p,
                        "gra_enc_l": args.gra_enc_l,
@@ -514,9 +528,17 @@ if __name__ == "__main__":
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if args.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
+    # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
+    logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
+    logger.info(f'Training set   = {len(norm_train_dataset["edges"])} graphs')
+    logger.info(f'Validation set = {len(norm_val_dataset["edges"])} graphs')
+    logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
 
-    train_graphs_loader, val_graphs_loader, test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=gra_edges_data_mats,  graph_node_arr=gra_nodes_data_mats)
+    train_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_train_dataset["edges"],  graph_node_arr=norm_train_dataset["nodes"])
+    val_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_val_dataset["edges"],  graph_node_arr=norm_val_dataset["nodes"])
+    test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_test_dataset["edges"],  graph_node_arr=norm_test_dataset["nodes"])
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)

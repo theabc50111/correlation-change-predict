@@ -4,7 +4,7 @@ from itertools import chain, product, repeat
 filt_mode_list = ["", "--filt_mode keep_strong"]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = ["--filt_quan 0.5"]  # ["--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
 nodes_v_mode_list = ["", "--graph_nodes_v_mode all_values", "--graph_nodes_v_mode mean", "--graph_nodes_v_mode mean_std"]
-discr_loss_list = ["", "--discr_loss"]  # ["" , "--discr_loss true"]
+discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = ["--discr_loss_r 0.01"]  # ["--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = ["--discr_pred_disp_r 2"]  # ["--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos fc --drop_pos gru"]
@@ -28,13 +28,18 @@ args_list = sorted(args_list, key=lambda x: x[10])
 args_list = sorted(args_list, key=lambda x: x[9])
 args_list = sorted(args_list, key=lambda x: x[3])
 
-num_models = sum([1 for x in args_list if x[3] == "--discr_loss" and x[9] == "--gra_enc_l 5" and x[10] == "--gra_enc_h 16"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
-model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1),  # The order of elements of model_timedelta_list should comply with the order of comply with args_list
-                        timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=3, minutes=20), timedelta(hours=3, minutes=5)]
+if "--discr_loss" in discr_loss_list:
+    num_models = sum([1 for x in args_list if x[3] == "--discr_loss" and x[9] == "--gra_enc_l 5" and x[10] == "--gra_enc_h 16"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
+    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1),  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
+                            timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=3, minutes=20), timedelta(hours=3, minutes=5)]
+else:
+    num_models = sum([1 for x in args_list if x[3] == "" and x[9] == "--gra_enc_l 5" and x[10] == "--gra_enc_h 16"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
+    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
+
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
 model_timedelta_list.pop()
-assert len(args_list) == len(model_timedelta_list), "The order of elements of model_timedelta_list should comply with the order of comply with args_list"
+assert len(args_list) == len(model_timedelta_list), f"The order of elements of model_timedelta_list〔length: {len(model_timedelta_list)}〕 should comply with the order of args_list: 〔length: {len(args_list)}〕"
 print(f"# len of experiments: {len(args_list)}")
 
 experiments_start_t = datetime.now() + timedelta(minutes=10)
