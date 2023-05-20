@@ -18,7 +18,6 @@ import numpy as np
 import torch
 import torch_geometric
 import yaml
-from sklearn.preprocessing import StandardScaler
 from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU,
                       Sequential)
 from torch_geometric.data import Data, DataLoader
@@ -26,8 +25,9 @@ from torch_geometric.nn import GINConv, GINEConv, global_add_pool, summary
 from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
-sys.path.append("/workspace/correlation-change-predict/ywt_library")
-from discriminate import DiscriminationTester
+sys.path.append("/workspace/correlation-change-predict/utils")
+from metrics import DiscriminationTester
+from utils import split_and_norm_data
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -40,18 +40,23 @@ logger_console = logging.StreamHandler()
 logger_formatter = logging.Formatter('%(levelname)-8s [%(filename)s] %(message)s')
 logger_console.setFormatter(logger_formatter)
 logger.addHandler(logger_console)
-discriminate_logger = logging.getLogger("discriminate")
+metrics_logger = logging.getLogger("metrics")
+utils_logger = logging.getLogger("utils")
 matplotlib_logger = logging.getLogger("matplotlib")
 logger.setLevel(logging.INFO)
-discriminate_logger.setLevel(logging.INFO)
+metrics_logger.setLevel(logging.INFO)
+utils_logger.setLevel(logging.INFO)
 matplotlib_logger.setLevel(logging.ERROR)
 mpl.rcParams['font.sans-serif'] = ['simhei']
 mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 
-# ## Load Graph Data
-def create_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray, is_discr: bool = False):
+# ## Load PYG(Pytorch Graph) Graph Data
+def create_pyg_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray, is_discr: bool = False):
+    """
+    Create Pytorch Geometric DataLoaders
+    """
     graph_node_arr = graph_node_arr.transpose(0, 2, 1)
     graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     dataset = []
@@ -416,42 +421,6 @@ def save_model(unsaved_model: torch.nn.Module, model_info: dict):
     logger.info(f"model has been saved in:{model_dir}")
 
 
-def split_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray):
-    """
-    split dataset to train, validation, test
-    normalize these dataset
-    """
-    assert len(edges_mats) == len(nodes_mats), "Check the whether gra_edges_data_mats match gra_nodes_data_mats"
-    num_graphs = len(nodes_mats)
-
-    # Create training, validation, and test sets
-    train_dataset = {"edges": edges_mats[:int(num_graphs * 0.9)], "nodes": nodes_mats[:int(num_graphs * 0.9)]}
-    val_dataset = {"edges": edges_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)], "nodes": nodes_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]}
-    test_dataset = {"edges": edges_mats[int(num_graphs * 0.95):], "nodes": nodes_mats[int(num_graphs * 0.95):]}
-    sc = StandardScaler()
-
-    if (train_dataset["nodes"] == 1).all() or (train_dataset["nodes"] == 0).all():
-        return train_dataset, val_dataset, test_dataset, sc
-
-    # normalize dataset
-    all_timesteps, num_features, num_nodes = nodes_mats.shape
-    val_timesteps = val_dataset['nodes'].shape[0]
-    stacked_tr_nodes_arr = train_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
-    stacked_val_nodes_arr = val_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
-    stacked_test_nodes_arr = test_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
-
-    norm_train_nodes_arr = sc.fit_transform(stacked_tr_nodes_arr)
-    norm_val_nodes_arr = sc.transform(stacked_val_nodes_arr)
-    norm_test_nodes_arr = sc.transform(stacked_test_nodes_arr)
-    revers_norm_val_nodes_arr = sc.inverse_transform(norm_val_nodes_arr).reshape(val_timesteps, num_nodes, num_features).transpose(0, 2, 1)
-    assert np.allclose(val_dataset["nodes"], revers_norm_val_nodes_arr), "Check the normalization process"
-    train_dataset['nodes'] = norm_train_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
-    val_dataset['nodes'] = norm_val_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
-    test_dataset['nodes'] = norm_test_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
-
-    return train_dataset, val_dataset, test_dataset, sc
-
-
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
     mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=32,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
@@ -530,17 +499,22 @@ if __name__ == "__main__":
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if args.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
-    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
+    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
     logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
+    logger.info(f"gra_nodes_data_mats.max:{np.nanmax(gra_nodes_data_mats)}, gra_nodes_data_mats.min:{np.nanmin(gra_nodes_data_mats)}")
+    logger.info(f"norm_train_nodes_data_mats.max:{np.nanmax(norm_train_dataset['nodes'])}, norm_train_nodes_data_mats.min:{np.nanmin(norm_train_dataset['nodes'])}")
+    logger.info(f"norm_val_nodes_data_mats.max:{np.nanmax(norm_val_dataset['nodes'])}, norm_val_nodes_data_mats.min:{np.nanmin(norm_val_dataset['nodes'])}")
+    logger.info(f"norm_test_nodes_data_mats.max:{np.nanmax(norm_test_dataset['nodes'])}, norm_test_nodes_data_mats.min:{np.nanmin(norm_test_dataset['nodes'])}")
     logger.info(f'Training set   = {len(norm_train_dataset["edges"])} graphs')
     logger.info(f'Validation set = {len(norm_val_dataset["edges"])} graphs')
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
+    logger.info("="*80)
 
-    train_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_train_dataset["edges"],  graph_node_arr=norm_train_dataset["nodes"])
-    val_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_val_dataset["edges"],  graph_node_arr=norm_val_dataset["nodes"])
-    test_graphs_loader = create_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_test_dataset["edges"],  graph_node_arr=norm_test_dataset["nodes"])
+    train_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_train_dataset["edges"],  graph_node_arr=norm_train_dataset["nodes"])
+    val_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_val_dataset["edges"],  graph_node_arr=norm_val_dataset["nodes"])
+    test_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_test_dataset["edges"],  graph_node_arr=norm_test_dataset["nodes"])
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)

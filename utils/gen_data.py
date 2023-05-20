@@ -15,10 +15,6 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
-from stl_decompn import stl_decompn
-
-sys.path.append("/workspace/correlation-change-predict/ywt_library")
-
 current_dir = Path(__file__).parent
 data_config_path = current_dir/"../config/data_config.yaml"
 with open(data_config_path) as f:
@@ -325,23 +321,6 @@ def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, no
     return ret_mats
 
 
-def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Path):
-    """
-    Produce property of correlation series in form of dataframe
-    """
-    if corr_property_df_path.exists():
-        corr_property_df = pd.read_csv(corr_property_df_path).set_index("items")
-    else:
-        corr_mean = corr_dataset.mean(axis=1)
-        corr_std = corr_dataset.std(axis=1)
-        corr_stl_series = corr_dataset.apply(stl_decompn, axis=1)
-        corr_stl_array = [[stl_period, stl_resid, stl_trend_std, stl_trend_coef] for stl_period, stl_resid, stl_trend_std, stl_trend_coef in corr_stl_series.values]
-        corr_property_df = pd.DataFrame(corr_stl_array, index=corr_dataset.index)
-        corr_property_df = pd.concat([corr_property_df, corr_mean, corr_std], axis=1)
-        corr_property_df.columns = ["corr_stl_period", "corr_stl_resid", "corr_stl_trend_std", "corr_stl_trend_coef", "corr_ser_mean", "corr_ser_std"]
-        corr_property_df.index.name = "items"
-        corr_property_df.to_csv(corr_property_df_path)
-    return corr_property_df
 
 
 if __name__ == "__main__":
