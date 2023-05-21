@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 import argparse
+import copy
 import functools
 import json
 import logging
 import sys
 import traceback
 import warnings
+from collections import OrderedDict
 from datetime import datetime
 from itertools import islice
 from pathlib import Path
@@ -53,14 +55,14 @@ warnings.simplefilter("ignore")
 
 
 # ## Load PYG(Pytorch Graph) Graph Data
-def create_pyg_data_loaders(data_loader_cfg: dict, model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray, is_discr: bool = False):
+def create_pyg_data_loaders(model_cfg: dict, graph_adj_arr: np.ndarray, graph_node_arr: np.ndarray, is_discr: bool = False):
     """
     Create Pytorch Geometric DataLoaders
     """
     graph_node_arr = graph_node_arr.transpose(0, 2, 1)
     graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
     dataset = []
-    loader_batch_size = data_loader_cfg["batch_size"] if not is_discr else 1
+    loader_batch_size = model_cfg["batch_size"] if not is_discr else 1
     for g_t in range(graph_time_step):
         edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_arr[g_t + 1])), axis=1))
         edge_attr_next_t = torch.tensor(graph_adj_arr[g_t + 1][~np.isnan(graph_adj_arr[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
@@ -295,7 +297,7 @@ def discr_loss(graphs_info, test_model, criterion: torch.nn.modules.loss = MSELo
 # ## Training Model
 def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dataloader.DataLoader,
           val_loader: torch_geometric.loader.dataloader.DataLoader, optim: torch.optim,
-          loss_fns: dict, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
+          loss_fns: dict, epochs: int = 5, num_diff_graphs: int = 5, args: argparse.Namespace = None, show_model_info: bool = False):
     best_model_info = {"num_training_graphs": len(train_loader.dataset),
                        "filt_mode": args.filt_mode,
                        "filt_quan": args.filt_quan,
@@ -366,9 +368,9 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
 
         # record training history
         best_model_info["train_loss_history"].append(epoch_loss["tr"].item())
+        best_model_info["val_loss_history"].append(epoch_loss['val'].item())
         best_model_info["tr_l2_loss_history"].append(epoch_loss["MSELoss()"].item())
         best_model_info["tr_discr_loss_history"].append(epoch_loss["discr_loss"].item())
-        best_model_info["val_loss_history"].append(epoch_loss['val'].item())
         best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
         tr_gra_embeds_disp_ylds = train_disc_tester.yield_real_disc(train_model)
         val_gra_embeds_disp_ylds = val_disc_tester.yield_real_disc(train_model)
@@ -382,7 +384,7 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
 
         # record training history and save best model
         if epoch_loss['val'] < best_model_info["min_val_loss"]:
-            best_model = train_model.copy()
+            best_model = copy.deepcopy(train_model.state_dict())
             best_model_info["best_val_epoch"] = epoch_i
             best_model_info["min_val_loss"] = epoch_loss['val'].item()
 
@@ -412,11 +414,11 @@ def test(test_model: torch.nn.Module, loader: torch_geometric.loader.dataloader.
     return test_loss
 
 
-def save_model(unsaved_model: torch.nn.Module, model_info: dict):
+def save_model(unsaved_model: OrderedDict, model_info: dict, model_dir: Path, model_log_dir: Path):
     e_i = model_info.get("best_val_epoch")
-    t = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
-    torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t}.pt")
-    with open(model_log_dir/f"epoch_{e_i}-{t}.json", "w") as f:
+    t_stamp = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
+    torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t_stamp}.pt")
+    with open(model_log_dir/f"epoch_{e_i}-{t_stamp}.json", "w") as f:
         json_str = json.dumps(model_info)
         f.write(json_str)
     logger.info(f"model has been saved in:{model_dir}")
@@ -460,9 +462,9 @@ if __name__ == "__main__":
                                          help="input the number of stacked-layers of gru")
     mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
                                          help="input the number of gru hidden size")
-    args = mts_corr_ad_args_parser.parse_args()
+    ARGS = mts_corr_ad_args_parser.parse_args()
     logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logger.info(pformat(f"\n{vars(args)}", indent=1, width=40, compact=True))
+    logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # ## Data implement & output setting & testset setting
     # data implement setting
@@ -473,7 +475,7 @@ if __name__ == "__main__":
     # setting of name of output files and pictures title
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
     # setting of output files
-    save_model_info = args.save_model
+    save_model_info = ARGS.save_model
     # set devide of pytorch
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
@@ -481,25 +483,25 @@ if __name__ == "__main__":
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
 
-    s_l, w_l = args.corr_stride, args.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
+    s_l, w_l = ARGS.corr_stride, ARGS.corr_window
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
-    model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    model_dir.mkdir(parents=True, exist_ok=True)
-    model_log_dir.mkdir(parents=True, exist_ok=True)
+    g_model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
+    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    g_model_dir.mkdir(parents=True, exist_ok=True)
+    g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
     # ## model configuration
-    loader_cfg = {"batch_size": args.batch_size}
-    mts_corr_ad_cfg = {"drop_pos": args.drop_pos,
-                       "drop_p": args.drop_p,
-                       "gra_enc_l": args.gra_enc_l,
-                       "gra_enc_h": args.gra_enc_h,
-                       "gru_l": args.gru_l,
-                       "gru_h": args.gru_h}
+    mts_corr_ad_cfg = {"batch_size": ARGS.batch_size,
+                       "drop_pos": ARGS.drop_pos,
+                       "drop_p": ARGS.drop_p,
+                       "gra_enc_l": ARGS.gra_enc_l,
+                       "gra_enc_h": ARGS.gra_enc_h,
+                       "gru_l": ARGS.gru_l,
+                       "gru_h": ARGS.gru_h}
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if args.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
@@ -513,24 +515,24 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    train_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_train_dataset["edges"],  graph_node_arr=norm_train_dataset["nodes"])
-    val_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_val_dataset["edges"],  graph_node_arr=norm_val_dataset["nodes"])
-    test_graphs_loader = create_pyg_data_loaders(data_loader_cfg=loader_cfg, model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_test_dataset["edges"],  graph_node_arr=norm_test_dataset["nodes"])
+    train_graphs_loader = create_pyg_data_loaders(model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_train_dataset["edges"],  graph_node_arr=norm_train_dataset["nodes"])
+    val_graphs_loader = create_pyg_data_loaders(model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_val_dataset["edges"],  graph_node_arr=norm_val_dataset["nodes"])
+    test_graphs_loader = create_pyg_data_loaders(model_cfg=mts_corr_ad_cfg, graph_adj_arr=norm_test_dataset["edges"],  graph_node_arr=norm_test_dataset["nodes"])
     mts_corr_ad_cfg["gra_enc_edge_dim"] = next(iter(train_graphs_loader)).edge_attr.shape[1]
     mts_corr_ad_cfg["dim_out"] = mts_corr_ad_cfg["gra_enc_l"] * mts_corr_ad_cfg["gra_enc_h"]
     gin_encoder = GinEncoder(**mts_corr_ad_cfg)
     gine_encoder = GineEncoder(**mts_corr_ad_cfg)
-    mts_corr_ad_cfg["graph_encoder"] = gine_encoder if args.gra_enc == "gine" else gin_encoder
+    mts_corr_ad_cfg["graph_encoder"] = gine_encoder if ARGS.gra_enc == "gine" else gin_encoder
     model =  MTSCorrAD(**mts_corr_ad_cfg)
     loss_fns_dict = {"fns": [MSELoss()],
-                     "fn_args": {"MSELoss()": {}, "discr_loss": {"disp_r": args.discr_loss_r, "loss_r": args.discr_pred_disp_r}}}
-    loss_fns_dict["fns"] = loss_fns_dict["fns"] + [discr_loss] if args.discr_loss else loss_fns_dict["fns"]
+                     "fn_args": {"MSELoss()": {}, "discr_loss": {"disp_r": ARGS.discr_loss_r, "loss_r": ARGS.discr_pred_disp_r}}}
+    loss_fns_dict["fns"] = loss_fns_dict["fns"] + [discr_loss] if ARGS.discr_loss else loss_fns_dict["fns"]
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
     while (is_training is True) and (train_count<100):
         try:
             train_count += 1
-            model, model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fns_dict, epochs=args.tr_epochs, show_model_info=True)
+            best_model, best_model_info = train(model, train_graphs_loader, val_graphs_loader, optimizer, loss_fns_dict, epochs=ARGS.tr_epochs, args=ARGS, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")
         except Exception as e:
@@ -548,4 +550,4 @@ if __name__ == "__main__":
         else:
             is_training = False
             if save_model_info:
-                save_model(model, model_info)
+                save_model(best_model, best_model_info, model_dir=g_model_dir, model_log_dir=g_model_log_dir)

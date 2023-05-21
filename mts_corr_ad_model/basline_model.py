@@ -62,7 +62,7 @@ class BaselineGRUModel(torch.nn.Module):
         return pred
 
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000):
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000, args: argparse.Namespace = None):
         super().train(mode=mode)
         if train_data is None:
             return self
@@ -104,7 +104,7 @@ class BaselineGRUModel(torch.nn.Module):
                 self.optim.step()
 
             # Validation
-            epoch_loss['val'], epoch_edge_acc['val'] = self.test(val_data)
+            epoch_loss['val'], epoch_edge_acc['val'] = self.test(val_data, args=args)
             self.train()
 
             # record training history
@@ -124,7 +124,7 @@ class BaselineGRUModel(torch.nn.Module):
         return best_model, best_model_info
 
 
-    def test(self, test_data: np.ndarray = None):
+    def test(self, test_data: np.ndarray = None, args: argparse.Namespace = None):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
@@ -199,9 +199,9 @@ if __name__ == "__main__":
                                       help="input the number of stacked-layers of gru")
     baseline_args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
                                       help="input the number of gru hidden size")
-    args = baseline_args_parser.parse_args()
+    ARGS = baseline_args_parser.parse_args()
     logger.debug(pformat(data_cfg, indent=1, width=100, compact=True))
-    logger.info(pformat(f"\n{vars(args)}", indent=1, width=40, compact=True))
+    logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # ## Data implement & output setting & testset setting
     # data implement setting
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     # setting of name of output files and pictures title
     output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
     # setting of output files
-    save_model_info = args.save_model
+    save_model_info = ARGS.save_model
     # set devide of pytorch
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
@@ -220,8 +220,8 @@ if __name__ == "__main__":
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
 
-    s_l, w_l = args.corr_stride, args.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
+    s_l, w_l = ARGS.corr_stride, ARGS.corr_window
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
     g_model_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
     g_model_log_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
@@ -229,12 +229,12 @@ if __name__ == "__main__":
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{args.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if args.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
-    mts_corr_ad_cfg = {"drop_p": args.drop_p,
+    mts_corr_ad_cfg = {"drop_p": ARGS.drop_p,
                        "dim_in": (norm_train_dataset['edges'].shape[1])**2,
-                       "gru_l": args.gru_l,
-                       "gru_h": args.gru_h,
+                       "gru_l": ARGS.gru_l,
+                       "gru_h": ARGS.gru_h,
                        "dim_out": (norm_train_dataset['edges'].shape[1])**2}
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
@@ -249,6 +249,6 @@ if __name__ == "__main__":
     logger.info("="*80)
 
     model = BaselineGRUModel(**mts_corr_ad_cfg)
-    best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=args.tr_epochs)
+    best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs, args=ARGS)
     if save_model_info:
         model.save_model(best_model, best_model_info, model_dir=g_model_dir, model_log_dir=g_model_log_dir)
