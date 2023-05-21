@@ -246,7 +246,7 @@ class MTSCorrAD(torch.nn.Module):
         self.graph_encoder = graph_encoder
         gru_input_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(gru_input_size, gru_h, gru_l, dropout=drop_p) if "gru" in drop_pos else GRU(gru_input_size, gru_h, gru_l)
-        self.lin1 = Linear(gru_h, dim_out)
+        self.fc = Linear(gru_h, dim_out)
         self.dropout = Dropout(p=drop_p)
 
 
@@ -259,9 +259,9 @@ class MTSCorrAD(torch.nn.Module):
 
         # Temporal Modeling
         gru_output, gru_hn = self.gru1(graph_embeds)  # regarding batch_size as time-steps(sequence length) by using "unbatched" input
-        lin_output = self.lin1(gru_output[-1])  # gru_output[-1] => only take last time-step
-        graph_embed_pred = self.dropout(lin_output)  if 'fc' in self.drop_pos else lin_output
-        #graph_embed_pred = self.dropout(lin_output)
+        fc_output = self.fc(gru_output[-1])  # gru_output[-1] => only take last time-step
+        graph_embed_pred = self.dropout(fc_output)  if 'fc' in self.drop_pos else fc_output
+        #graph_embed_pred = self.dropout(fc_output)
 
         return graph_embed_pred
 
@@ -316,9 +316,9 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
                                                 "graph_embeds_disparity": dict()},
                        "min_val_loss": float('inf'),
                        "train_loss_history": [],
+                       "val_loss_history": [],
                        "tr_l2_loss_history": [],
-                       "tr_discr_loss_history": [],
-                       "val_loss_history": []}
+                       "tr_discr_loss_history": []}
     gra_embeds_disp_rec_keys = [str(i/(num_diff_graphs-1))+"_disp" for i in range(num_diff_graphs)]
     best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_gra_enc"] = {k: [] for k in gra_embeds_disp_rec_keys}
     best_model_info["graph_embeds_history"]["graph_embeds_disparity"]["train_pred"] = {k: [] for k in gra_embeds_disp_rec_keys}
@@ -342,16 +342,16 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
             y_graph_embeds = train_model.graph_encoder.get_embeddings(y, y_edge_index, y_batch_node_id, y_edge_attr)
             loss_fns["fn_args"]["MSELoss()"].update({"input": graph_embeds_pred, "target":  y_graph_embeds})
             loss_fns["fn_args"]["discr_loss"].update({"graphs_info": train_disc_tester.graphs_info, "test_model": train_model})
-            optim.zero_grad()
             for fn in loss_fns["fns"]:
                 fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                 partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                 loss = partial_fn()
                 epoch_loss[fn_name] += loss / len(train_loader)
                 epoch_loss["tr"] +=  loss / len(train_loader)
+                optim.zero_grad()
                 loss.backward(retain_graph=True)
+                optim.step()
             graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad is not None else torch.zeros((1,)), (-1,)))) for p in islice(train_model.graph_encoder.parameters(), 0, graph_enc_num_layers))  # sums up in each batch
-            optim.step()
             best_model_info["graph_embeds_history"]["graph_embeds_pred"].append(graph_embeds_pred.tolist())
             best_model_info["graph_embeds_history"]["y_graph_embeds"].append(y_graph_embeds.tolist())
         else:
@@ -381,15 +381,16 @@ def train(train_model: torch.nn.Module, train_loader: torch_geometric.loader.dat
             logger.debug(f"{k} of train graph: {tr_gra_embeds_disp}, {k} of val graph: {val_gra_embeds_disp}")
 
         # record training history and save best model
-        if epoch_loss['val']<best_model_info["min_val_loss"]:
-            best_model = train_model
+        if epoch_loss['val'] < best_model_info["min_val_loss"]:
+            best_model = train_model.copy()
             best_model_info["best_val_epoch"] = epoch_i
             best_model_info["min_val_loss"] = epoch_loss['val'].item()
 
         # observe model info in console
-        if show_model_info and epoch_i==0:
+        if epoch_i==0:
             best_model_info["model_structure"] = str(train_model) + "\n" + "="*100 + "\n" + str(summary(train_model, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, max_depth=20))
-            logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
+            if show_model_info :
+                logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_i} batch, the model structure:\n{best_model_info['model_structure']}")
         if epoch_i % 10 == 0:  # show metrics every 10 epochs
             logger.info(f"Epoch {epoch_i:>3} | Train Loss: {epoch_loss['tr'].item():.5f} | Train L2 Loss: {epoch_loss['MSELoss()'].item():.5f} | Train graph emb disparity Loss: {epoch_loss['discr_loss'].item():.5f} | Val Loss: {epoch_loss['val'].item():.5f} ")
 
@@ -413,9 +414,9 @@ def test(test_model: torch.nn.Module, loader: torch_geometric.loader.dataloader.
 
 def save_model(unsaved_model: torch.nn.Module, model_info: dict):
     e_i = model_info.get("best_val_epoch")
-    t = datetime.strftime(datetime.now(),"%Y%m%d%H%M%S")
+    t = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
     torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t}.pt")
-    with open(model_log_dir/f"epoch_{e_i}-{t}.json","w") as f:
+    with open(model_log_dir/f"epoch_{e_i}-{t}.json", "w") as f:
         json_str = json.dumps(model_info)
         f.write(json_str)
     logger.info(f"model has been saved in:{model_dir}")
@@ -483,8 +484,8 @@ if __name__ == "__main__":
     s_l, w_l = args.corr_stride, args.corr_window
     graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{args.filt_mode}-quan{str(args.filt_quan).replace('.', '')}" if args.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    model_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}'
-    model_log_dir = current_dir / f'save_models/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
+    model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     model_dir.mkdir(parents=True, exist_ok=True)
     model_log_dir.mkdir(parents=True, exist_ok=True)
 
