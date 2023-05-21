@@ -92,7 +92,6 @@ class BaselineGRUModel(torch.nn.Module):
             batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=args.batch_size)
             for batched_data in batch_data_generator:
                 x, y = batched_data[0], batched_data[1]
-                print(x[0, :5], y[:5])
                 torch.autograd.set_detect_anomaly(True)
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
