@@ -58,7 +58,7 @@ class BaselineGRUModel(torch.nn.Module):
 
     def forward(self, x):
         gru_output, gru_hn = self.gru(x)
-        pred = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
+        pred = self.fc(gru_output[-1, :])  # Only use the output of the last time step
         return pred
 
 
@@ -71,7 +71,6 @@ class BaselineGRUModel(torch.nn.Module):
                            "filt_mode": args.filt_mode,
                            "filt_quan": args.filt_quan,
                            "graph_nodes_v_mode": args.graph_nodes_v_mode,
-                           "seq_len": args.seq_len,
                            "batchs_per_epoch": ceil(len(train_data)//args.batch_size),
                            "epochs": epochs,
                            "train_batch": args.batch_size,
@@ -90,11 +89,13 @@ class BaselineGRUModel(torch.nn.Module):
             epoch_loss = {"tr": torch.zeros(1), "val": torch.zeros(1)}
             epoch_edge_acc = {"tr": torch.zeros(1), "val": torch.zeros(1)}
             # Train on batches
-            batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=args.batch_size, seq_len=args.seq_len)
+            batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=args.batch_size)
             for batched_data in batch_data_generator:
                 x, y = batched_data[0], batched_data[1]
+                print(x[0, :5], y[:5])
                 torch.autograd.set_detect_anomaly(True)
                 pred = self.forward(x)
+                pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y, target=torch.tensor([1]))
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                 epoch_edge_acc["tr"] += edge_acc / num_batchs
@@ -129,15 +130,15 @@ class BaselineGRUModel(torch.nn.Module):
         test_loss = 0
         test_edge_acc = 0
         with torch.no_grad():
-            batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=args.batch_size, seq_len=args.seq_len)
+            batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=args.batch_size)
             num_batchs = ceil(len(test_data)//args.batch_size)
             for batched_data in batch_data_generator:
                 x, y = batched_data[0], batched_data[1]
                 torch.autograd.set_detect_anomaly(True)
                 pred = self.forward(x)
+                pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y, target=torch.tensor([1]))
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                print(x.shape, pred.shape, y.shape)
                 test_edge_acc += edge_acc / num_batchs
                 test_loss += loss / num_batchs
 
@@ -154,23 +155,17 @@ class BaselineGRUModel(torch.nn.Module):
         logger.info(f"model has been saved in:{model_dir}")
 
     @staticmethod
-    def yield_batch_data(graph_adj_arr: np.ndarray, seq_len: int = 10, batch_size:int =11):
+    def yield_batch_data(graph_adj_arr: np.ndarray, batch_size:int =11):
         graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
         _, num_nodes, _ = graph_adj_arr.shape
         graph_adj_arr = graph_adj_arr.reshape(graph_time_step+1, -1)
         for g_t in range(0, graph_time_step, batch_size):
-            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
-            if cur_batch_size <= 0: break
-            batch_x = torch.empty((cur_batch_size, seq_len, num_nodes**2)).fill_(np.nan)
-            batch_y = torch.empty((cur_batch_size, num_nodes**2)).fill_(np.nan)
-            for data_batch_idx in range(cur_batch_size):
-                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
-                batch_x[data_batch_idx] = torch.tensor(graph_adj_arr[begin_t:end_t])
-                batch_y[data_batch_idx] = torch.tensor(graph_adj_arr[end_t])
+            begin_t, end_t = g_t, g_t+batch_size
+            if end_t > graph_time_step+1: break
+            x = torch.tensor(graph_adj_arr[begin_t:end_t]).float()
+            y = torch.tensor(graph_adj_arr[end_t]).float()
 
-            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
-
-            yield batch_x, batch_y
+            yield x, y
 
 
 if __name__ == "__main__":
@@ -191,8 +186,6 @@ if __name__ == "__main__":
                                       help="input the filtered quantile of graph edges")
     baseline_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                       help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
-    baseline_args_parser.add_argument("--seq_len", type=int, nargs='?', default=32,
-                                      help="Decide length of sequence, default: 32")
     baseline_args_parser.add_argument("--drop_p", type=float, default=0,
                                       help="input 0~1 to decide the probality of drop layers")
     baseline_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
