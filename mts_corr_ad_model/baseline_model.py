@@ -20,8 +20,8 @@ import numpy as np
 import torch
 import torch_geometric
 import yaml
-from torch.nn import (GRU, BatchNorm1d, CosineEmbeddingLoss, Dropout, Linear,
-                      ReLU, Sequential)
+from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU,
+                      Sequential)
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
@@ -51,7 +51,7 @@ class BaselineGRUModel(torch.nn.Module):
         self.drop_p = drop_p
         self.gru = GRU(input_size=self.dim_in, hidden_size=self.gru_h, num_layers=self.gru_l, dropout=drop_p)
         self.fc = Linear(in_features=self.gru_h, out_features=self.dim_out)
-        self.loss_fn = CosineEmbeddingLoss()
+        self.loss_fn = MSELoss()
         self.optim = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=50, gamma=0.5)
 
@@ -95,7 +95,7 @@ class BaselineGRUModel(torch.nn.Module):
                 torch.autograd.set_detect_anomaly(True)
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
-                loss = self.loss_fn(pred, y, target=torch.tensor([1]))
+                loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                 epoch_edge_acc["tr"] += edge_acc / num_batchs
                 epoch_loss["tr"] += loss / num_batchs
@@ -136,7 +136,7 @@ class BaselineGRUModel(torch.nn.Module):
                 torch.autograd.set_detect_anomaly(True)
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
-                loss = self.loss_fn(pred, y, target=torch.tensor([1]))
+                loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                 test_edge_acc += edge_acc / num_batchs
                 test_loss += loss / num_batchs
