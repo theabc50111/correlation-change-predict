@@ -63,6 +63,7 @@ class BaselineGRUModel(torch.nn.Module):
 
 
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000, args: argparse.Namespace = None):
+        # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
         if train_data is None:
             return self
@@ -114,6 +115,9 @@ class BaselineGRUModel(torch.nn.Module):
             best_model_info["val_edge_acc_history"].append(epoch_edge_acc['val'].item())
             if epoch_i==0:
                 best_model_info["model_structure"] = str(self)
+
+            if epoch_i % 10 == 0:  # show metrics every 10 epochs
+                logger.info(f"Epoch {epoch_i:>3} | Train Loss: {epoch_loss['tr'].item():.5f} | Train edge acc: {epoch_edge_acc['tr'].item():.5f} | Val Loss: {epoch_loss['val'].item():.5f} | Val edge acc: {epoch_edge_acc['val'].item():.5f}")
 
             # record training history and save best model
             if epoch_loss['val'] < best_model_info["min_val_loss"]:
