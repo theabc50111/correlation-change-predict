@@ -277,7 +277,7 @@ def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, no
     - save_dir: save directory of graph array
     """
     s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
-    corr_begin_idx = target_df.index.get_loc(corr_dates[0]) - 9
+    corr_begin_idx = target_df.index.get_loc(corr_dates[0]) - w_l + 1
     corr_end_idx = target_df.index.get_loc(corr_dates[-1]) + 1
     logger.debug(f"\nbegin idx of target_df:{corr_begin_idx}, end idx of target_df:{corr_end_idx}"
                  f"\nselected dates of setted_corr_dataset:{corr_dates}")
@@ -295,8 +295,8 @@ def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, no
         computing_mats[i] = target_df.iloc[sp_begin_idx:sp_end_idx, :].values
 
     logger.debug(f"\nNodes matrices.shape:{computing_mats.shape}"
-                 f"\nValues of 2 nodes in first 10 day of first 3 window:"
-                 f"\n{computing_mats[:3, :10, :2]}")
+                 f"\nValues of 2 nodes of {w_l} day in first 3 window:"
+                 f"\n{computing_mats[:3, ::, :2]}")
 
     assert nodes_v_mode in ["all_values", "mean", "std", "mean_std", "min", "max"], "The given mode of nodes values is not in the options"
     if nodes_v_mode == "all_values":
@@ -313,14 +313,12 @@ def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, no
         ret_mats = np.max(computing_mats, axis=1).reshape(num_mats, -1, num_nodes)
 
     logger.info(f"\nReturn nodes's matrices.shape:{ret_mats.shape}"
-                f"\n5 nodes's matrices in first 3 window of first 10 day:\n{ret_mats[:3, :10, :5]}'")
+                f"\nall node-features of 7 nodes in first 3 window:\n{ret_mats[:3, ::, :7]}'")
 
     if save_dir:
         np.save(save_dir/f"{nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy", ret_mats)
 
     return ret_mats
-
-
 
 
 if __name__ == "__main__":
@@ -371,7 +369,6 @@ if __name__ == "__main__":
     data_args_parser.add_argument("--save_corr_graph_arr", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                   help="input --save_corr_graph_arr to save correlation graph data")
     args = data_args_parser.parse_args()
-    logger.debug(pformat(DATA_CFG, indent=1, width=100, compact=True))
     logger.info(pformat(vars(args), indent=1, width=100, compact=True))
 
     # generate correlation matrix across time

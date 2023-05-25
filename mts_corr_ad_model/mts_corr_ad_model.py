@@ -55,7 +55,6 @@ mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 
-
 # ## Multi-Dimension Time-Series Correlation Anomly Detection Model
 class GineEncoder(torch.nn.Module):
     """
@@ -205,6 +204,9 @@ class MTSCorrAD(torch.nn.Module):
         logger.info(f"Model Configuration: \n{observe_model_cfg}")
 
     def forward(self, x, edge_index, batch_node_id, edge_attr, *unused_args):
+        """
+        Operate when model called
+        """
         # Inter-series modeling
         if type(self.graph_encoder).__name__ == "GinEncoder":
             graph_embeds = self.graph_encoder(x, edge_index, batch_node_id)
@@ -221,7 +223,6 @@ class MTSCorrAD(torch.nn.Module):
         pred_graph_adj = self.decoder.forward_all(z, sigmoid=False)
 
         return pred_graph_adj
-
 
     def train(self, mode: bool = True, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, args: argparse.Namespace = None, show_model_info: bool = False):
         """
@@ -342,7 +343,6 @@ class MTSCorrAD(torch.nn.Module):
 
         return best_model, best_model_info
 
-
     def test(self, loader: torch_geometric.loader.dataloader.DataLoader, criterion: torch.nn.modules.loss = MSELoss()):
         self.eval()
         test_loss = 0
@@ -371,7 +371,6 @@ class MTSCorrAD(torch.nn.Module):
             f.write(json_str)
         logger.info(f"model has been saved in:{model_dir}")
 
-
     def get_pred_embeddings(self, x, edge_index, batch_node_id, edge_attr, *unused_args):
         """
         get  the predictive graph_embeddings with no_grad by using part of self.forward() process
@@ -388,16 +387,15 @@ class MTSCorrAD(torch.nn.Module):
 
         return pred_graph_embeds
 
-
     def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, is_discr: bool = False):
         """
         Create Pytorch Geometric DataLoaders
         """
         graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
-        graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
         dataset = []
         loader_batch_size = self.model_cfg["batch_size"] if not is_discr else 1
-        for g_t in range(graph_time_step):
+        for g_t in range(graph_time_len):
             edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t + 1])), axis=1))
             edge_attr_next_t = torch.tensor(graph_adj_mats[g_t + 1][~np.isnan(graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
             node_attr_next_t = torch.tensor(graph_nodes_mats[g_t + 1], dtype=torch.float32)
@@ -474,8 +472,6 @@ def discr_loss(graphs_info, test_model, criterion: torch.nn.modules.loss = MSELo
     ret_loss = loss_r * disp_loss
 
     return ret_loss
-
-
 
 
 if __name__ == "__main__":
