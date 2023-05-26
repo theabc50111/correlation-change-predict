@@ -90,12 +90,12 @@ class GraphTimeSeriesDataset(Dataset):
                 for data_batch_idx in range(self.batch_size):
                     g_t = batch_head + seq_t + data_batch_idx
                     edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t + 1])), axis=1))
-                    edge_attr_next_t = torch.tensor(graph_adj_mats[g_t + 1][~np.isnan(graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float32)
-                    node_attr_next_t = torch.tensor(graph_nodes_mats[g_t + 1], dtype=torch.float32)
+                    edge_attr_next_t = torch.tensor(graph_adj_mats[g_t + 1][~np.isnan(graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float64)
+                    node_attr_next_t = torch.tensor(graph_nodes_mats[g_t + 1], dtype=torch.float64)
                     data_y = Data(x=node_attr_next_t, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
                     edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t])), axis=1))
-                    edge_attr = torch.tensor(graph_adj_mats[g_t][~np.isnan(graph_adj_mats[g_t])].reshape(-1, 1), dtype=torch.float32)
-                    node_attr = torch.tensor(graph_nodes_mats[g_t], dtype=torch.float32)
+                    edge_attr = torch.tensor(graph_adj_mats[g_t][~np.isnan(graph_adj_mats[g_t])].reshape(-1, 1), dtype=torch.float64)
+                    node_attr = torch.tensor(graph_nodes_mats[g_t], dtype=torch.float64)
                     data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
                     batch_data_list.append(data)
                 seq_data_list.append(batch_data_list)
@@ -115,11 +115,11 @@ class GraphTimeSeriesDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        Return a batch_data. For example, when idx is "0", `__getitem__()` will return:
+        Return a batch_data. For example, when idx is "0", `__getitem__()` will return a list that contains batch_size graphs:
         | __get_item__ idx |         batch_size         |
              idx=0 ----->  [graph_t0, graph_t1, graph_t2]
 
-        In order to make the `DataLoader` combine sequencial graphs into a `Data` object, the arrange of self.data_list will not be sequencial.
+        In order to make the `DataLoader` combine sequencial graphs into a `Data` objects, the arrange of self.data_list will not be sequencial.
         !!!So the return of `__getitem__()` will not be sequencial either!!!
         For example, when batch_size is "3" and seq_len is 5, `__getitem__()` will return:
         | __get_item__ idx |         batch_size         |
@@ -144,6 +144,19 @@ class GraphTimeSeriesDataset(Dataset):
 
         return batch_data
 
+    def len(self) -> int:
+        r"""
+        Returns the number of graphs stored in the dataset.
+        Implement this to match abstract base class.
+        """
+        return self.__len__()
+
+    def get(self, idx: int) -> list:
+        r"""
+        Gets the data object at index :obj:`idx`.
+        Implement this to match abstract base class.
+        """
+        return self.__getitem__(idx)
 
 # ## Multi-Dimension Time-Series Correlation Anomly Detection Model
 class GineEncoder(torch.nn.Module):
@@ -171,7 +184,6 @@ class GineEncoder(torch.nn.Module):
                                 BatchNorm1d(gra_enc_h), ReLU())
             self.gine_convs.append(GINEConv(nn, edge_dim=num_edge_features, aggr=gra_enc_aggr))
 
-
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr):
         """
         x: node attributes
@@ -197,7 +209,6 @@ class GineEncoder(torch.nn.Module):
         graph_embeds = torch.cat(nodes_emb_pools, dim=1)  # the shape of graph_embeds: [seq_len, num_layers*gra_enc_h]
                                                           # (each graph represent for a time step, so seq_len means the number of graphs and number of time steps)
         return graph_embeds
-
 
     def get_embeddings(self, x, edge_index, seq_batch_node_id, edge_attr):
         """
@@ -545,7 +556,7 @@ if __name__ == "__main__":
                                          help="input 0~1 to decide the probality of drop layers")
     mts_corr_ad_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
                                          help="input the type of graph encoder")
-    mts_corr_ad_args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="mean",
+    mts_corr_ad_args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="add",
                                          help="input the type of aggregator of graph encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
@@ -569,7 +580,7 @@ if __name__ == "__main__":
     # set devide of pytorch
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    torch.set_default_tensor_type(torch.cuda.DoubleTensor if torch.cuda.is_available() else torch.DoubleTensor)
     torch.autograd.set_detect_anomaly(True)  # for debug grad
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
