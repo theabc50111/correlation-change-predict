@@ -152,7 +152,7 @@ class GineEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINEconv
     gra_enc_h: output size of hidden layer of GINEconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, num_edge_features: int, **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, num_edge_features: int, **unused_kwargs):
         super(GineEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gine_convs = torch.nn.ModuleList()
@@ -169,7 +169,7 @@ class GineEncoder(torch.nn.Module):
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU())
-            self.gine_convs.append(GINEConv(nn, edge_dim=num_edge_features))
+            self.gine_convs.append(GINEConv(nn, edge_dim=num_edge_features, aggr=gra_enc_aggr))
 
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr):
@@ -215,7 +215,7 @@ class GinEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINconv
     gra_enc_h: output size of hidden layer of GINconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, **unused_kwargs):
         super(GinEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gin_convs = torch.nn.ModuleList()
@@ -232,7 +232,7 @@ class GinEncoder(torch.nn.Module):
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU())
-            self.gin_convs.append(GINConv(nn))
+            self.gin_convs.append(GINConv(nn, aggr=gra_enc_aggr))
 
 
     def forward(self, x, edge_index, seq_batch_node_id, *unused_args):
@@ -343,6 +343,7 @@ class MTSCorrAD(torch.nn.Module):
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
                            "drop_pos": self.model_cfg["drop_pos"],
                            "graph_enc": type(self.graph_encoder).__name__,
+                           "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
                            "graph_enc_w_grad_history": [],
                            "graph_embeds_history": {"pred_graph_embeds": [],
                                                     "y_graph_embeds": [],
@@ -367,18 +368,18 @@ class MTSCorrAD(torch.nn.Module):
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                    epoch_metrics["tr_edge_acc"] += edge_acc / self.num_tr_batches
+                    epoch_metrics["tr_edge_acc"] += edge_acc / (self.num_tr_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        total_loss += loss
-                        epoch_metrics[fn_name] += loss / self.num_tr_batches
+                        total_loss += loss / (self.num_tr_batches*self.model_cfg['batch_size'])
+                        epoch_metrics[fn_name] += loss / (self.num_tr_batches*self.model_cfg['batch_size'])
                 total_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-                epoch_metrics["tr_loss"] += total_loss / self.num_tr_batches
+                epoch_metrics["tr_loss"] += total_loss
                 log_model_info_data = data
                 log_model_info_batch_idx = batch_idx
             pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
@@ -428,13 +429,13 @@ class MTSCorrAD(torch.nn.Module):
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                    test_edge_acc += edge_acc / self.num_val_batches
+                    test_edge_acc += edge_acc / (self.num_val_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        test_loss += loss / self.num_val_batches
+                        test_loss += loss / (self.num_val_batches*self.model_cfg['batch_size'])
 
         return test_loss, test_edge_acc
 
@@ -518,32 +519,6 @@ class MTSCorrAD(torch.nn.Module):
         return data_loader
 
 
-# ## Loss function
-def barlo_twins_loss(pred: torch.Tensor, target: torch.Tensor):
-    """
-    loss function 
-    """
-    assert pred.shape == target.shape, "The shape of prediction and target aren't match"  # TODO
-
-
-def discr_loss(graphs_info, test_model, criterion: torch.nn.modules.loss = MSELoss(), disp_r: float = 1, loss_r: float = 10):
-    real_gra_embeds_dispiraty, real_pred_embeds_dispiraty  = 0, 0
-    emb_r_list = [0] + np.linspace(0.01, 1, len(graphs_info)-1).tolist()
-    for i, (emb_r, g_info) in enumerate(zip(emb_r_list, graphs_info)):
-        if i == 0:
-            comp_gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], g_info["x_edge_idx"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
-            comp_pred_embeds = test_model(g_info["x"], g_info["x_edge_idx"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
-        else:
-            gra_embeds = test_model.graph_encoder.get_embeddings(g_info["x"], g_info["x_edge_idx"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
-            pred_embeds = test_model(g_info["x"], g_info["x_edge_idx"], torch.zeros(g_info["x"].shape[0], dtype=torch.int64), g_info["x_edge_attr"])
-            real_gra_embeds_dispiraty += emb_r * criterion(comp_gra_embeds, gra_embeds)
-            real_pred_embeds_dispiraty += emb_r * criterion(comp_pred_embeds, pred_embeds)
-            disp_loss = -1 * (real_gra_embeds_dispiraty + disp_r * real_pred_embeds_dispiraty)
-    ret_loss = loss_r * disp_loss
-
-    return ret_loss
-
-
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
     mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=11,
@@ -570,6 +545,8 @@ if __name__ == "__main__":
                                          help="input 0~1 to decide the probality of drop layers")
     mts_corr_ad_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
                                          help="input the type of graph encoder")
+    mts_corr_ad_args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="mean",
+                                         help="input the type of aggregator of graph encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
                                          help="input the number of graph laryers of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
@@ -629,11 +606,12 @@ if __name__ == "__main__":
                        "seq_len": ARGS.seq_len,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
+                       "gra_enc_aggr": ARGS.gra_enc_aggr,
                        "gra_enc_l": ARGS.gra_enc_l,
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
                        "dataset": {"train": norm_train_dataset, "val": norm_val_dataset, "test": norm_test_dataset},
-                       "graph_encoder": GinEncoder if ARGS.gra_enc == "gine" else GinEncoder,
+                       "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": InnerProductDecoder}
     model = MTSCorrAD(mts_corr_ad_cfg)
     loss_fns_dict = {"fns": [MSELoss()],
