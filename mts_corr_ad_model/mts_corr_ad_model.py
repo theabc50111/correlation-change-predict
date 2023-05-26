@@ -521,11 +521,11 @@ class MTSCorrAD(torch.nn.Module):
 
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
-    mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=11,
+    mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,
                                          help="input the number of batch size")
-    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
+    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
                                          help="input the number of training epochs")
-    mts_corr_ad_args_parser.add_argument("--seq_len", type=int, nargs='?', default=32,
+    mts_corr_ad_args_parser.add_argument("--seq_len", type=int, nargs='?', default=30,
                                          help="input the number of sequence length")
     mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                          help="input --save_model to save model weight and model info")
