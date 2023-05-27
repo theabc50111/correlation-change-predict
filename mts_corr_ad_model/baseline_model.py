@@ -42,102 +42,100 @@ logger.setLevel(logging.INFO)
 
 
 class BaselineGRUModel(torch.nn.Module):
-    def __init__(self, dim_in: int, gru_l: int, gru_h: int, dim_out: int, drop_p: float, **unused_kwargs):
+    def __init__(self, model_cfg: dict, **unused_kwargs):
         super(BaselineGRUModel, self).__init__()
-        self.dim_in = dim_in
-        self.gru_l = gru_l
-        self.gru_h = gru_h
-        self.dim_out = dim_out
-        self.drop_p = drop_p
-        self.gru = GRU(input_size=self.dim_in, hidden_size=self.gru_h, num_layers=self.gru_l, dropout=drop_p)
+        self.model_cfg = model_cfg
+        self.num_tr_batches = self.model_cfg['num_tr_batches']
+        self.dim_in = self.model_cfg['dim_in']
+        self.gru_l = self.model_cfg['gru_l']
+        self.gru_h = self.model_cfg['gru_h']
+        self.dim_out = self.model_cfg['dim_out']
+        self.drop_p = self.model_cfg['drop_p']
+        self.gru = GRU(input_size=self.dim_in, hidden_size=self.gru_h, num_layers=self.gru_l, dropout=self.drop_p)
         self.fc = Linear(in_features=self.gru_h, out_features=self.dim_out)
         self.loss_fn = MSELoss()
-        self.optim = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=50, gamma=0.5)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
 
     def forward(self, x):
         gru_output, gru_hn = self.gru(x)
-        pred = self.fc(gru_output[-1, :])  # Only use the output of the last time step
+        pred = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
         return pred
 
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000, args: argparse.Namespace = None):
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000):
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
         if train_data is None:
             return self
 
         best_model_info = {"num_training_graphs": len(train_data),
-                           "filt_mode": args.filt_mode,
-                           "filt_quan": args.filt_quan,
-                           "graph_nodes_v_mode": args.graph_nodes_v_mode,
-                           "batchs_per_epoch": ceil(len(train_data)//args.batch_size),
+                           "filt_mode": self.model_cfg['filt_mode'],
+                           "filt_quan": self.model_cfg['filt_quan'],
+                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
+                           "batchs_per_epoch": ceil(len(train_data)//self.model_cfg['batch_size']),
                            "epochs": epochs,
-                           "train_batch": args.batch_size,
-                           "val_batch": args.batch_size,
-                           "optimizer": str(self.optim),
+                           "batch_size": self.model_cfg['batch_size'],
+                           "seq_len": self.model_cfg['seq_len'],
+                           "optimizer": str(self.optimizer),
                            "loss_fn": str(self.loss_fn.__name__ if hasattr(self.loss_fn, '__name__') else str(self.loss_fn)),
-                           "min_val_loss": float('inf'),
-                           "train_loss_history": [],
-                           "val_loss_history": [],
-                           "train_edge_acc_history": [],
-                           "val_edge_acc_history": []}
+                           "min_val_loss": float('inf')}
+        batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
 
         best_model = []
-        num_batchs = ceil(len(train_data)//args.batch_size)
+        num_batchs = ceil(len(train_data)//self.model_cfg['batch_size'])
         for epoch_i in tqdm(range(epochs)):
-            epoch_loss = {"tr": torch.zeros(1), "val": torch.zeros(1)}
-            epoch_edge_acc = {"tr": torch.zeros(1), "val": torch.zeros(1)}
+            self.train()
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1)}
             # Train on batches
-            batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=args.batch_size)
-            for batched_data in batch_data_generator:
-                x, y = batched_data[0], batched_data[1]
-                torch.autograd.set_detect_anomaly(True)
+            gradients = 0
+            batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
+            for batch_data in batch_data_generator:
+                x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                epoch_edge_acc["tr"] += edge_acc / num_batchs
-                epoch_loss["tr"] += loss / num_batchs
-                self.optim.zero_grad()
+                epoch_metrics["tr_edge_acc"] += edge_acc / num_batchs
+                epoch_metrics["tr_loss"] += loss / num_batchs
+                self.optimizer.zero_grad()
                 loss.backward()
-                self.optim.step()
+                self.optimizer.step()
+                self.scheduler.step()
+                gradients += sum([p.grad.sum() for p in self.parameters()])
 
             # Validation
-            epoch_loss['val'], epoch_edge_acc['val'] = self.test(val_data, args=args)
-            self.train()
-
-            # record training history
-            best_model_info["train_loss_history"].append(epoch_loss["tr"].item())
-            best_model_info["val_loss_history"].append(epoch_loss['val'].item())
-            best_model_info["train_edge_acc_history"].append(epoch_edge_acc["tr"].item())
-            best_model_info["val_edge_acc_history"].append(epoch_edge_acc['val'].item())
-            if epoch_i==0:
-                best_model_info["model_structure"] = str(self)
-
-            if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                logger.info(f"Epoch {epoch_i:>3} | Train Loss: {epoch_loss['tr'].item():.5f} | Train edge acc: {epoch_edge_acc['tr'].item():.5f} | Val Loss: {epoch_loss['val'].item():.5f} | Val edge acc: {epoch_edge_acc['val'].item():.5f}")
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
 
             # record training history and save best model
-            if epoch_loss['val'] < best_model_info["min_val_loss"]:
+            for k, v in epoch_metrics.items():
+                history_list = best_model_info.setdefault(k+"_history", [])
+                history_list.append(v.item())
+            if epoch_i == 0:
+                best_model_info["model_structure"] = str(self)
+            if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
                 best_model = copy.deepcopy(self.state_dict())
                 best_model_info["best_val_epoch"] = epoch_i
-                best_model_info["min_val_loss"] = epoch_loss['val'].item()
+                best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
+                best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
+
+            if epoch_i % 10 == 0:  # show metrics every 10 epochs
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
+                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | gradients: {gradients:.8f}")
 
         return best_model, best_model_info
 
 
-    def test(self, test_data: np.ndarray = None, args: argparse.Namespace = None):
+    def test(self, test_data: np.ndarray = None):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
         with torch.no_grad():
-            batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=args.batch_size)
-            num_batchs = ceil(len(test_data)//args.batch_size)
-            for batched_data in batch_data_generator:
-                x, y = batched_data[0], batched_data[1]
-                torch.autograd.set_detect_anomaly(True)
+            batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
+            num_batchs = ceil(len(test_data)//self.model_cfg['batch_size'])
+            for batch_data in batch_data_generator:
+                x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y)
@@ -158,25 +156,33 @@ class BaselineGRUModel(torch.nn.Module):
         logger.info(f"model has been saved in:{model_dir}")
 
     @staticmethod
-    def yield_batch_data(graph_adj_arr: np.ndarray, batch_size:int =11):
+    def yield_batch_data(graph_adj_arr: np.ndarray, seq_len: int = 10, batch_size: int = 5):
         graph_time_step = graph_adj_arr.shape[0] - 1  # the graph of last "t" can't be used as train data
         _, num_nodes, _ = graph_adj_arr.shape
         graph_adj_arr = graph_adj_arr.reshape(graph_time_step+1, -1)
         for g_t in range(0, graph_time_step, batch_size):
-            begin_t, end_t = g_t, g_t+batch_size
-            if end_t > graph_time_step+1: break
-            x = torch.tensor(graph_adj_arr[begin_t:end_t]).float()
-            y = torch.tensor(graph_adj_arr[end_t]).float()
+            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
+            if cur_batch_size <= 0: break
+            batch_x = torch.empty((cur_batch_size, seq_len, num_nodes**2)).fill_(np.nan)
+            batch_y = torch.empty((cur_batch_size, num_nodes**2)).fill_(np.nan)
+            for data_batch_idx in range(cur_batch_size):
+                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
+                batch_x[data_batch_idx] = torch.tensor(graph_adj_arr[begin_t:end_t])
+                batch_y[data_batch_idx] = torch.tensor(graph_adj_arr[end_t])
 
-            yield x, y
+            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
+
+            yield batch_x, batch_y
 
 
 if __name__ == "__main__":
     baseline_args_parser = argparse.ArgumentParser()
-    baseline_args_parser.add_argument("--batch_size", type=int, nargs='?', default=32,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
+    baseline_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                       help="input the number of training batch")
-    baseline_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
+    baseline_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
                                       help="input the number of training epochs")
+    baseline_args_parser.add_argument("--seq_len", type=int, nargs='?', default=30,
+                                      help="Decide length of sequence, default: 30")
     baseline_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                       help="input --save_model to save model weight and model info")
     baseline_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
@@ -212,7 +218,8 @@ if __name__ == "__main__":
     # set devide of pytorch
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    torch.set_default_tensor_type(torch.cuda.DoubleTensor)
+    torch.autograd.set_detect_anomaly(True)
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
 
@@ -227,11 +234,6 @@ if __name__ == "__main__":
     gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
-    mts_corr_ad_cfg = {"drop_p": ARGS.drop_p,
-                       "dim_in": (norm_train_dataset['edges'].shape[1])**2,
-                       "gru_l": ARGS.gru_l,
-                       "gru_h": ARGS.gru_h,
-                       "dim_out": (norm_train_dataset['edges'].shape[1])**2}
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
     logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
@@ -244,7 +246,19 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    model = BaselineGRUModel(**mts_corr_ad_cfg)
-    best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs, args=ARGS)
+    baseline_gru_model_cfg = {"filt_mode": ARGS.filt_mode,
+                              "filt_quan": ARGS.filt_quan,
+                              "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
+                              "batch_size": ARGS.batch_size,
+                              "seq_len": ARGS.seq_len,
+                              "num_tr_batches": ceil(len(norm_train_dataset['edges']) / ARGS.batch_size),
+                              "drop_p": ARGS.drop_p,
+                              "dim_in": (norm_train_dataset['edges'].shape[1])**2,
+                              "gru_l": ARGS.gru_l,
+                              "gru_h": ARGS.gru_h,
+                              "dim_out": (norm_train_dataset['edges'].shape[1])**2}
+    model = BaselineGRUModel(baseline_gru_model_cfg)
+    best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
+
     if save_model_info:
         model.save_model(best_model, best_model_info, model_dir=g_model_dir, model_log_dir=g_model_log_dir)
