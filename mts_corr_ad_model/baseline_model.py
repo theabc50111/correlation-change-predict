@@ -87,7 +87,7 @@ class BaselineGRUModel(torch.nn.Module):
         num_batchs = ceil(len(train_data)//self.model_cfg['batch_size'])
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}}
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}
             # Train on batches
             gradients = 0
             batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
@@ -102,9 +102,9 @@ class BaselineGRUModel(torch.nn.Module):
                 self.optimizer.step()
                 self.scheduler.step()
                 gradients += sum([p.grad.sum() for p in self.parameters()])
-                epoch_metrics["tr_edge_acc"] += edge_acc / num_batchs
-                epoch_metrics["tr_loss"] += loss / num_batchs
-                epoch_metrics["gradient"] += gradient / num_batchs
+                epoch_metrics["tr_edge_acc"] += edge_acc/num_batchs
+                epoch_metrics["tr_loss"] += loss/num_batchs
+                epoch_metrics["gradient"] += gradients/num_batchs
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
