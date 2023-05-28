@@ -87,7 +87,7 @@ class BaselineGRUModel(torch.nn.Module):
         num_batchs = ceil(len(train_data)//self.model_cfg['batch_size'])
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1)}
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}}
             # Train on batches
             gradients = 0
             batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
@@ -97,13 +97,14 @@ class BaselineGRUModel(torch.nn.Module):
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                epoch_metrics["tr_edge_acc"] += edge_acc / num_batchs
-                epoch_metrics["tr_loss"] += loss / num_batchs
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
                 gradients += sum([p.grad.sum() for p in self.parameters()])
+                epoch_metrics["tr_edge_acc"] += edge_acc / num_batchs
+                epoch_metrics["tr_loss"] += loss / num_batchs
+                epoch_metrics["gradient"] += gradient / num_batchs
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
@@ -122,7 +123,7 @@ class BaselineGRUModel(torch.nn.Module):
 
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
-                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | gradients: {gradients:.8f}")
+                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
 
         return best_model, best_model_info
 
