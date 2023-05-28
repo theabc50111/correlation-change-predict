@@ -251,7 +251,7 @@ if __name__ == "__main__":
                               "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                               "batch_size": ARGS.batch_size,
                               "seq_len": ARGS.seq_len,
-                              "num_tr_batches": ceil(len(norm_train_dataset['edges']) / ARGS.batch_size),
+                              "num_tr_batches": ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size),
                               "drop_p": ARGS.drop_p,
                               "dim_in": (norm_train_dataset['edges'].shape[1])**2,
                               "gru_l": ARGS.gru_l,

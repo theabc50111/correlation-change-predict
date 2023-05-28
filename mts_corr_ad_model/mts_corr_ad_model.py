@@ -55,7 +55,7 @@ warnings.simplefilter("ignore")
 
 
 class GraphTimeSeriesDataset(Dataset):
-    def __init__(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, model_cfg: dict):
+    def __init__(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, model_cfg: dict, show_log: bool = True):
         """
         Create list of graph data:
         In order to make the `DataLoader` combine sequencial graphs into a `Data` object, the arrange of self.data_list will not be sequencial.
@@ -81,11 +81,14 @@ class GraphTimeSeriesDataset(Dataset):
         self.seq_len = model_cfg['seq_len']
         graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
         graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        final_batch_head = graph_time_len - (self.seq_len-1) - (self.batch_size-1)
+        final_batch_head = ((graph_time_len//self.batch_size)-1)*self.batch_size
+        last_seq_len = graph_time_len-final_batch_head-self.batch_size
         data_list = []
-        for batch_head in range(0, final_batch_head, self.batch_size):
+        for batch_head in range(0, final_batch_head+1, self.batch_size):
             seq_data_list = []
             for seq_t in range(self.seq_len):
+                if batch_head == final_batch_head and seq_t > last_seq_len:
+                    break
                 batch_data_list = []
                 for data_batch_idx in range(self.batch_size):
                     g_t = batch_head + seq_t + data_batch_idx
@@ -101,16 +104,20 @@ class GraphTimeSeriesDataset(Dataset):
                 seq_data_list.append(batch_data_list)
             data_list.extend(seq_data_list)
         self.data_list = data_list
-        model_cfg["fc_out_dim"] = data.y.x.shape[0]  # turn on this if the input of loss-function graphs
-        model_cfg["num_node_features"] = data.num_node_features
-        model_cfg["num_edge_features"] = data.num_edge_features
 
-        logger.info(f"Time length of graphs: {graph_time_len}")
-        logger.info(f"The length of Dataset is: {len(data_list)}")
-        logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
-        logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
+        if show_log:
+            logger.info(f"Time length of graphs: {graph_time_len}")
+            logger.info(f"The length of Dataset is: {len(data_list)}")
+            logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
+            logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
 
     def __len__(self):
+        """
+        Return the length of dataset
+        Computation of length of dataset:
+        graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        len(self.data_list) = (graph_time_len//self.model_cfg['batch_size']) * self.model_cfg['seq_len']
+        """
         return len(self.data_list)
 
     def __getitem__(self, idx):
@@ -292,11 +299,8 @@ class MTSCorrAD(torch.nn.Module):
         super(MTSCorrAD, self).__init__()
         self.model_cfg = model_cfg
         # create data loader
-        self.train_loader = self.create_pyg_data_loaders(graph_adj_mats=self.model_cfg['dataset']['train']["edges"],  graph_nodes_mats=self.model_cfg['dataset']['train']["nodes"], loader_seq_len=self.model_cfg["seq_len"])
-        self.val_loader = self.create_pyg_data_loaders(graph_adj_mats=self.model_cfg['dataset']['val']["edges"],  graph_nodes_mats=self.model_cfg['dataset']['val']["nodes"], loader_seq_len=self.model_cfg["seq_len"])
-        self.test_loader = self.create_pyg_data_loaders(graph_adj_mats=self.model_cfg['dataset']['test']["edges"],  graph_nodes_mats=self.model_cfg['dataset']['test']["nodes"], loader_seq_len=self.model_cfg["seq_len"])
-        self.num_tr_batches = len(self.train_loader)
-        self.num_val_batches = len(self.val_loader)
+        self.num_tr_batches = self.model_cfg["num_batches"]['train']
+        self.num_val_batches = self.model_cfg["num_batches"]['val']
 
         # set model components
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
@@ -305,8 +309,8 @@ class MTSCorrAD(torch.nn.Module):
         self.fc = Linear(graph_enc_emb_size, self.model_cfg["fc_out_dim"])
         self.decoder = self.model_cfg['decoder']()
         self.dropout = Dropout(p=self.model_cfg["drop_p"])
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.01)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
@@ -333,16 +337,16 @@ class MTSCorrAD(torch.nn.Module):
 
         return pred_graph_adj
 
-    def train(self, mode: bool = True, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
         """
         Training MTSCorrAD Model
         """
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
-        if loss_fns is None:
+        if train_data is None:
             return self
 
-        best_model_info = {"num_training_graphs": len(self.train_loader.dataset),
+        best_model_info = {"num_training_graphs": len(train_data),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
@@ -363,12 +367,13 @@ class MTSCorrAD(torch.nn.Module):
         graph_enc_w_grad_after = 0
         best_model = []
 
+        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1)}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
-            for batch_idx, batch_data in enumerate(self.train_loader):
+            for batch_idx, batch_data in enumerate(train_loader):
                 self.optimizer.zero_grad()
                 total_loss = torch.zeros(1)
                 for data_batch_idx in range(self.model_cfg['batch_size']):
@@ -402,7 +407,7 @@ class MTSCorrAD(torch.nn.Module):
             graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad is not None else torch.zeros((1,)), (-1,)))) for p in islice(self.graph_encoder.parameters(), 0, self.graph_enc_num_layers))  # sums up in each batch
             assert graph_enc_w_grad_after > 0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
             # Validation
-            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(self.val_loader, loss_fns=loss_fns)
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
 
             # record training history and save best model
             for k, v in epoch_metrics.items():
@@ -426,12 +431,13 @@ class MTSCorrAD(torch.nn.Module):
 
         return best_model, best_model_info
 
-    def test(self, loader: torch_geometric.loader.dataloader.DataLoader, loss_fns: dict):
+    def test(self, test_data: np.ndarray = None, loss_fns: dict = None, show_loader_log: bool = False):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
+        test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
         with torch.no_grad():
-            for batch_data in loader:
+            for batch_data in test_loader:
                 for data_batch_idx in range(self.model_cfg['batch_size']):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
@@ -476,7 +482,7 @@ class MTSCorrAD(torch.nn.Module):
 
         return pred_graph_embeds
 
-    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int,  show_debug_info: bool = False):
+    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int,  show_log: bool = True, show_debug_info: bool = False):
         """
         Create Pytorch Geometric DataLoaders
         """
@@ -484,8 +490,10 @@ class MTSCorrAD(torch.nn.Module):
         dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg)
         # Create mini-batches
         data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
-        logger.info(f'Number of batches in this data_loader: {len(data_loader)}')
-        logger.info("="*30)
+
+        if show_log:
+            logger.info(f'Number of batches in this data_loader: {len(data_loader)}')
+            logger.info("="*30)
 
         if show_debug_info:
             logger.debug('Peeking info of subgraph:')
@@ -615,22 +623,28 @@ if __name__ == "__main__":
                        "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                        "batch_size": ARGS.batch_size,
                        "seq_len": ARGS.seq_len,
+                       "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
+                                       "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
+                                       "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
                        "gra_enc_aggr": ARGS.gra_enc_aggr,
                        "gra_enc_l": ARGS.gra_enc_l,
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
-                       "dataset": {"train": norm_train_dataset, "val": norm_val_dataset, "test": norm_test_dataset},
+                       "fc_out_dim": norm_train_dataset["edges"].shape[1],
+                       "num_node_features": norm_train_dataset["nodes"].shape[2],
+                       "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": InnerProductDecoder}
+
     model = MTSCorrAD(mts_corr_ad_cfg)
     loss_fns_dict = {"fns": [MSELoss()],
                      "fn_args": {"MSELoss()": {}}}
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1
-            g_best_model, g_best_model_info = model.train(loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")
         except Exception as e:

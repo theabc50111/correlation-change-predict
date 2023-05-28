@@ -167,7 +167,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
 def gen_corr_dist_mat(data_ser: pd.Series, raw_df: pd.DataFrame, out_mat_compo: str = "sim"):
     """
     out_mat_compo:
-        - sim : output a matrix with similiarity dat
+        - sim : output a matrix with similiarity data
         - dist : output a matrix with distance data
     """
 
