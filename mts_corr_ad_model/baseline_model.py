@@ -74,7 +74,7 @@ class BaselineGRUModel(torch.nn.Module):
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batchs_per_epoch": ceil(len(train_data)//self.model_cfg['batch_size']),
+                           "batches_per_epoch": ceil(len(train_data)//self.model_cfg['batch_size']),
                            "epochs": epochs,
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
@@ -84,7 +84,7 @@ class BaselineGRUModel(torch.nn.Module):
         batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
 
         best_model = []
-        num_batchs = ceil(len(train_data)//self.model_cfg['batch_size'])
+        num_batches = ceil(len(train_data)//self.model_cfg['batch_size'])
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}
@@ -102,9 +102,9 @@ class BaselineGRUModel(torch.nn.Module):
                 self.optimizer.step()
                 self.scheduler.step()
                 gradients += sum([p.grad.sum() for p in self.parameters()])
-                epoch_metrics["tr_edge_acc"] += edge_acc/num_batchs
-                epoch_metrics["tr_loss"] += loss/num_batchs
-                epoch_metrics["gradient"] += gradients/num_batchs
+                epoch_metrics["tr_edge_acc"] += edge_acc/num_batches
+                epoch_metrics["tr_loss"] += loss/num_batches
+                epoch_metrics["gradient"] += gradients/num_batches
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
@@ -134,15 +134,15 @@ class BaselineGRUModel(torch.nn.Module):
         test_edge_acc = 0
         with torch.no_grad():
             batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
-            num_batchs = ceil(len(test_data)//self.model_cfg['batch_size'])
+            num_batches = ceil(len(test_data)//self.model_cfg['batch_size'])
             for batch_data in batch_data_generator:
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x)
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                test_edge_acc += edge_acc / num_batchs
-                test_loss += loss / num_batchs
+                test_edge_acc += edge_acc / num_batches
+                test_loss += loss / num_batches
 
         return test_loss, test_edge_acc
 

@@ -165,6 +165,7 @@ class GraphTimeSeriesDataset(Dataset):
         """
         return self.__getitem__(idx)
 
+
 # ## Multi-Dimension Time-Series Correlation Anomly Detection Model
 class GineEncoder(torch.nn.Module):
     """
@@ -487,7 +488,7 @@ class MTSCorrAD(torch.nn.Module):
         Create Pytorch Geometric DataLoaders
         """
         # Create an instance of the GraphTimeSeriesDataset
-        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg)
+        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg, show_log=show_log)
         # Create mini-batches
         data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
 
@@ -577,7 +578,7 @@ if __name__ == "__main__":
 
     # ## Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = "SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     #data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
