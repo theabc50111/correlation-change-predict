@@ -84,7 +84,7 @@ class BaselineGRUModel(torch.nn.Module):
         batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
 
         best_model = []
-        num_batches = ceil(len(train_data)//self.model_cfg['batch_size'])
+        num_batches = ceil(len(train_data)//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}
@@ -134,7 +134,7 @@ class BaselineGRUModel(torch.nn.Module):
         test_edge_acc = 0
         with torch.no_grad():
             batch_data_generator = self.yield_batch_data(graph_adj_arr=test_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
-            num_batches = ceil(len(test_data)//self.model_cfg['batch_size'])
+            num_batches = ceil(len(test_data)//self.model_cfg['batch_size'])+1
             for batch_data in batch_data_generator:
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x)
