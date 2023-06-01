@@ -10,7 +10,6 @@ import traceback
 import warnings
 from collections import OrderedDict
 from datetime import datetime
-from itertools import islice
 from pathlib import Path
 from pprint import pformat
 
@@ -311,7 +310,7 @@ class MTSCorrAD(torch.nn.Module):
         self.decoder = self.model_cfg['decoder']()
         self.dropout = Dropout(p=self.model_cfg["drop_p"])
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.9)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 700, 50))+list(range(700, self.model_cfg['tr_epochs'], 10)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
@@ -360,23 +359,21 @@ class MTSCorrAD(torch.nn.Module):
                            "drop_pos": self.model_cfg["drop_pos"],
                            "graph_enc": type(self.graph_encoder).__name__,
                            "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
-                           "graph_enc_w_grad_history": [],
-                           "graph_embeds_history": {"pred_graph_embeds": [],
-                                                    "y_graph_embeds": [],
-                                                    "graph_embeds_disparity": {}},
                            "min_val_loss": float('inf')}
-        graph_enc_w_grad_after = 0
         best_model = []
 
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1)}
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
+                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "fc_grad": torch.zeros(1),
+                             "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             for batch_idx, batch_data in enumerate(train_loader):
                 self.optimizer.zero_grad()
-                total_loss = torch.zeros(1)
+                batch_loss = torch.zeros(1)
+                batch_edge_acc = torch.zeros(1)
                 for data_batch_idx in range(self.model_cfg['batch_size']):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
@@ -385,50 +382,55 @@ class MTSCorrAD(torch.nn.Module):
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                    epoch_metrics["tr_edge_acc"] += edge_acc / (self.num_tr_batches*self.model_cfg['batch_size'])
+                    batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        total_loss += loss / (self.num_tr_batches*self.model_cfg['batch_size'])
-                        epoch_metrics[fn_name] += loss / (self.num_tr_batches*self.model_cfg['batch_size'])
-                total_loss.backward()
+                        batch_loss += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+                batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-                epoch_metrics["tr_loss"] += total_loss
+                # compute graph embeds
+                pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
+                # record metrics for each batch
+                epoch_metrics["tr_loss"] += batch_loss
+                epoch_metrics["tr_edge_acc"] += batch_edge_acc
+                epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["fc_grad"] += sum(p.grad.sum() for p in self.fc.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
+                epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
+                # used in observation model info in console
                 log_model_info_data = data
                 log_model_info_batch_idx = batch_idx
-            pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
-            y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
-            best_model_info["graph_embeds_history"]["pred_graph_embeds"].append(pred_graph_embeds.tolist())
-            best_model_info["graph_embeds_history"]["y_graph_embeds"].append(y_graph_embeds.tolist())
 
-            # Check if graph_encoder.parameters() have been updated
-            graph_enc_w_grad_after += sum(sum(torch.abs(torch.reshape(p.grad if p.grad is not None else torch.zeros((1,)), (-1,)))) for p in islice(self.graph_encoder.parameters(), 0, self.graph_enc_num_layers))  # sums up in each batch
-            assert graph_enc_w_grad_after > 0, f"After loss.backward(), Sum of MainModel.graph_encoder weights in epoch_{epoch_i}:{graph_enc_w_grad_after}"
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
 
             # record training history and save best model
             for k, v in epoch_metrics.items():
                 history_list = best_model_info.setdefault(k+"_history", [])
-                history_list.append(v.item())
-            best_model_info["graph_enc_w_grad_history"].append(graph_enc_w_grad_after.item())
+                history_list.append(v.item() if isinstance(v, torch.Tensor) else v)
             if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
                 best_model = copy.deepcopy(self.state_dict())
                 best_model_info["best_val_epoch"] = epoch_i
                 best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
                 best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
 
+            # Check if graph_encoder.parameters() have been updated
+            assert sum(map(abs, best_model_info['gra_enc_grad_history'])) > 0, f"Sum of gradient of MTSCorrAD.graph_encoder in epoch_{epoch_i}:{sum(map(abs, best_model_info['gra_enc_grad_history']))}"
             # observe model info in console
             if epoch_i == 0:
                 best_model_info["model_structure"] = str(self) + "\n" + "="*100 + "\n" + str(summary(self, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, max_depth=20))
                 if show_model_info:
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.5f}" for k, v in epoch_metrics.items()])
-                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | Graph encoder weights grad: {graph_enc_w_grad_after.item():.5f}")
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.5f}" for k, v in epoch_metrics.items() if "embeds" not in k])
+                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
 
         return best_model, best_model_info
 
@@ -447,13 +449,13 @@ class MTSCorrAD(torch.nn.Module):
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                    test_edge_acc += edge_acc / (self.num_val_batches*self.model_cfg['batch_size'])
+                    test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        test_loss += loss / (self.num_val_batches*self.model_cfg['batch_size'])
+                        test_loss += loss/(self.num_val_batches*self.model_cfg['batch_size'])
 
         return test_loss, test_edge_acc
 
@@ -622,6 +624,7 @@ if __name__ == "__main__":
     mts_corr_ad_cfg = {"filt_mode": ARGS.filt_mode,
                        "filt_quan": ARGS.filt_quan,
                        "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
+                       "tr_epochs": ARGS.tr_epochs,
                        "batch_size": ARGS.batch_size,
                        "seq_len": ARGS.seq_len,
                        "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
