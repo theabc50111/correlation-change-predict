@@ -68,6 +68,18 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre/corr_s1_w50/corr_ser_calc_reg/sim/corr_ser_std/corr_mat_hrchy_9_cluster_label_last-pre.csv"
         TRAIN_SET: ['AAL', 'ALK', 'DAL', 'LB', 'UAA']
         OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_9_cluster_label_last"
+    SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre/corr_s1_w50/corr_ser_calc_reg/sim/corr_ser_std/corr_mat_hrchy_10_cluster_label_7-pre.csv"
+        TRAIN_SET: ['ALL', 'BRK', 'CB', 'CINF', 'COG', 'GE', 'MAT', 'MSI', 'RRC', 'VZ']
+        OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_10_cluster_label_7th"
+    SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_ALL_MIX:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre/corr_s1_w50/corr_ser_calc_reg/sim/corr_ser_std/corr_mat_hrchy_10_cluster_label_all_mix-pre.csv"
+        TRAIN_SET: ['BRK', 'HON', 'LEN', 'MSCI', 'NEE', 'NFLX', 'NFX', 'PKG', 'UAA', 'URI']
+        OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_10_cluster_label_all_mix"
+    SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX:
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre/corr_s1_w50/corr_ser_calc_reg/sim/corr_ser_std/corr_mat_hrchy_10_cluster_label_half_mix-pre.csv"
+        TRAIN_SET: ['BRK', 'GE', 'HON', 'LEN', 'MAT', 'MSI', 'NEE', 'NFLX', 'UAA', 'VZ']
+        OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_10_cluster_label_half_mix"
     SP500_20082017_RANDOM_66:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
         TRAIN_SET: ['L', 'CBS', 'LNC', 'DISCA', 'UPS', 'GD', 'JNPR', 'SYY', 'XOM', 'DVN', 'MSFT', 'RHI', 'REG', 'CMI', 'AET', 'BEN', 'EQR', 'HRB', 'RRC', 'NVDA', 'FLS', 'FE', 'FLR', 'UNH', 'AEE', 'BAX', 'SJM', 'D', 'MGM', 'CAH', 'SCG', 'ANSS', 'GE', 'PX', 'MDLZ', 'AMD', 'DISH', 'PHM', 'NBL', 'COP', 'RJF', 'TWX', 'IR', 'DHR', 'AZO', 'DRI', 'CCI', 'GPN', 'CSCO', 'VLO', 'MET', 'DFS', 'ILMN', 'MON', 'NEM', 'GILD', 'ED', 'ZBH', 'LRCX', 'INTU', 'SHW', 'ROP', 'BDX', 'BBT', 'GPC', 'NKTR']

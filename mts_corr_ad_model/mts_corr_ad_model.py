@@ -305,12 +305,12 @@ class MTSCorrAD(torch.nn.Module):
         # set model components
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
-        self.gru1 = GRU(graph_enc_emb_size, graph_enc_emb_size, self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"]) if "gru" in self.model_cfg["drop_pos"] else GRU(graph_enc_emb_size, graph_enc_emb_size, self.model_cfg["gru_l"])
-        self.fc = Linear(graph_enc_emb_size, self.model_cfg["fc_out_dim"])
+        self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"]) if "gru" in self.model_cfg["drop_pos"] else GRU(graph_enc_emb_size, self.model_cfg['gru_h'], self.model_cfg["gru_l"])
+        self.fc = Linear(self.model_cfg['gru_h'], self.model_cfg["fc_out_dim"])
         self.decoder = self.model_cfg['decoder']()
         self.dropout = Dropout(p=self.model_cfg["drop_p"])
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 700, 50))+list(range(700, self.model_cfg['tr_epochs'], 10)), gamma=0.9)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 600, 50))+list(range(600, self.model_cfg['tr_epochs'], 1000)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
@@ -355,6 +355,7 @@ class MTSCorrAD(torch.nn.Module):
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
                            "optimizer": str(self.optimizer),
+                           "opt_scheduler": {"gamma": self.scheduler.gamma, "milestoines": self.scheduler.milestones},
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
                            "drop_pos": self.model_cfg["drop_pos"],
                            "graph_enc": type(self.graph_encoder).__name__,
@@ -575,6 +576,8 @@ if __name__ == "__main__":
                                          help="input the number of graph embedding hidden size of graph_encoder")
     mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
                                          help="input the number of stacked-layers of gru")
+    mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=None,
+                                         help="input the number of gru hidden size")
     ARGS = mts_corr_ad_args_parser.parse_args()
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
@@ -636,6 +639,7 @@ if __name__ == "__main__":
                        "gra_enc_l": ARGS.gra_enc_l,
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
+                       "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
                        "fc_out_dim": norm_train_dataset["edges"].shape[1],
                        "num_node_features": norm_train_dataset["nodes"].shape[2],
                        "num_edge_features": 1,
