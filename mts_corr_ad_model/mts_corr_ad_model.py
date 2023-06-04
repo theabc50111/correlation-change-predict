@@ -310,8 +310,10 @@ class MTSCorrAD(torch.nn.Module):
         self.decoder = self.model_cfg['decoder']()
         self.dropout = Dropout(p=self.model_cfg["drop_p"])
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 600, 50))+list(range(600, self.model_cfg['tr_epochs'], 1000)), gamma=0.9)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 600, 50))+list(range(600, self.model_cfg['tr_epochs'], 25)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
+        observe_model_cfg['optimizer'] = str(self.optimizer)
+        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler.milestones, "gamma": self.scheduler.gamma}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
@@ -431,7 +433,8 @@ class MTSCorrAD(torch.nn.Module):
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.5f}" for k, v in epoch_metrics.items() if "embeds" not in k])
-                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
+                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.scheduler.get_last_lr()[0]:.5f}")
+                logger.info(f"Epoch {epoch_i:>3} \npred_graph_adj:{pred_graph_adj}\n y_graph_adj:{y_graph_adj}\n pred_graph_embeds:{pred_graph_embeds}\n y_graph_embeds:{y_graph_embeds}")
 
         return best_model, best_model_info
 
@@ -484,7 +487,7 @@ class MTSCorrAD(torch.nn.Module):
             # Temporal Modeling
             pred_graph_embeds, _ = self.gru1(graph_embeds)
 
-        return pred_graph_embeds
+        return pred_graph_embeds[-1]
 
     def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int,  show_log: bool = True, show_debug_info: bool = False):
         """
