@@ -9,19 +9,16 @@ import traceback
 import warnings
 from collections import OrderedDict
 from datetime import datetime
-from itertools import islice
-from math import ceil
+from math import ceil, sqrt
 from pathlib import Path
 from pprint import pformat
 
 import dynamic_yaml
-import matplotlib as mpl
 import numpy as np
 import torch
-import torch_geometric
 import yaml
-from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU,
-                      Sequential)
+from torch.nn import GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU
+from torch_geometric.nn.models.autoencoder import InnerProductDecoder
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
@@ -49,20 +46,18 @@ class BaselineGRUModel(torch.nn.Module):
         self.dim_in = self.model_cfg['dim_in']
         self.gru_l = self.model_cfg['gru_l']
         self.gru_h = self.model_cfg['gru_h']
-        self.dim_out = self.model_cfg['dim_out']
+        self.fc_out_dim = self.model_cfg['fc_out_dim']
         self.drop_p = self.model_cfg['drop_p']
         self.gru = GRU(input_size=self.dim_in, hidden_size=self.gru_h, num_layers=self.gru_l, dropout=self.drop_p)
-        self.fc = Linear(in_features=self.gru_h, out_features=self.dim_out)
+        self.fc = Linear(in_features=self.gru_h, out_features=self.fc_out_dim)
         self.loss_fn = MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
-
 
     def forward(self, x):
         gru_output, gru_hn = self.gru(x)
         pred = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
         return pred
-
 
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000):
         # In order to make original function of nn.Module.train() work, we need to override it
@@ -87,13 +82,12 @@ class BaselineGRUModel(torch.nn.Module):
         num_batches = ceil(len(train_data)//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gradient": torch.zeros(1)}
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gru_gradient": torch.zeros(1), "fc_gradient": torch.zeros(1)}
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             for batch_data in batch_data_generator:
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x)
-                pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 loss = self.loss_fn(pred, y)
                 edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                 self.optimizer.zero_grad()
@@ -102,7 +96,8 @@ class BaselineGRUModel(torch.nn.Module):
                 self.scheduler.step()
                 epoch_metrics["tr_edge_acc"] += edge_acc/num_batches
                 epoch_metrics["tr_loss"] += loss/num_batches
-                epoch_metrics["gradient"] += sum([p.grad.sum() for p in self.parameters()])/num_batches
+                epoch_metrics["gru_gradient"] += sum([p.grad.sum() for p in self.gru.parameters()])/num_batches
+                epoch_metrics["fc_gradient"] += sum([p.grad.sum() for p in self.fc.parameters()])/num_batches
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
@@ -124,7 +119,6 @@ class BaselineGRUModel(torch.nn.Module):
                 logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
 
         return best_model, best_model_info
-
 
     def test(self, test_data: np.ndarray = None):
         self.eval()
@@ -174,6 +168,23 @@ class BaselineGRUModel(torch.nn.Module):
             yield batch_x, batch_y
 
 
+class BaselineGRUInnerdecoderModel(BaselineGRUModel):
+    def __init__(self, model_cfg: dict, **unused_kwargs):
+        super().__init__(model_cfg)
+        self.fc_out_dim = int(sqrt(self.model_cfg['fc_out_dim']))
+        self.fc = Linear(in_features=self.gru_h, out_features=self.fc_out_dim)
+        self.decoder = InnerProductDecoder()
+
+    def forward(self, x):
+        gru_output, gru_hn = self.gru(x)
+        fc_output = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
+        for data_batch_idx, fc_output_i in enumerate(fc_output):
+            z = fc_output_i.reshape(-1, 1)
+            pred_graph_adj = self.decoder.forward_all(z, sigmoid=False).reshape(1, -1)
+            batch_pred_graph_adj = pred_graph_adj if data_batch_idx == 0 else torch.cat((batch_pred_graph_adj, pred_graph_adj), dim=0)
+        return batch_pred_graph_adj
+
+
 if __name__ == "__main__":
     baseline_args_parser = argparse.ArgumentParser()
     baseline_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
@@ -196,6 +207,8 @@ if __name__ == "__main__":
                                       help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     baseline_args_parser.add_argument("--drop_p", type=float, default=0,
                                       help="input 0~1 to decide the probality of drop layers")
+    baseline_args_parser.add_argument("--baseline_model", type=str, nargs='?', default="GRU",
+                                      help="input the baseline type, the options\n- GRU\n- GRU+InnerDecoder")
     baseline_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
                                       help="input the number of stacked-layers of gru")
     baseline_args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
@@ -255,8 +268,11 @@ if __name__ == "__main__":
                               "dim_in": (norm_train_dataset['edges'].shape[1])**2,
                               "gru_l": ARGS.gru_l,
                               "gru_h": ARGS.gru_h,
-                              "dim_out": (norm_train_dataset['edges'].shape[1])**2}
-    model = BaselineGRUModel(baseline_gru_model_cfg)
+                              "fc_out_dim": (norm_train_dataset['edges'].shape[1])**2}
+    if ARGS.baseline_model == "GRU":
+        model = BaselineGRUModel(baseline_gru_model_cfg)
+    elif ARGS.baseline_model == "GRU+InnerDecoder":
+        model = BaselineGRUInnerdecoderModel(baseline_gru_model_cfg)
     best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
 
     if save_model_info:
