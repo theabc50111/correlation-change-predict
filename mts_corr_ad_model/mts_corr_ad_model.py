@@ -306,11 +306,12 @@ class MTSCorrAD(torch.nn.Module):
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"]) if "gru" in self.model_cfg["drop_pos"] else GRU(graph_enc_emb_size, self.model_cfg['gru_h'], self.model_cfg["gru_l"])
-        self.fc = Linear(self.model_cfg['gru_h'], self.model_cfg["fc_out_dim"])
+        self.fc1 = Linear(self.model_cfg['gru_h'], self.model_cfg["fc1_out_dim"])
+        self.fc2 = Linear(self.model_cfg['fc1_out_dim'], self.model_cfg["fc2_out_dim"])
         self.decoder = self.model_cfg['decoder']()
         self.dropout = Dropout(p=self.model_cfg["drop_p"])
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, 600, 50))+list(range(600, self.model_cfg['tr_epochs'], 200)), gamma=0.9)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*10)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
         observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler.milestones, "gamma": self.scheduler.gamma}
@@ -332,9 +333,10 @@ class MTSCorrAD(torch.nn.Module):
         gru_output, _ = self.gru1(graph_embeds)
 
         # Decoder (Graph Adjacency Reconstruction)
-        fc_output = self.fc(gru_output[-1])  # gru_output[-1] => only take last time-step
-        fc_output = self.dropout(fc_output) if 'fc' in self.model_cfg['drop_pos'] else fc_output
-        z = fc_output.reshape(-1, 1)
+        fc1_output = self.fc1(gru_output[-1])  # gru_output[-1] => only take last time-step
+        fc2_output = self.fc2(fc1_output)  # gru_output[-1] => only take last time-step
+        fc2_output = self.dropout(fc2_output) if 'fc' in self.model_cfg['drop_pos'] else fc2_output
+        z = fc2_output.reshape(-1, 1)
         pred_graph_adj = self.decoder.forward_all(z, sigmoid=False)
 
         return pred_graph_adj
@@ -369,7 +371,7 @@ class MTSCorrAD(torch.nn.Module):
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
-                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "fc_grad": torch.zeros(1),
+                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "fc1_grad": torch.zeros(1), "fc2_grad": torch.zeros(1), "lr": torch.zeros(1),
                              "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
@@ -404,7 +406,9 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["fc_grad"] += sum(p.grad.sum() for p in self.fc.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["fc1_grad"] += sum(p.grad.sum() for p in self.fc1.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["fc2_grad"] += sum(p.grad.sum() for p in self.fc2.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
                 epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
                 # used in observation model info in console
@@ -432,8 +436,8 @@ class MTSCorrAD(torch.nn.Module):
                 if show_model_info:
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.5f}" for k, v in epoch_metrics.items() if "embeds" not in k])
-                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.scheduler.get_last_lr()[0]:.5f}")
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
+                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
                 logger.info(f"\nIn Epoch {epoch_i:>3} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
@@ -643,7 +647,8 @@ if __name__ == "__main__":
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
-                       "fc_out_dim": norm_train_dataset["edges"].shape[1],
+                       "fc1_out_dim": (norm_train_dataset["edges"].shape[1])**2,
+                       "fc2_out_dim": norm_train_dataset["edges"].shape[1],
                        "num_node_features": norm_train_dataset["nodes"].shape[2],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
