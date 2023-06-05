@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#EXPORT TZ=Asia/Taipei 
+#EXPORT TZ=Asia/Taipei
 
 ARGUMENT_LIST=(
   "batch_size"

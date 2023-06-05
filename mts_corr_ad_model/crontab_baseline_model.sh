@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 #EXPORT TZ=Asia/Taipei 
