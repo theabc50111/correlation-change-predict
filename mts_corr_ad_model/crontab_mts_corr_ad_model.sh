@@ -3,22 +3,19 @@
 #EXPORT TZ=Asia/Taipei 
 
 ARGUMENT_LIST=(
-  "tr_batch"
-  "val_batch"
-  "test_batch"
+  "batch_size"
   "tr_epochs"
   "save_model"
+  "seq_len"
   "corr_window"
   "corr_stride"
   "filt_mode"
   "filt_quan"
   "graph_nodes_v_mode"
-  "discr_loss"
-  "discr_loss_r"
-  "discr_pred_disp_r"
   "drop_pos"
   "drop_p"
   "gra_enc"
+  "gra_enc_aggr"
   "gra_enc_l"
   "gra_enc_h"
   "gru_l"
@@ -45,17 +42,16 @@ eval set --$opts
 # Default values of arguments
 batch_size="--batch_size 32"
 tr_epochs="--tr_epochs 1000"
+seq_len="--seq_len 10"
 corr_window="--corr_window 10"
 corr_stride="--corr_stride 1"
 filt_mode=""
-filt_quan="--filt_quan 0.77"
+filt_quan=""
 graph_nodes_v_mode=""
-discr_loss=""
-discr_loss_r="--discr_loss_r 3"
-discr_pred_disp_r="--discr_pred_disp_r 7"
 drop_pos=()
 drop_p=""
 gra_enc=""
+gra_enc_aggr=""
 gra_enc_l=""
 gra_enc_h=""
 gru_l=""
@@ -104,21 +100,6 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
-    --discr_loss)
-      discr_loss="--discr_loss"
-      shift 2
-      ;;
-
-    --discr_loss_r)
-      discr_loss_r="--discr_loss_r $2"
-      shift 2
-      ;;
-
-    --discr_pred_disp_r)
-      discr_pred_disp_r="--discr_pred_disp_r $2"
-      shift 2
-      ;;
-
     --drop_pos)
       drop_pos+=("$2")
       shift 2
@@ -131,6 +112,11 @@ while [[ $# -gt 0 ]]; do
 
     --gra_enc)
       gra_enc="--gra_enc $2"
+      shift 2
+      ;;
+
+    --gra_enc_aggr)
+      gra_enc="--gra_enc_aggr $2"
       shift 2
       ;;
 
@@ -171,7 +157,7 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py $batch_size $tr_epochs $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $discr_loss $discr_loss_r $discr_pred_disp_r ${drop_pos[@]} $drop_p $gra_enc  $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/mts_corr_ad_model.py $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_mts_corr_ad_model.log 2>&1
 
 #if [ -n "$save_model" ];
 #then
