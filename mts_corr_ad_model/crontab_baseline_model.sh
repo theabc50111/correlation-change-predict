@@ -3,6 +3,7 @@
 #EXPORT TZ=Asia/Taipei 
 
 ARGUMENT_LIST=(
+  "data_implement"
   "batch_size"
   "tr_epochs"
   "save_model"
@@ -40,16 +41,14 @@ tr_epochs="--tr_epochs 1000"
 seq_len="--seq_len 10"
 corr_window="--corr_window 10"
 corr_stride="--corr_stride 1"
-filt_mode=""
-filt_quan=""
-graph_nodes_v_mode=""
-drop_p=""
-gru_l=""
-gru_h=""
-save_model=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --data_implement)
+      data_implement="--data_implement $2"
+      shift 2
+      ;;
+
     --batch_size)
       batch_size="--batch_size $2" # Note: In order to handle the argument containing space, the quotes around '$2': they are essential!
       shift 2 # The 'shift' eats a commandline argument, i.e. converts $1=a, $2=b, $3=c, $4=d into $1=b, $2=c, $3=d. shift 2 moves it all the way to $1=c, $2=d. It's done since that particular branch uses an argument, so it has to remove two things from the list (the -r and the argument following it) not just one.
@@ -132,5 +131,5 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_baseline_model.log
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/baseline_model.py $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $drop_p $baseline_model $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_baseline_model.log 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/baseline_model.py $data_implement $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $drop_p $baseline_model $gru_l $gru_h $save_model >> /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_baseline_model.log 2>&1
 

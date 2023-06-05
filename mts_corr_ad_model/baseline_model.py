@@ -187,6 +187,8 @@ class BaselineGRUInnerdecoderModel(BaselineGRUModel):
 
 if __name__ == "__main__":
     baseline_args_parser = argparse.ArgumentParser()
+    baseline_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST",
+                                      help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     baseline_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                       help="input the number of training batch")
     baseline_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
@@ -219,8 +221,7 @@ if __name__ == "__main__":
 
     # ## Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
-    #data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = ARGS.data_implement
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
