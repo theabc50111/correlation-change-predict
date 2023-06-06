@@ -10,6 +10,7 @@ import traceback
 import warnings
 from collections import OrderedDict
 from datetime import datetime
+from math import sqrt
 from pathlib import Path
 from pprint import pformat
 
@@ -165,7 +166,7 @@ class GraphTimeSeriesDataset(Dataset):
         return self.__getitem__(idx)
 
 
-# ## Multi-Dimension Time-Series Correlation Anomly Detection Model
+# Multi-Dimension Time-Series Correlation Anomly Detection Model
 class GineEncoder(torch.nn.Module):
     """
     num_node_features: number of features per node in the graph, in this model every node has same size of features
@@ -291,6 +292,42 @@ class GinEncoder(torch.nn.Module):
         return graph_embeds
 
 
+class ModifiedInnerProductDecoder(InnerProductDecoder):
+    """
+    Inner product decoder layer. Modified to insert fc layer before forward_all.
+    """
+    def __init__(self, fc1_in_dim: int, fc1_out_dim: int, drop_p: float = 0.0):
+        super(ModifiedInnerProductDecoder, self).__init__()
+        self.fc1 = Linear(fc1_in_dim, fc1_out_dim)
+        self.dropout = Dropout(p=drop_p)  # Set dropout probability to 0.2
+        self.fc1_is_dropout = drop_p > 0.0
+
+    def forward(self, enc_output: torch.Tensor, has_sigmoid: bool = False):
+        fc1_output = self.fc1(enc_output)
+        fc1_output = self.dropout(fc1_output) if self.fc1_is_dropout else fc1_output
+        z = fc1_output.reshape(-1, 1)
+        pred_graph_adj = self.forward_all(z, sigmoid=has_sigmoid)
+        return pred_graph_adj
+
+
+class MLPDecoder(torch.nn.Module):
+    """
+    Multi-layer perceptron decoder layer.
+    """
+    def __init__(self, fc1_in_dim: int, sqrt_fc1_out_dim: int, drop_p: float = 0.0):
+        super(MLPDecoder, self).__init__()
+        self.fc1_out_dim = sqrt_fc1_out_dim**2
+        self.fc1 = Linear(fc1_in_dim, self.fc1_out_dim)
+        self.dropout = Dropout(p=drop_p)
+        self.fc1_is_dropout = drop_p > 0.0
+
+    def forward(self, enc_output: torch.Tensor, has_sigmoid: bool = False):
+        fc1_output = self.fc1(enc_output)
+        fc1_output = self.dropout(fc1_output) if self.fc1_is_dropout else fc1_output
+        pred_graph_adj = fc1_output.reshape(int(sqrt(self.fc1_out_dim)), -1)
+        return pred_graph_adj
+
+
 class MTSCorrAD(torch.nn.Module):
     """
     Multi-Time Series Correlation Anomaly Detection (MTSCorrAD)
@@ -306,12 +343,9 @@ class MTSCorrAD(torch.nn.Module):
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"]) if "gru" in self.model_cfg["drop_pos"] else GRU(graph_enc_emb_size, self.model_cfg['gru_h'], self.model_cfg["gru_l"])
-        self.fc1 = Linear(self.model_cfg['gru_h'], self.model_cfg["fc1_out_dim"])
-        self.fc2 = Linear(self.model_cfg['fc1_out_dim'], self.model_cfg["fc2_out_dim"])
-        self.decoder = self.model_cfg['decoder']()
-        self.dropout = Dropout(p=self.model_cfg["drop_p"])
+        self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*10)), gamma=0.9)
+        self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
         observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler.milestones, "gamma": self.scheduler.gamma}
@@ -333,11 +367,7 @@ class MTSCorrAD(torch.nn.Module):
         gru_output, _ = self.gru1(graph_embeds)
 
         # Decoder (Graph Adjacency Reconstruction)
-        fc1_output = self.fc1(gru_output[-1])  # gru_output[-1] => only take last time-step
-        fc2_output = self.fc2(fc1_output)  # gru_output[-1] => only take last time-step
-        fc2_output = self.dropout(fc2_output) if 'fc' in self.model_cfg['drop_pos'] else fc2_output
-        z = fc2_output.reshape(-1, 1)
-        pred_graph_adj = self.decoder.forward_all(z, sigmoid=False)
+        pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
 
         return pred_graph_adj
 
@@ -371,7 +401,7 @@ class MTSCorrAD(torch.nn.Module):
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
-                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "fc1_grad": torch.zeros(1), "fc2_grad": torch.zeros(1), "lr": torch.zeros(1),
+                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "gra_dec_grad": torch.zeros(1), "lr": torch.zeros(1),
                              "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
@@ -406,8 +436,7 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["fc1_grad"] += sum(p.grad.sum() for p in self.fc1.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["fc2_grad"] += sum(p.grad.sum() for p in self.fc2.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
                 epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
@@ -588,10 +617,9 @@ if __name__ == "__main__":
     ARGS = mts_corr_ad_args_parser.parse_args()
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
-    # ## Data implement & output setting & testset setting
+    # Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
-    #data_implement = "ARTIF_PARTICLE"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = "SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
@@ -614,7 +642,7 @@ if __name__ == "__main__":
     g_model_dir.mkdir(parents=True, exist_ok=True)
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
-    # ## model configuration
+    # model configuration
     is_training, train_count = True, 0
     graph_adj_data = np.load(graph_adj_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     graph_nodes_data = np.load(graph_nodes_data_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((graph_adj_data.shape[0], 1, graph_adj_data.shape[2]))
@@ -647,12 +675,11 @@ if __name__ == "__main__":
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
-                       "fc1_out_dim": (norm_train_dataset["edges"].shape[1])**2,
-                       "fc2_out_dim": norm_train_dataset["edges"].shape[1],
+                       "num_edges": (norm_train_dataset["edges"].shape[1]),
                        "num_node_features": norm_train_dataset["nodes"].shape[2],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
-                       "decoder": InnerProductDecoder}
+                       "decoder": MLPDecoder}
 
     model = MTSCorrAD(mts_corr_ad_cfg)
     loss_fns_dict = {"fns": [MSELoss()],
