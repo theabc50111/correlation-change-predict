@@ -29,6 +29,7 @@ from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
+from metrics_utils import EdgeAccuracyLoss
 from utils import split_and_norm_data
 
 current_dir = Path(__file__).parent
@@ -342,7 +343,7 @@ class MTSCorrAD(torch.nn.Module):
         # set model components
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
-        self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"]) if "gru" in self.model_cfg["drop_pos"] else GRU(graph_enc_emb_size, self.model_cfg['gru_h'], self.model_cfg["gru_l"])
+        self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
@@ -419,6 +420,7 @@ class MTSCorrAD(torch.nn.Module):
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                     batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
+                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
@@ -488,6 +490,7 @@ class MTSCorrAD(torch.nn.Module):
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                     test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
+                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
@@ -599,7 +602,7 @@ if __name__ == "__main__":
     mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                          help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     mts_corr_ad_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                                         help="input [gru] | [gru fc] | [fc gru graph_encoder] to decide the position of drop layers")
+                                         help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     mts_corr_ad_args_parser.add_argument("--drop_p", type=float, default=0,
                                          help="input 0~1 to decide the probality of drop layers")
     mts_corr_ad_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
@@ -682,8 +685,8 @@ if __name__ == "__main__":
                        "decoder": MLPDecoder}
 
     model = MTSCorrAD(mts_corr_ad_cfg)
-    loss_fns_dict = {"fns": [MSELoss()],
-                     "fn_args": {"MSELoss()": {}}}
+    loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
+                     "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1

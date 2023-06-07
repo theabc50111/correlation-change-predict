@@ -81,3 +81,13 @@ class DiscriminationTester:
                 real_pred_embeds_dispiraty = self.criterion(comp_pred_embeds, pred_embeds).item()
                 logger.debug(f"[{instance_name}]-- Time:{g_info['gra_time_pt']}, graph_dispiraty: {g_info['graph_disp']}, graph_embeds_dispiraty: {real_gra_embeds_dispiraty}, pred_embeds_disparity: {real_pred_embeds_dispiraty}")
                 yield {"gra_enc_emb": real_gra_embeds_dispiraty, "pred_emb": real_pred_embeds_dispiraty}
+
+
+class EdgeAccuracyLoss(torch.nn.Module):
+    def __init__(self):
+        super(EdgeAccuracyLoss, self).__init__()
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        edge_acc = np.isclose(input.cpu().detach().numpy(), target.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+        loss = 1 - edge_acc
+        return torch.tensor(loss)
