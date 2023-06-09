@@ -5,8 +5,6 @@ import copy
 import json
 import logging
 import sys
-import traceback
-import warnings
 from collections import OrderedDict
 from datetime import datetime
 from math import ceil, sqrt
@@ -17,12 +15,14 @@ import dynamic_yaml
 import numpy as np
 import torch
 import yaml
-from torch.nn import GRU, BatchNorm1d, Dropout, Linear, MSELoss, ReLU
+from torch.nn import GRU, BatchNorm1d, Dropout, Linear, MSELoss
 from torch_geometric.nn.models.autoencoder import InnerProductDecoder
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
 from utils import split_and_norm_data
+
+from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -43,21 +43,19 @@ class BaselineGRUModel(torch.nn.Module):
         super(BaselineGRUModel, self).__init__()
         self.model_cfg = model_cfg
         self.num_tr_batches = self.model_cfg['num_tr_batches']
-        self.dim_in = self.model_cfg['dim_in']
-        self.gru_l = self.model_cfg['gru_l']
-        self.gru_h = self.model_cfg['gru_h']
-        self.fc_out_dim = self.model_cfg['fc_out_dim']
-        self.drop_p = self.model_cfg['drop_p']
-        self.gru = GRU(input_size=self.dim_in, hidden_size=self.gru_h, num_layers=self.gru_l, dropout=self.drop_p)
-        self.fc = Linear(in_features=self.gru_h, out_features=self.fc_out_dim)
+        self.gru = GRU(input_size=self.model_cfg['dim_in'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
+        self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.loss_fn = MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
     def forward(self, x):
         gru_output, gru_hn = self.gru(x)
-        pred = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
-        return pred
+        # Decoder (Graph Adjacency Reconstruction)
+        for data_batch_idx in range(x.shape[0]):
+            pred = self.decoder(gru_output[data_batch_idx, -1, :])  # gru_output[-1] => only take last time-step
+            pred_graph_adjs = pred.reshape(1, -1) if data_batch_idx == 0 else torch.cat((pred_graph_adjs, pred.reshape(1, -1)), dim=0)
+        return pred_graph_adjs
 
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000):
         # In order to make original function of nn.Module.train() work, we need to override it
@@ -82,7 +80,7 @@ class BaselineGRUModel(torch.nn.Module):
         num_batches = ceil(len(train_data)//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gru_gradient": torch.zeros(1), "fc_gradient": torch.zeros(1)}
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gru_gradient": torch.zeros(1), "decoder_gradient": torch.zeros(1)}
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_arr=train_data, batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             for batch_data in batch_data_generator:
@@ -97,7 +95,7 @@ class BaselineGRUModel(torch.nn.Module):
                 epoch_metrics["tr_edge_acc"] += edge_acc/num_batches
                 epoch_metrics["tr_loss"] += loss/num_batches
                 epoch_metrics["gru_gradient"] += sum([p.grad.sum() for p in self.gru.parameters()])/num_batches
-                epoch_metrics["fc_gradient"] += sum([p.grad.sum() for p in self.fc.parameters()])/num_batches
+                epoch_metrics["decoder_gradient"] += sum([p.grad.sum() for p in self.decoder.parameters()])/num_batches
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
@@ -207,6 +205,8 @@ if __name__ == "__main__":
                                       help="input the filtered quantile of graph edges")
     baseline_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                       help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    baseline_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
+                                         help="input [gru] | [decoder] | [decoder gru] to decide the position of drop layers")
     baseline_args_parser.add_argument("--drop_p", type=float, default=0,
                                       help="input 0~1 to decide the probality of drop layers")
     baseline_args_parser.add_argument("--baseline_model", type=str, nargs='?', default="GRU",
@@ -265,11 +265,14 @@ if __name__ == "__main__":
                               "batch_size": ARGS.batch_size,
                               "seq_len": ARGS.seq_len,
                               "num_tr_batches": ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size),
+                              "drop_pos": ARGS.drop_pos,
                               "drop_p": ARGS.drop_p,
                               "dim_in": (norm_train_dataset['edges'].shape[1])**2,
                               "gru_l": ARGS.gru_l,
                               "gru_h": ARGS.gru_h,
-                              "fc_out_dim": (norm_train_dataset['edges'].shape[1])**2}
+                              "num_edges": (norm_train_dataset["edges"].shape[1]),
+                              "decoder": MLPDecoder}
+
     if ARGS.baseline_model == "GRU":
         model = BaselineGRUModel(baseline_gru_model_cfg)
     elif ARGS.baseline_model == "GRU+InnerDecoder":
