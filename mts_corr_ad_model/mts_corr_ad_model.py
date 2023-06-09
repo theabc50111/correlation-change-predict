@@ -306,6 +306,7 @@ class MTSCorrAD(torch.nn.Module):
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
+            if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
