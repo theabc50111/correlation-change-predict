@@ -38,12 +38,12 @@ logger.addHandler(logger_console)
 logger.setLevel(logging.INFO)
 
 
-class BaselineGRUModel(torch.nn.Module):
+class BaselineGRU(torch.nn.Module):
     def __init__(self, model_cfg: dict, **unused_kwargs):
-        super(BaselineGRUModel, self).__init__()
+        super(BaselineGRU, self).__init__()
         self.model_cfg = model_cfg
         self.num_tr_batches = self.model_cfg['num_tr_batches']
-        self.gru = GRU(input_size=self.model_cfg['dim_in'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
+        self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.loss_fn = MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
@@ -166,26 +166,9 @@ class BaselineGRUModel(torch.nn.Module):
             yield batch_x, batch_y
 
 
-class BaselineGRUInnerdecoderModel(BaselineGRUModel):
-    def __init__(self, model_cfg: dict, **unused_kwargs):
-        super().__init__(model_cfg)
-        self.fc_out_dim = int(sqrt(self.model_cfg['fc_out_dim']))
-        self.fc = Linear(in_features=self.gru_h, out_features=self.fc_out_dim)
-        self.decoder = InnerProductDecoder()
-
-    def forward(self, x):
-        gru_output, gru_hn = self.gru(x)
-        fc_output = self.fc(gru_output[:, -1, :])  # Only use the output of the last time step
-        for data_batch_idx, fc_output_i in enumerate(fc_output):
-            z = fc_output_i.reshape(-1, 1)
-            pred_graph_adj = self.decoder.forward_all(z, sigmoid=False).reshape(1, -1)
-            batch_pred_graph_adj = pred_graph_adj if data_batch_idx == 0 else torch.cat((batch_pred_graph_adj, pred_graph_adj), dim=0)
-        return batch_pred_graph_adj
-
-
 if __name__ == "__main__":
     baseline_args_parser = argparse.ArgumentParser()
-    baseline_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST",
+    baseline_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
                                       help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     baseline_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,  # each graph contains 5 days correlation, so 4 graphs means a month, 12 graphs means a quarter
                                       help="input the number of training batch")
@@ -209,8 +192,6 @@ if __name__ == "__main__":
                                          help="input [gru] | [decoder] | [decoder gru] to decide the position of drop layers")
     baseline_args_parser.add_argument("--drop_p", type=float, default=0,
                                       help="input 0~1 to decide the probality of drop layers")
-    baseline_args_parser.add_argument("--baseline_model", type=str, nargs='?', default="GRU",
-                                      help="input the baseline type, the options\n- GRU\n- GRU+InnerDecoder")
     baseline_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
                                       help="input the number of stacked-layers of gru")
     baseline_args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
@@ -267,16 +248,13 @@ if __name__ == "__main__":
                               "num_tr_batches": ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size),
                               "drop_pos": ARGS.drop_pos,
                               "drop_p": ARGS.drop_p,
-                              "dim_in": (norm_train_dataset['edges'].shape[1])**2,
+                              "gru_in_dim": (norm_train_dataset['edges'].shape[1])**2,
                               "gru_l": ARGS.gru_l,
                               "gru_h": ARGS.gru_h,
                               "num_edges": (norm_train_dataset["edges"].shape[1]),
                               "decoder": MLPDecoder}
 
-    if ARGS.baseline_model == "GRU":
-        model = BaselineGRUModel(baseline_gru_model_cfg)
-    elif ARGS.baseline_model == "GRU+InnerDecoder":
-        model = BaselineGRUInnerdecoderModel(baseline_gru_model_cfg)
+    model = BaselineGRU(baseline_gru_model_cfg)
     best_model, best_model_info = model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
 
     if save_model_info:

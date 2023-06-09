@@ -420,6 +420,8 @@ class MTSCorrAD(torch.nn.Module):
 
 if __name__ == "__main__":
     mts_corr_ad_args_parser = argparse.ArgumentParser()
+    mts_corr_ad_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
+                                         help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,
                                          help="input the number of batch size")
     mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
@@ -459,7 +461,7 @@ if __name__ == "__main__":
 
     # Data implement & output setting & testset setting
     # data implement setting
-    data_implement = "SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX"  # watch options by operate: logger.info(data_cfg["DATASETS"].keys())
+    data_implement = ARGS.data_implement
     # train set setting
     train_items_setting = "-train_train"  # -train_train|-train_all
     # setting of name of output files and pictures title
@@ -475,8 +477,8 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    graph_adj_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
-    graph_nodes_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
+    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
     g_model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
     g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     g_model_dir.mkdir(parents=True, exist_ok=True)
@@ -484,13 +486,13 @@ if __name__ == "__main__":
 
     # model configuration
     is_training, train_count = True, 0
-    graph_adj_data = np.load(graph_adj_data_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    graph_nodes_data = np.load(graph_nodes_data_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((graph_adj_data.shape[0], 1, graph_adj_data.shape[2]))
-    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(graph_adj_data, graph_nodes_data)
+    gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
     # show info
-    logger.info(f"graph_adj_data.shape:{graph_adj_data.shape}, graph_nodes_data.shape:{graph_nodes_data.shape}")
-    logger.info(f"graph_adj_data.max:{np.nanmax(graph_adj_data)}, graph_adj_data.min:{np.nanmin(graph_adj_data)}")
-    logger.info(f"graph_nodes_data.max:{np.nanmax(graph_nodes_data)}, graph_nodes_data.min:{np.nanmin(graph_nodes_data)}")
+    logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
+    logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
+    logger.info(f"gra_nodes_data_mats.max:{np.nanmax(gra_nodes_data_mats)}, gra_nodes_data_mats.min:{np.nanmin(gra_nodes_data_mats)}")
     logger.info(f"norm_train_nodes_data_mats.max:{np.nanmax(norm_train_dataset['nodes'])}, norm_train_nodes_data_mats.min:{np.nanmin(norm_train_dataset['nodes'])}")
     logger.info(f"norm_val_nodes_data_mats.max:{np.nanmax(norm_val_dataset['nodes'])}, norm_val_nodes_data_mats.min:{np.nanmin(norm_val_dataset['nodes'])}")
     logger.info(f"norm_test_nodes_data_mats.max:{np.nanmax(norm_test_dataset['nodes'])}, norm_test_nodes_data_mats.min:{np.nanmin(norm_test_dataset['nodes'])}")
