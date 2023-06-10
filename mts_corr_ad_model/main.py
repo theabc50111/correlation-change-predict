@@ -108,10 +108,10 @@ if __name__ == "__main__":
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
     graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    mts_corr_ad_model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
-    mts_corr_ad_model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    baseline_model_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
-    baseline_model_log_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    mts_corr_ad_model_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
+    baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
