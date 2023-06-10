@@ -47,27 +47,27 @@ warnings.simplefilter("ignore")
 
 if __name__ == "__main__":
     args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
+    args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST",
                              help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
-    args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,
+    args_parser.add_argument("--batch_size", type=int, nargs='?', default=64,
                              help="input the number of batch size")
-    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
+    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
                              help="input the number of training epochs")
-    args_parser.add_argument("--seq_len", type=int, nargs='?', default=30,
+    args_parser.add_argument("--seq_len", type=int, nargs='?', default=5,
                              help="input the number of sequence length")
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
     args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                              help="input the number of stride length of correlation computing")
-    args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
+    args_parser.add_argument("--corr_window", type=int, nargs='?', default=50,
                              help="input the number of window length of correlation computing")
     args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
                              help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
-    args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
+    args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0,
                              help="input the filtered quantile of graph edges")
     args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
-    args_parser.add_argument("--train_models", type=str, nargs='*', default=[],
+    args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
                              help="input [MTSCorrAD] | [Baseline] | [MTSCorrAD Baseline] to decide which models to train")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                              help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
@@ -81,9 +81,9 @@ if __name__ == "__main__":
                              help="input the number of graph laryers of graph_encoder")
     args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                              help="input the number of graph embedding hidden size of graph_encoder")
-    args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
+    args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
                              help="input the number of stacked-layers of gru")
-    args_parser.add_argument("--gru_h", type=int, nargs='?', default=None,
+    args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
     ARGS = args_parser.parse_args()
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
@@ -136,7 +136,7 @@ if __name__ == "__main__":
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
                        "num_edges": (norm_train_dataset["edges"].shape[1]),
-                       "num_node_features": norm_train_dataset["nodes"].shape[2],
+                       "num_node_features": norm_train_dataset["nodes"].shape[1],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": MLPDecoder}

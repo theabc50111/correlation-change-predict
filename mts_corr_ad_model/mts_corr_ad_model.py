@@ -519,7 +519,7 @@ if __name__ == "__main__":
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
                        "num_edges": (norm_train_dataset["edges"].shape[1]),
-                       "num_node_features": norm_train_dataset["nodes"].shape[2],
+                       "num_node_features": norm_train_dataset["nodes"].shape[1],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": MLPDecoder}
