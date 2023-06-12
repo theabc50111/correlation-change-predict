@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 
@@ -53,7 +54,8 @@ experiments_start_t = datetime.now() - timedelta(minutes=10)
 for i, (prev_model_time_len, model_args) in enumerate(zip(model_timedelta_list, args_list)):
     # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
     model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
-    cron_args = [model_start_t.strftime("%M %H %d %m") + " *"] + list(model_args)
-    print("{} /home/ywt01_dmlab/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.sh {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+    home_directory = os.path.expanduser("~")
+    cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory] + list(model_args)
+    print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.sh {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
     # if x[9]==1 and x[10]==4:
     #     print(prev_model_time_len, model_args)
