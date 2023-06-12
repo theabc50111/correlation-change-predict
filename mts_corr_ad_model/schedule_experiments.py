@@ -56,7 +56,12 @@ if __name__ == "__main__":
     args_parser.add_argument("--script", type=str, nargs='?', default="crontab_main_gpu_task1.sh",
                              help="Input the name of operating script")
     args_parser.add_argument("--operating_time", type=str, nargs='?', default="+ 0:03",
-                             help="Input the operating time, the format of time: +/- hours:minutes.\nFor example:\n    - postpone 1 hour and 3 minutes: \"+ 1:03\"\n    - in advance 11 hour and 5 minutes: \"- 11:05\"")
+                             help=(f"Input the operating time, the format of time: +/- hours:minutes.\n"
+                                   f"For example:\n"
+                                   f"    - postpone 1 hour and 3 minutes: \"+ 1:03\"\n"
+                                   f"    - in advance 11 hour and 5 minutes: \"- 11:05\""))
+    args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
+                             help="Input the gpu id")
     ARGS = args_parser.parse_args()
     pprint(f"\n{vars(ARGS)}", indent=1, width=40, compact=True)
     operating_time_status = "postpone" if ARGS.operating_time.split(" ")[0] == "+" else "advance"
@@ -70,7 +75,7 @@ if __name__ == "__main__":
         # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
         model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
         home_directory = os.path.expanduser("~")
-        cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script] + list(model_args)
-        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+        cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--cuda_device {ARGS.cuda_device}"] + list(model_args)
+        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
         # if x[9]==1 and x[10]==4:
         #     print(prev_model_time_len, model_args)
