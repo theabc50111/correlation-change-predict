@@ -1,6 +1,8 @@
+import argparse
 import os
 from datetime import datetime, timedelta
 from itertools import chain, product, repeat
+from pprint import pprint
 
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
@@ -49,13 +51,26 @@ model_timedelta_list.pop()
 assert len(args_list) == len(model_timedelta_list), f"The order of elements of model_timedelta_list〔length: {len(model_timedelta_list)}〕 should comply with the order of args_list: 〔length: {len(args_list)}〕"
 print(f"# len of experiments: {len(args_list)}")
 
-experiments_start_t = datetime.now() + timedelta(minutes=3)
-#experiments_start_t = datetime.now() - timedelta(minutes=10)
-for i, (prev_model_time_len, model_args) in enumerate(zip(model_timedelta_list, args_list)):
-    # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
-    model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
-    home_directory = os.path.expanduser("~")
-    cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory] + list(model_args)
-    print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.sh {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
-    # if x[9]==1 and x[10]==4:
-    #     print(prev_model_time_len, model_args)
+if __name__ == "__main__":
+    args_parser = argparse.ArgumentParser()
+    args_parser.add_argument("--script", type=str, nargs='?', default="crontab_main_gpu_task1.sh",
+                             help="Input the name of operating script")
+    args_parser.add_argument("--operating_time", type=str, nargs='?', default="+ 0:03",
+                             help="Input the operating time, the format of time: +/- hours:minutes.\nFor example:\n    - postpone 1 hour and 3 minutes: \"+ 1:03\"\n    - in advance 11 hour and 5 minutes: \"- 11:05\"")
+    ARGS = args_parser.parse_args()
+    pprint(f"\n{vars(ARGS)}", indent=1, width=40, compact=True)
+    operating_time_status = "postpone" if ARGS.operating_time.split(" ")[0] == "+" else "advance"
+    operating_hours = int(ARGS.operating_time.split(" ")[1].split(":")[0])
+    operating_minutes = int(ARGS.operating_time.split(" ")[1].split(":")[1].lstrip("0"))
+    if operating_time_status == "postpone":
+        experiments_start_t = datetime.now()+timedelta(hours=operating_hours, minutes=operating_minutes)
+    elif operating_time_status == "advance":
+        experiments_start_t = datetime.now()-timedelta(hours=operating_hours, minutes=operating_minutes)
+    for i, (prev_model_time_len, model_args) in enumerate(zip(model_timedelta_list, args_list)):
+        # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
+        model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
+        home_directory = os.path.expanduser("~")
+        cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script] + list(model_args)
+        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+        # if x[9]==1 and x[10]==4:
+        #     print(prev_model_time_len, model_args)
