@@ -69,6 +69,10 @@ if __name__ == "__main__":
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
                              help="input [MTSCorrAD] | [Baseline] | [MTSCorrAD Baseline] to decide which models to train")
+    args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
+                             help="input the learning rate of training")
+    args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0,
+                             help="input the weight decay of training")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                              help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     args_parser.add_argument("--drop_p", type=float, default=0,
@@ -83,7 +87,7 @@ if __name__ == "__main__":
                              help="input the number of graph embedding hidden size of graph_encoder")
     args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
                              help="input the number of stacked-layers of gru")
-    args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
+    args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
                              help="input the number of gru hidden size")
     ARGS = args_parser.parse_args()
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
@@ -128,6 +132,8 @@ if __name__ == "__main__":
                        "tr_epochs": ARGS.tr_epochs,
                        "batch_size": ARGS.batch_size,
                        "seq_len": ARGS.seq_len,
+                       "learning_rate": ARGS.learning_rate,
+                       "weight_decay": ARGS.weight_decay,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
                        "gra_enc_aggr": ARGS.gra_enc_aggr,

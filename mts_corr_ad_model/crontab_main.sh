@@ -12,6 +12,7 @@ ARGUMENT_LIST=(
   "filt_mode"
   "filt_quan"
   "graph_nodes_v_mode"
+  "weight_decay"
   "drop_pos"
   "drop_p"
   "gra_enc"
@@ -100,6 +101,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --weight_decay)
+      weight_decay="--weight_decay $2"
+      shift 2
+      ;;
+
     --drop_pos)
       drop_pos+=("$2")
       shift 2
@@ -157,7 +163,7 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> $HOME/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.log
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> $HOME/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.log 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $weight_decay ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> $HOME/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main.log 2>&1
 
 #if [ -n "$save_model" ];
 #then

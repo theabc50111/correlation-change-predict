@@ -188,8 +188,12 @@ if __name__ == "__main__":
                                       help="input the filtered quantile of graph edges")
     baseline_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                       help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    baseline_args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.001,
+                                      help="input the learning rate of optimizer")
+    baseline_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
+                                      help="input the weight decay of optimizer")
     baseline_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                                         help="input [gru] | [decoder] | [decoder gru] to decide the position of drop layers")
+                                      help="input [gru] | [decoder] | [decoder gru] to decide the position of drop layers")
     baseline_args_parser.add_argument("--drop_p", type=float, default=0,
                                       help="input 0~1 to decide the probality of drop layers")
     baseline_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru

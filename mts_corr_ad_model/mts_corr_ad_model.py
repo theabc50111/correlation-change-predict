@@ -182,7 +182,7 @@ class MTSCorrAD(torch.nn.Module):
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
@@ -305,7 +305,7 @@ class MTSCorrAD(torch.nn.Module):
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
-                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
+                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
@@ -441,6 +441,10 @@ if __name__ == "__main__":
                                          help="input the filtered quantile of graph edges")
     mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                          help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    mts_corr_ad_args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
+                                         help="input the learning rate of training")
+    mts_corr_ad_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
+                                         help="input the weight decay of training")
     mts_corr_ad_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                                          help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     mts_corr_ad_args_parser.add_argument("--drop_p", type=float, default=0,
@@ -511,6 +515,8 @@ if __name__ == "__main__":
                        "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
                                        "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
                                        "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
+                       "learning_rate": ARGS.learning_rate,
+                       "weight_decay": ARGS.weight_decay,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
                        "gra_enc_aggr": ARGS.gra_enc_aggr,
