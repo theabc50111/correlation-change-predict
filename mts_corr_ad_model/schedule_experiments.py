@@ -28,8 +28,8 @@ args_list = list(filter(lambda x: not (x[3] == "" and x[5] == "--discr_pred_disp
 args_list = list(filter(lambda x: not (x[3] == "" and x[5] == "--discr_pred_disp_r 5"), args_list))
 args_list = list(filter(lambda x: not (x[7] == "" and x[8] == "--drop_p 0.33"), args_list))
 args_list = list(filter(lambda x: not (x[7] == "" and x[8] == "--drop_p 0.66"), args_list))
-args_list = sorted(args_list, key=lambda x: int(x[11].replace("--gra_enc_l ", "")))
 args_list = sorted(args_list, key=lambda x: int(x[12].replace("--gra_enc_h ", "")))
+args_list = sorted(args_list, key=lambda x: int(x[11].replace("--gra_enc_l ", "")))
 args_list = sorted(args_list, key=lambda x: x[3])
 
 #if "--discr_loss" in discr_loss_list:
@@ -50,7 +50,7 @@ assert len(args_list) == len(model_timedelta_list), f"The order of elements of m
 print(f"# len of experiments: {len(args_list)}")
 
 experiments_start_t = datetime.now() + timedelta(minutes=3)
-experiments_start_t = datetime.now() - timedelta(minutes=10)
+#experiments_start_t = datetime.now() - timedelta(minutes=10)
 for i, (prev_model_time_len, model_args) in enumerate(zip(model_timedelta_list, args_list)):
     # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
     model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
