@@ -67,6 +67,8 @@ if __name__ == "__main__":
                              help="input the filtered quantile of graph edges")
     args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
+                             help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
                              help="input [MTSCorrAD] | [Baseline] | [MTSCorrAD Baseline] to decide which models to train")
     args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     # setting of output files
     save_model_info = ARGS.save_model
     # set devide of pytorch
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(f'cuda:{ARGS.cuda_device}' if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
     torch.set_default_tensor_type(torch.cuda.DoubleTensor if torch.cuda.is_available() else torch.DoubleTensor)
     torch.autograd.set_detect_anomaly(True)  # for debug grad
