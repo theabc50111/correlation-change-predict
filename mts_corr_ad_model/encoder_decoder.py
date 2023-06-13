@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 from math import sqrt
+from typing import List
 
 import torch
 from torch.nn import BatchNorm1d, Dropout, Linear, ReLU, Sequential
@@ -15,7 +16,7 @@ class GineEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINEconv
     gra_enc_h: output size of hidden layer of GINEconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, num_edge_features: int, **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, num_edge_features: int, drop_p: float, drop_pos: List[str], **unused_kwargs):
         super(GineEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gine_convs = torch.nn.ModuleList()
@@ -26,12 +27,14 @@ class GineEncoder(torch.nn.Module):
                 nn = Sequential(Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU())
+                                BatchNorm1d(gra_enc_h), ReLU(),
+                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
             else:
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU())
+                                BatchNorm1d(gra_enc_h), ReLU(),
+                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
             self.gine_convs.append(GINEConv(nn, edge_dim=num_edge_features, aggr=gra_enc_aggr))
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr):
@@ -76,7 +79,7 @@ class GinEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINconv
     gra_enc_h: output size of hidden layer of GINconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, drop_p: float, drop_pos: List[str], **unused_kwargs):
         super(GinEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gin_convs = torch.nn.ModuleList()
@@ -87,14 +90,15 @@ class GinEncoder(torch.nn.Module):
                 nn = Sequential(Linear(gra_enc_h, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU())
+                                BatchNorm1d(gra_enc_h), ReLU(),
+                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
             else:
                 nn = Sequential(Linear(num_node_features, gra_enc_h),
                                 BatchNorm1d(gra_enc_h), ReLU(),
                                 Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU())
+                                BatchNorm1d(gra_enc_h), ReLU(),
+                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
             self.gin_convs.append(GINConv(nn, aggr=gra_enc_aggr))
-
 
     def forward(self, x, edge_index, seq_batch_node_id, *unused_args):
         """

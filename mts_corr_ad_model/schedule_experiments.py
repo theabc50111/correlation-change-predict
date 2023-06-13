@@ -11,8 +11,8 @@ discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = ["--weight_decay 0.1", "--weight_decay 0.01", "--weight_decay 0.001"]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru"]
-drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+drop_pos_list = ["", "--drop_pos gru", "--drop_pos gru --drop_pos decoder", "--drop_pos graph_encoder decoder"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = ["", "--drop_p 0.5"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
 gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 5"]
@@ -28,8 +28,7 @@ args_list = list(filter(lambda x: not (x[3] == "" and x[4] == "--discr_loss_r 0.
 args_list = list(filter(lambda x: not (x[3] == "" and x[4] == "--discr_loss_r 0.001"), args_list))
 args_list = list(filter(lambda x: not (x[3] == "" and x[5] == "--discr_pred_disp_r 1"), args_list))
 args_list = list(filter(lambda x: not (x[3] == "" and x[5] == "--discr_pred_disp_r 5"), args_list))
-args_list = list(filter(lambda x: not (x[7] == "" and x[8] == "--drop_p 0.33"), args_list))
-args_list = list(filter(lambda x: not (x[7] == "" and x[8] == "--drop_p 0.66"), args_list))
+args_list = list(filter(lambda x: not ((not x[7] and x[8]) or (x[7] and not x[8])), args_list))  # Eliminate cases where either one of {drop_p, drop_pos} is null.
 args_list = sorted(args_list, key=lambda x: int(x[12].replace("--gra_enc_h ", "")))
 args_list = sorted(args_list, key=lambda x: int(x[11].replace("--gra_enc_l ", "")))
 args_list = sorted(args_list, key=lambda x: x[3])
@@ -53,7 +52,7 @@ print(f"# len of experiments: {len(args_list)}")
 
 if __name__ == "__main__":
     args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("--script", type=str, nargs='?', default="crontab_main_gpu_task1.sh",
+    args_parser.add_argument("--script", type=str, nargs='?', default="crontab_main.sh",
                              help="Input the name of operating script")
     args_parser.add_argument("--operating_time", type=str, nargs='?', default="+ 0:03",
                              help=(f"Input the operating time, the format of time: +/- hours:minutes.\n"
@@ -62,6 +61,8 @@ if __name__ == "__main__":
                                    f"    - in advance 11 hour and 5 minutes: \"- 11:05\""))
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="Input the gpu id")
+    args_parser.add_argument("--log_suffix", type=str, nargs='?', default="",
+                             help="Input the suffix of log file")
     ARGS = args_parser.parse_args()
     pprint(f"\n{vars(ARGS)}", indent=1, width=40, compact=True)
     operating_time_status = "postpone" if ARGS.operating_time.split(" ")[0] == "+" else "advance"
@@ -75,7 +76,7 @@ if __name__ == "__main__":
         # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
         model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
         home_directory = os.path.expanduser("~")
-        cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--cuda_device {ARGS.cuda_device}"] + list(model_args)
-        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+        cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--log_suffix {ARGS.log_suffix}", f"--cuda_device {ARGS.cuda_device}"] + list(model_args)
+        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
         # if x[9]==1 and x[10]==4:
         #     print(prev_model_time_len, model_args)

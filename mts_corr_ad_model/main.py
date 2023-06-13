@@ -71,7 +71,7 @@ if __name__ == "__main__":
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
                              help="input [MTSCorrAD] | [Baseline] | [MTSCorrAD Baseline] to decide which models to train")
-    args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
+    args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.001,
                              help="input the learning rate of training")
     args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0,
                              help="input the weight decay of training")
@@ -83,13 +83,13 @@ if __name__ == "__main__":
                              help="input the type of graph encoder")
     args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="add",
                              help="input the type of aggregator of graph encoder")
-    args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
+    args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=2,  # range:1~n, for graph encoder after the second layer,
                              help="input the number of graph laryers of graph_encoder")
     args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                              help="input the number of graph embedding hidden size of graph_encoder")
-    args_parser.add_argument("--gru_l", type=int, nargs='?', default=1,  # range:1~n, for gru
+    args_parser.add_argument("--gru_l", type=int, nargs='?', default=5,  # range:1~n, for gru
                              help="input the number of stacked-layers of gru")
-    args_parser.add_argument("--gru_h", type=int, nargs='?', default=24,
+    args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
     ARGS = args_parser.parse_args()
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
