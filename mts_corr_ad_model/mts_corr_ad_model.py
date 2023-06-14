@@ -230,6 +230,7 @@ class MTSCorrAD(torch.nn.Module):
                            "opt_scheduler": {"gamma": self.scheduler.gamma, "milestoines": self.scheduler.milestones},
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
                            "drop_pos": self.model_cfg["drop_pos"],
+                           "drop_p": self.model_cfg["drop_p"],
                            "graph_enc": type(self.graph_encoder).__name__,
                            "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
                            "min_val_loss": float('inf')}
