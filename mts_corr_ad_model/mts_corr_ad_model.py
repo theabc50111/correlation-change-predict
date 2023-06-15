@@ -186,10 +186,10 @@ class MTSCorrAD(torch.nn.Module):
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
-        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, miltstaones=[self.num_tr_batches*6])
+        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler.milestones, "gamma": self.scheduler.gamma}
+        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
@@ -230,7 +230,7 @@ class MTSCorrAD(torch.nn.Module):
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
                            "optimizer": str(self.optimizer),
-                           "opt_scheduler": {"gamma": self.scheduler.gamma, "milestoines": self.scheduler.milestones},
+                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],
