@@ -273,6 +273,8 @@ class MTSCorrAD(torch.nn.Module):
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).sum() for p in self.graph_encoder.parameters())
                     batch_loss += gra_enc_weight_l2_penalty
+                else:
+                    gra_enc_weight_l2_penalty = 0
                 batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
