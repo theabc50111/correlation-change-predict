@@ -15,6 +15,7 @@ ARGUMENT_LIST=(
   "graph_nodes_v_mode"
   "cuda_device"
   "weight_decay"
+  "graph_enc_weight_l2_reg_lambda"
   "drop_pos"
   "drop_p"
   "gra_enc"
@@ -38,6 +39,7 @@ filt_quan=""
 graph_nodes_v_mode=""
 cuda_device=""
 weight_decay=""
+graph_enc_weight_l2_reg_lambda=""
 drop_pos=()
 drop_p=""
 gra_enc=""
@@ -121,6 +123,11 @@ while [[ $# -gt 0 ]]; do
 
     --weight_decay)
       weight_decay="--weight_decay $2"
+      shift 2
+      ;;
+
+    --graph_enc_weight_l2_reg_lambda)
+      graph_enc_weight_l2_reg_lambda="--graph_enc_weight_l2_reg_lambda $2"
       shift 2
       ;;
 

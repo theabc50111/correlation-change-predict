@@ -242,7 +242,7 @@ class MTSCorrAD(torch.nn.Module):
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
             self.train()
-            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "gra_enc_weight_l2_reg": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
                              "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "gra_dec_grad": torch.zeros(1), "lr": torch.zeros(1),
                              "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
@@ -268,6 +268,10 @@ class MTSCorrAD(torch.nn.Module):
                         loss = partial_fn()
                         batch_loss += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
                         epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+
+                if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
+                    gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).sum() for p in self.graph_encoder.parameters())
+                    batch_loss += gra_enc_weight_l2_penalty
                 batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
@@ -277,6 +281,7 @@ class MTSCorrAD(torch.nn.Module):
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
+                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
@@ -449,6 +454,8 @@ if __name__ == "__main__":
                                          help="input the learning rate of training")
     mts_corr_ad_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
                                          help="input the weight decay of training")
+    mts_corr_ad_args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
+                                         help="input the weight of graph encoder weight l2 norm loss")
     mts_corr_ad_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                                          help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     mts_corr_ad_args_parser.add_argument("--drop_p", type=float, default=0,
@@ -521,6 +528,7 @@ if __name__ == "__main__":
                                        "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
                        "learning_rate": ARGS.learning_rate,
                        "weight_decay": ARGS.weight_decay,
+                       "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
                        "gra_enc_aggr": ARGS.gra_enc_aggr,

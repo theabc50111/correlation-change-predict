@@ -75,6 +75,8 @@ if __name__ == "__main__":
                              help="input the learning rate of training")
     args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0,
                              help="input the weight decay of training")
+    args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
+                             help="input the weight of graph encoder weight l2 norm loss")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                              help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     args_parser.add_argument("--drop_p", type=float, default=0,
@@ -136,6 +138,7 @@ if __name__ == "__main__":
                        "seq_len": ARGS.seq_len,
                        "learning_rate": ARGS.learning_rate,
                        "weight_decay": ARGS.weight_decay,
+                       "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,
                        "gra_enc_aggr": ARGS.gra_enc_aggr,
