@@ -232,6 +232,7 @@ class MTSCorrAD(torch.nn.Module):
                            "optimizer": str(self.optimizer),
                            "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
+                           "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],
                            "graph_enc": type(self.graph_encoder).__name__,
