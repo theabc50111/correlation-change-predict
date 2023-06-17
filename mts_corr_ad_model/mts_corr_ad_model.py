@@ -271,7 +271,7 @@ class MTSCorrAD(torch.nn.Module):
                         epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
-                    gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).sum() for p in self.graph_encoder.parameters())
+                    gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
                     batch_loss += gra_enc_weight_l2_penalty
                 else:
                     gra_enc_weight_l2_penalty = 0

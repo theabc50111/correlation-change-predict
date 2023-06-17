@@ -16,6 +16,9 @@ import torch
 import yaml
 from torch.nn import MSELoss
 from torch.optim.lr_scheduler import ConstantLR, MultiStepLR, SequentialLR
+from torch_geometric.data import DataLoader
+from torch_geometric.utils import unbatch, unbatch_edge_index
+from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
 from metrics_utils import EdgeAccuracyLoss
@@ -80,6 +83,30 @@ class GAE(torch.nn.Module):
 
         x_recon = self.decoder(graph_embeds)
         return x_recon
+
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, show_model_info: bool = False):
+        """
+        Training MTSCorrAD Model
+        """
+        # In order to make original function of nn.Module.train() work, we need to override it
+        super().train(mode=mode)
+        if train_data is None:
+            return self
+
+        best_model = []
+
+        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
+        for epoch_i in tqdm(range(epochs)):
+            self.train()
+            epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "gra_enc_weight_l2_reg": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
+                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "gra_dec_grad": torch.zeros(1), "lr": torch.zeros(1),
+                             "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
+            epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
+            # Train on batches
+            for batch_idx, batch_data in enumerate(train_loader):
+                self.optimizer.zero_grad()
+                batch_loss = torch.zeros(1)
+                batch_edge_acc = torch.zeros(1)
 
     def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int, show_log: bool = True, show_debug_info: bool = False):
         """
