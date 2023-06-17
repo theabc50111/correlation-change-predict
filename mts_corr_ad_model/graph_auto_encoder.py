@@ -81,6 +81,61 @@ class GAE(torch.nn.Module):
         x_recon = self.decoder(graph_embeds)
         return x_recon
 
+    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int, show_log: bool = True, show_debug_info: bool = False):
+        """
+        Create Pytorch Geometric DataLoaders
+        """
+        # Create an instance of the GraphTimeSeriesDataset
+        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg, show_log=show_log)
+        # Create mini-batches
+        data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
+
+        if show_log:
+            logger.info(f'Number of batches in this data_loader: {len(data_loader)}')
+            logger.info("="*30)
+
+        if show_debug_info:
+            logger.debug('Peeking info of subgraph:')
+            for batch_idx, subgraph in enumerate(data_loader):
+                if 2 < batch_idx < (len(data_loader)-2):  # only peek the first 2 and last 2 batches
+                    continue
+                for data_batch_idx in range(self.model_cfg['batch_size']):
+                    if 1 < data_batch_idx < (self.model_cfg['batch_size'] - 1):  # only peek the first and last data instances in the batch_data
+                        continue
+                    logger.debug(f' - Subgraph of data_batch_idx-{data_batch_idx} in batch-{batch_idx}: {subgraph[data_batch_idx]} ; num_graphs:{subgraph[data_batch_idx].num_graphs} ; edge_index[::, 10:15]: {subgraph[data_batch_idx].edge_index[::, 10:15]}')
+
+            logger.debug('Peeking info of data instance:')
+            for batch_idx, batch_data in enumerate(data_loader):
+                if 2 < batch_idx < (len(data_loader)-1):  # only peek the first 2 and last batches
+                    continue
+                for data_batch_idx in range(self.model_cfg['batch_size']):
+                    if data_batch_idx > 0:  # only peek the first data instance in the batch_data
+                        continue
+                    data_x_nodes_list = unbatch(batch_data[data_batch_idx].x, batch_data[data_batch_idx].batch)
+                    data_x_edges_idx_list = unbatch_edge_index(batch_data[data_batch_idx].edge_index, batch_data[data_batch_idx].batch)
+                    batch_edge_attr_start_idx = 0
+                    for seq_t in range(loader_seq_len):
+                        if 3 < seq_t < (loader_seq_len-2):  # only peek the first 3 and last 2 seq_t
+                            continue
+                        batch_edge_attr_end_idx = data_x_edges_idx_list[seq_t].shape[1] + batch_edge_attr_start_idx
+                        data_x_nodes = data_x_nodes_list[seq_t]
+                        data_x_edges_idx = data_x_edges_idx_list[seq_t]
+                        data_x_edges = batch_data[data_batch_idx].edge_attr[batch_edge_attr_start_idx: batch_edge_attr_end_idx]
+                        data_y = batch_data[data_batch_idx].y[seq_t]
+                        data_y_nodes = data_y.x
+                        data_y_edges = data_y.edge_attr
+                        data_y_edges_idx = data_y.edge_index
+                        batch_edge_attr_start_idx = batch_edge_attr_end_idx
+
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x.shape at t{seq_t}: {data_x_nodes.shape} \n batch{batch_idx}_data{data_batch_idx}_x[:5] at t{seq_t}:\n{data_x_nodes[:5]}")
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x_edges.shape at t{seq_t}: {data_x_edges.shape} \n batch{batch_idx}_data{data_batch_idx}_x_edges[:5] at t{seq_t}:\n{data_x_edges[:5]}")
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x_edges_idx.shape at t{seq_t}: {data_x_edges_idx.shape} \n batch{batch_idx}_data{data_batch_idx}_x_edges_idx[:5] at t{seq_t}:\n{data_x_edges_idx[::, :5]}")
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y.shape at t{seq_t}: {data_y_nodes.shape} \n batch{batch_idx}_data{data_batch_idx}_y[:5] at t{seq_t}:\n{data_y_nodes[:5]}")
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y_edges.shape at t{seq_t}: {data_y_edges.shape} \n batch{batch_idx}_data{data_batch_idx}_y_edges[:5] at t{seq_t}:\n{data_y_edges[:5]}")
+                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y_edges_idx.shape at t{seq_t}: {data_y_edges_idx.shape} \n batch{batch_idx}_data{data_batch_idx}_y_edges_idx[:5] at t{seq_t}:\n{data_y_edges_idx[::, :5]}")
+
+        return data_loader
+
 
 if __name__ == "__main__":
     gae_args_parser = argparse.ArgumentParser()
@@ -193,7 +248,8 @@ if __name__ == "__main__":
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1
-            g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            train_loader = model.create_pyg_data_loaders(graph_adj_mats=norm_train_dataset['edges'],  graph_nodes_mats=norm_train_dataset["nodes"], loader_seq_len=gae_cfg["seq_len"], show_log=True, show_debug_info=False)
+            #g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")
         except Exception as e:
