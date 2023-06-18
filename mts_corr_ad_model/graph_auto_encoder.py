@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 import argparse
+import copy
+import functools
 import json
 import logging
 import sys
 import traceback
 import warnings
+from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from pprint import pformat
@@ -16,7 +19,8 @@ import torch
 import yaml
 from torch.nn import MSELoss
 from torch.optim.lr_scheduler import ConstantLR, MultiStepLR, SequentialLR
-from torch_geometric.data import DataLoader
+from torch_geometric.data import Data, DataLoader
+from torch_geometric.nn import summary
 from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
@@ -26,7 +30,6 @@ from utils import split_and_norm_data
 
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
-from mts_corr_ad_model import GraphTimeSeriesDataset
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -93,29 +96,152 @@ class GAE(torch.nn.Module):
         if train_data is None:
             return self
 
+        best_model_info = {"num_training_graphs": len(train_data),
+                           "filt_mode": self.model_cfg['filt_mode'],
+                           "filt_quan": self.model_cfg['filt_quan'],
+                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
+                           "batches_per_epoch": self.num_tr_batches,
+                           "epochs": epochs,
+                           "batch_size": self.model_cfg['batch_size'],
+                           "seq_len": self.model_cfg['seq_len'],
+                           "optimizer": str(self.optimizer),
+                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
+                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
+                           "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
+                           "drop_pos": self.model_cfg["drop_pos"],
+                           "drop_p": self.model_cfg["drop_p"],
+                           "graph_enc": type(self.graph_encoder).__name__,
+                           "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
+                           "min_val_loss": float('inf')}
         best_model = []
-
-        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
+        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], batch_size=self.model_cfg["batch_size"])
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "gra_enc_weight_l2_reg": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
-                             "gra_enc_grad": torch.zeros(1), "gru_grad": torch.zeros(1), "gra_dec_grad": torch.zeros(1), "lr": torch.zeros(1),
-                             "pred_gra_embeds": [], "y_gra_embeds": [], "gra_embeds_disparity": {}}
+                             "gra_enc_grad": torch.zeros(1), "gra_dec_grad": torch.zeros(1), "lr": torch.zeros(1)}
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             for batch_idx, batch_data in enumerate(train_loader):
                 self.optimizer.zero_grad()
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)
+                for data_batch_idx in range(len(batch_data)):
+                    data = batch_data[data_batch_idx]
+                    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+                    num_nodes = x.shape[0]
+                    recon_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                    x_graph_adj = torch.sparse_coo_tensor(x_edge_index, x_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                    edge_acc = np.isclose(recon_graph_adj.cpu().detach().numpy(), x_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+                    batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
+                    #print(f"batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx}, edge_acc:{edge_acc}, batch_edge_acc:{batch_edge_acc}")
+                    loss_fns["fn_args"]["MSELoss()"].update({"input": recon_graph_adj, "target":  x_graph_adj})
+                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": recon_graph_adj, "target":  x_graph_adj})
+                    #print(f"self.num_tr_batches:{self.num_tr_batches}, self.model_cfg['batch_size']:{self.model_cfg['batch_size']}, self.num_tr_batches*self.model_cfg['batch_size']: {self.num_tr_batches*self.model_cfg['batch_size']}")
+                    for fn in loss_fns["fns"]:
+                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                        loss = partial_fn()
+                        batch_loss += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+                        #print(f"fn_name:{fn_name}, loss:{loss}, batch_loss:{batch_loss}")
+                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
 
-    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int, show_log: bool = True, show_debug_info: bool = False):
+                if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
+                    gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
+                    batch_loss += gra_enc_weight_l2_penalty
+                else:
+                    gra_enc_weight_l2_penalty = 0
+                batch_loss.backward()
+                self.optimizer.step()
+                self.scheduler.step()
+                # record metrics for each batch
+                epoch_metrics["tr_loss"] += batch_loss
+                epoch_metrics["tr_edge_acc"] += batch_edge_acc
+                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty
+                epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
+                # used in observation model info in console
+                log_model_info_data = data
+                log_model_info_batch_idx = batch_idx
+
+            # Validation
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
+
+            # record training history and save best model
+            for k, v in epoch_metrics.items():
+                history_list = best_model_info.setdefault(k+"_history", [])
+                history_list.append(v.item() if isinstance(v, torch.Tensor) else v)
+            if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
+                best_model = {"encoder_weight": copy.deepcopy(self.graph_encoder.state_dict()), "decoder_weight": copy.deepcopy(self.decoder.state_dict())}
+                best_model_info["best_val_epoch"] = epoch_i
+                best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
+                best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
+
+            # observe model info in console
+            if epoch_i == 0:
+                best_model_info["model_structure"] = str(self) + "\n" + "="*100 + "\n" + str(summary(self, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, max_depth=20))
+                if show_model_info:
+                    logger.info(f"\nNumber of graphs:{batch_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
+            if epoch_i % 10 == 0:  # show metrics every 10 epochs
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
+                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
+            if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
+                logger.info(f"\nIn Epoch {epoch_i:>3} \nrecon_graph_adj:\n{recon_graph_adj}\nx_graph_adj:\n{x_graph_adj}\n")
+
+        return best_model, best_model_info
+
+    def test(self, test_data: np.ndarray = None, loss_fns: dict = None, show_loader_log: bool = False):
+        self.eval()
+        test_loss = 0
+        test_edge_acc = 0
+        test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], batch_size=self.model_cfg["batch_size"], show_log=show_loader_log)
+        with torch.no_grad():
+            for batch_data in test_loader:
+                for data_batch_idx in range(len(batch_data)):
+                    data = batch_data[data_batch_idx]
+                    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+                    num_nodes = x.shape[0]
+                    recon_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                    x_graph_adj = torch.sparse_coo_tensor(x_edge_index, x_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                    edge_acc = np.isclose(recon_graph_adj.cpu().detach().numpy(), x_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+                    test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
+                    loss_fns["fn_args"]["MSELoss()"].update({"input": recon_graph_adj, "target":  x_graph_adj})
+                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": recon_graph_adj, "target":  x_graph_adj})
+                    for fn in loss_fns["fns"]:
+                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                        loss = partial_fn()
+                        test_loss += loss/(self.num_val_batches*self.model_cfg['batch_size'])
+
+        return test_loss, test_edge_acc
+
+    @staticmethod
+    def save_model(unsaved_model: OrderedDict, model_info: dict, model_dir: Path, model_log_dir: Path):
+        e_i = model_info.get("best_val_epoch")
+        t_stamp = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
+        torch.save(unsaved_model['encoder_weight'], model_dir/f"epoch_{e_i}-{t_stamp}-encoder_weight.pt")
+        torch.save(unsaved_model['decoder_weight'], model_dir/f"epoch_{e_i}-{t_stamp}-decoder_weight.pt")
+        with open(model_log_dir/f"epoch_{e_i}-{t_stamp}.json", "w") as f:
+            json_str = json.dumps(model_info)
+            f.write(json_str)
+        logger.info(f"model has been saved in:{model_dir}")
+
+    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, batch_size: int, show_log: bool = True, show_debug_info: bool = False):
         """
         Create Pytorch Geometric DataLoaders
         """
         # Create an instance of the GraphTimeSeriesDataset
-        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg, show_log=show_log)
+        graph_time_len = graph_adj_mats.shape[0]
+        graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
+        data_list = []
+        for g_t in range(graph_time_len):
+            edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t])), axis=1))
+            edge_attr = torch.tensor(graph_adj_mats[g_t][~np.isnan(graph_adj_mats[g_t])].reshape(-1, 1), dtype=torch.float64)
+            node_attr = torch.tensor(graph_nodes_mats[g_t], dtype=torch.float64)
+            data = Data(x=node_attr, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
+            data_list.append(data)
         # Create mini-batches
-        data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
+        data_loader = DataLoader(data_list, batch_size=batch_size, shuffle=False)
 
         if show_log:
             logger.info(f'Number of batches in this data_loader: {len(data_loader)}')
@@ -141,8 +267,8 @@ class GAE(torch.nn.Module):
                     data_x_nodes_list = unbatch(batch_data[data_batch_idx].x, batch_data[data_batch_idx].batch)
                     data_x_edges_idx_list = unbatch_edge_index(batch_data[data_batch_idx].edge_index, batch_data[data_batch_idx].batch)
                     batch_edge_attr_start_idx = 0
-                    for seq_t in range(loader_seq_len):
-                        if 3 < seq_t < (loader_seq_len-2):  # only peek the first 3 and last 2 seq_t
+                    for seq_t in range(batch_size):
+                        if 3 < seq_t < (batch_size-2):  # only peek the first 3 and last 2 seq_t
                             continue
                         batch_edge_attr_end_idx = data_x_edges_idx_list[seq_t].shape[1] + batch_edge_attr_start_idx
                         data_x_nodes = data_x_nodes_list[seq_t]
@@ -190,6 +316,8 @@ if __name__ == "__main__":
                                  help="input the learning rate of training")
     gae_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
                                  help="input the weight decay of training")
+    gae_args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
+                                 help="input the weight of graph encoder weight l2 norm loss")
     gae_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
                                  help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
     gae_args_parser.add_argument("--drop_p", type=float, default=0,
@@ -225,8 +353,8 @@ if __name__ == "__main__":
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
     graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    g_model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
-    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    g_model_dir = current_dir / f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}'
+    g_model_log_dir = current_dir / f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     g_model_dir.mkdir(parents=True, exist_ok=True)
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -258,6 +386,7 @@ if __name__ == "__main__":
                                "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
                "learning_rate": ARGS.learning_rate,
                "weight_decay": ARGS.weight_decay,
+               "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
                "drop_pos": ARGS.drop_pos,
                "drop_p": ARGS.drop_p,
                "gra_enc_aggr": ARGS.gra_enc_aggr,
@@ -275,8 +404,7 @@ if __name__ == "__main__":
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1
-            train_loader = model.create_pyg_data_loaders(graph_adj_mats=norm_train_dataset['edges'],  graph_nodes_mats=norm_train_dataset["nodes"], loader_seq_len=gae_cfg["seq_len"], show_log=True, show_debug_info=False)
-            #g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")
         except Exception as e:
