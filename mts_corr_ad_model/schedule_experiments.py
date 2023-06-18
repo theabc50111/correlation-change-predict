@@ -11,13 +11,13 @@ discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-graph_enc_weight_l2_reg_lambda_list = ["--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001", "--graph_enc_weight_l2_reg_lambda 0.0001"]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = ["", "--drop_pos graph_encoder"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
-drop_p_list = ["", "--drop_p 0.1", "--drop_p 0.01"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
+drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
-gra_enc_l_list = ["--gra_enc_l 2"]
-gra_enc_h_list = ["--gra_enc_h 4"]
+gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 5"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 32"]
 
 args_list = list(product(filt_mode_list, filt_quan_list, nodes_v_mode_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list, graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list))
 args_list = list(filter(lambda x: not (x[12] == "--gra_enc_l 1" and x[13] == "--gra_enc_h 32"), args_list))
@@ -44,7 +44,7 @@ args_list = sorted(args_list, key=lambda x: x[3])
 
 num_models = sum([1 for x in args_list if x[3] == "" and x[12] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
 #model_timedelta_list = [timedelta(hours=3, minutes=40), timedelta(hours=5, minutes=20), timedelta(hours=10, minutes=0)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
-model_timedelta_list = [timedelta(hours=5, minutes=50)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
+model_timedelta_list = [timedelta(hours=2, minutes=35), timedelta(hours=4, minutes=10), timedelta(hours=9)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list

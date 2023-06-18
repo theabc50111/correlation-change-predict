@@ -22,6 +22,7 @@ from utils import split_and_norm_data
 from baseline_model import BaselineGRU
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
+from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
 
 current_dir = Path(__file__).parent
@@ -69,8 +70,12 @@ if __name__ == "__main__":
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
-    args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
-                             help="input [MTSCorrAD] | [Baseline] | [MTSCorrAD Baseline] to decide which models to train")
+    args_parser.add_argument("--train_models", type=str, nargs='*', default=["GAE"],
+                             help="input [MTSCorrAD] | [Baseline] | [GAE] | [MTSCorrAD GAE] | [MTSCorrAD Baseline GAE] to decide which models to train")
+    args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
+                             help="input the path of pretrain encoder weights")
+    args_parser.add_argument("--pretrain_decoder", type=str, nargs='?', default="",
+                             help="input the path of pretrain decoder weights")
     args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.001,
                              help="input the learning rate of training")
     args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0,
@@ -94,6 +99,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
     ARGS = args_parser.parse_args()
+    assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -120,10 +126,14 @@ if __name__ == "__main__":
     mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
     baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}'
+    gae_model_log_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
+    gae_model_dir.mkdir(parents=True, exist_ok=True)
+    gae_model_log_dir.mkdir(parents=True, exist_ok=True)
 
     # model configuration
     is_training, train_count = True, 0
@@ -153,12 +163,19 @@ if __name__ == "__main__":
                        "decoder": MLPDecoder}
 
     mts_corr_ad_cfg = basic_model_cfg.copy()
-    baseline_gru_model_cfg = basic_model_cfg.copy()
+    baseline_gru_cfg = basic_model_cfg.copy()
+    gae_cfg = basic_model_cfg.copy()
     mts_corr_ad_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
                                       "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
                                       "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
-    baseline_gru_model_cfg["num_tr_batches"] = ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size)
-    baseline_gru_model_cfg["gru_in_dim"] = (norm_train_dataset['edges'].shape[1])**2
+    mts_corr_ad_cfg["pretrain_encoder"] = ARGS.pretrain_encoder
+    mts_corr_ad_cfg["pretrain_decoder"] = ARGS.pretrain_decoder
+    baseline_gru_cfg["num_tr_batches"] = ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size)
+    baseline_gru_cfg["gru_in_dim"] = (norm_train_dataset['edges'].shape[1])**2
+    gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
+    gae_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
+                              "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
+                              "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
 
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
@@ -173,7 +190,8 @@ if __name__ == "__main__":
     logger.info("="*80)
 
     model = MTSCorrAD(mts_corr_ad_cfg)
-    baseline_model = BaselineGRU(baseline_gru_model_cfg)
+    baseline_model = BaselineGRU(baseline_gru_cfg)
+    gae_model = GAE(gae_cfg)
     loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
                      "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
     while (is_training is True) and (train_count < 100):
@@ -183,6 +201,8 @@ if __name__ == "__main__":
                 best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
+            if "GAE" in ARGS.train_models:
+                best_gae_model, best_gae_model_info = gae_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")
         except Exception as e:
@@ -204,3 +224,5 @@ if __name__ == "__main__":
                     model.save_model(best_model, best_model_info, model_dir=mts_corr_ad_model_dir, model_log_dir=mts_corr_ad_model_log_dir)
                 if "Baseline" in ARGS.train_models:
                     baseline_model.save_model(best_baseline_model, best_baseline_model_info, model_dir=baseline_model_dir, model_log_dir=baseline_model_log_dir)
+                if "GAE" in ARGS.train_models:
+                    gae_model.save_model(best_gae_model, best_gae_model_info, model_dir=gae_model_dir, model_log_dir=gae_model_log_dir)

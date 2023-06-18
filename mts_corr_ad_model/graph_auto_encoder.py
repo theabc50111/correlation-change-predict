@@ -103,7 +103,6 @@ class GAE(torch.nn.Module):
                            "batches_per_epoch": self.num_tr_batches,
                            "epochs": epochs,
                            "batch_size": self.model_cfg['batch_size'],
-                           "seq_len": self.model_cfg['seq_len'],
                            "optimizer": str(self.optimizer),
                            "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
                            "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
@@ -298,8 +297,6 @@ if __name__ == "__main__":
                                  help="input the number of batch size")
     gae_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
                                  help="input the number of training epochs")
-    gae_args_parser.add_argument("--seq_len", type=int, nargs='?', default=30,
-                                 help="input the number of sequence length")
     gae_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                  help="input --save_model to save model weight and model info")
     gae_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
@@ -319,7 +316,7 @@ if __name__ == "__main__":
     gae_args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
                                  help="input the weight of graph encoder weight l2 norm loss")
     gae_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                                 help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
+                                 help="input [decoder] | [graph_encoder] | [decoder graph_encoder] to decide the position of drop layers")
     gae_args_parser.add_argument("--drop_p", type=float, default=0,
                                  help="input 0~1 to decide the probality of drop layers")
     gae_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
@@ -380,7 +377,6 @@ if __name__ == "__main__":
                "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                "tr_epochs": ARGS.tr_epochs,
                "batch_size": ARGS.batch_size,
-               "seq_len": ARGS.seq_len,
                "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
                                "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
                                "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},

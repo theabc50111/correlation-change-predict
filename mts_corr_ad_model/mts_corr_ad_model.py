@@ -183,6 +183,10 @@ class MTSCorrAD(torch.nn.Module):
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
+        if self.model_cfg["pretrain_encoder"]:
+            self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
+        if self.model_cfg["pretrain_decoder"]:
+            self.decoder.load_state_dict(torch.load(self.model_cfg["pretrain_decoder"]))
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
@@ -453,6 +457,10 @@ if __name__ == "__main__":
                                          help="input the filtered quantile of graph edges")
     mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                          help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    mts_corr_ad_args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
+                                         help="input the path of pretrain encoder weights")
+    mts_corr_ad_args_parser.add_argument("--pretrain_decoder", type=str, nargs='?', default="",
+                                         help="input the path of pretrain decoder weights")
     mts_corr_ad_args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
                                          help="input the learning rate of training")
     mts_corr_ad_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
@@ -476,6 +484,7 @@ if __name__ == "__main__":
     mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=None,
                                          help="input the number of gru hidden size")
     ARGS = mts_corr_ad_args_parser.parse_args()
+    assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -529,6 +538,8 @@ if __name__ == "__main__":
                        "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
                                        "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
                                        "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
+                       "pretrain_encoder": ARGS.pretrain_encoder,
+                       "pretrain_decoder": ARGS.pretrain_decoder,
                        "learning_rate": ARGS.learning_rate,
                        "weight_decay": ARGS.weight_decay,
                        "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
