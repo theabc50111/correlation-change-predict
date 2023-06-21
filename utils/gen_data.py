@@ -335,7 +335,7 @@ if __name__ == "__main__":
                                                                                     # 80 is ONLY SUIT for  disjoint-method(CORR_WINDOW=CORR_STRIDE);
                                                                                     # 80 is data generation setting in Korea paper. Because each pair need to be diversified to 5 corr_series,
                                                                                     # if diversified to 3 corr_series, MAX_DATA_DIV_START_ADD should be 40.
-    data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",  # data implement setting
+    data_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER_LABEL_LAST",  # data implement setting
                                   help="input the name of implemented dataset, watch options by printing /config/data_config.yaml/[\"DATASETS\"].keys()")  # watch options by operate: print(data_cfg["DATASETS"].keys())
     data_args_parser.add_argument("--train_items_setting", type=str, nargs='?', default="train_train",  # train set setting
                                   help="input the setting of training items, options:\n    - 'train_train'\n    - 'train_all'")

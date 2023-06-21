@@ -52,11 +52,11 @@ warnings.simplefilter("ignore")
 
 if __name__ == "__main__":
     args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_9_CLUSTER_LABEL_LAST",
+    args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
                              help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     args_parser.add_argument("--batch_size", type=int, nargs='?', default=64,
                              help="input the number of batch size")
-    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
+    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=2000,
                              help="input the number of training epochs")
     args_parser.add_argument("--seq_len", type=int, nargs='?', default=5,
                              help="input the number of sequence length")
@@ -98,7 +98,7 @@ if __name__ == "__main__":
                              help="input the number of graph laryers of graph_encoder")
     args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                              help="input the number of graph embedding hidden size of graph_encoder")
-    args_parser.add_argument("--gru_l", type=int, nargs='?', default=5,  # range:1~n, for gru
+    args_parser.add_argument("--gru_l", type=int, nargs='?', default=2,  # range:1~n, for gru
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
