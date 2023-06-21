@@ -158,8 +158,8 @@ class BaselineGRU(torch.nn.Module):
             batch_y = torch.empty((cur_batch_size, num_nodes**2)).fill_(np.nan)
             for data_batch_idx in range(cur_batch_size):
                 begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
-                batch_x[data_batch_idx] = torch.tensor(graph_adj_arr[begin_t:end_t])
-                batch_y[data_batch_idx] = torch.tensor(graph_adj_arr[end_t])
+                batch_x[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[begin_t:end_t], nan=0))
+                batch_y[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[end_t], nan=0))
 
             assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
 

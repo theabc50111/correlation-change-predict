@@ -39,10 +39,14 @@ logger.addHandler(logger_console)
 metrics_logger = logging.getLogger("metrics")
 utils_logger = logging.getLogger("utils")
 mts_corr_ad_model_logger = logging.getLogger("mts_corr_ad_model")
-baseline_logger = logging.getLogger("baseline_model")
+baseline_model_logger = logging.getLogger("baseline_model")
+gae_model_logger = logging.getLogger("graph_auto_encoder")
 logger.setLevel(logging.INFO)
 metrics_logger.setLevel(logging.INFO)
 utils_logger.setLevel(logging.INFO)
+mts_corr_ad_model_logger.setLevel(logging.INFO)
+baseline_model_logger.setLevel(logging.INFO)
+gae_model_logger.setLevel(logging.INFO)
 warnings.simplefilter("ignore")
 
 
@@ -189,19 +193,19 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    model = MTSCorrAD(mts_corr_ad_cfg)
-    baseline_model = BaselineGRU(baseline_gru_cfg)
-    gae_model = GAE(gae_cfg)
     loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
                      "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1
             if "MTSCorrAD" in ARGS.train_models:
+                model = MTSCorrAD(mts_corr_ad_cfg)
                 best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
+                baseline_model = BaselineGRU(baseline_gru_cfg)
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
             if "GAE" in ARGS.train_models:
+                gae_model = GAE(gae_cfg)
                 best_gae_model, best_gae_model_info = gae_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
         except AssertionError as e:
             logger.error(f"\n{e}")

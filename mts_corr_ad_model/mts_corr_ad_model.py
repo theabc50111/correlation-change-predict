@@ -323,7 +323,7 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-                logger.info(f"\nIn Epoch {epoch_i:>3} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
+                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
 
@@ -397,40 +397,40 @@ class MTSCorrAD(torch.nn.Module):
             for batch_idx, subgraph in enumerate(data_loader):
                 if 2 < batch_idx < (len(data_loader)-2):  # only peek the first 2 and last 2 batches
                     continue
-                for data_batch_idx in range(self.model_cfg['batch_size']):
+                for data_batch_idx in range(len(subgraph)):
                     if 1 < data_batch_idx < (self.model_cfg['batch_size'] - 1):  # only peek the first and last data instances in the batch_data
                         continue
                     logger.debug(f' - Subgraph of data_batch_idx-{data_batch_idx} in batch-{batch_idx}: {subgraph[data_batch_idx]} ; num_graphs:{subgraph[data_batch_idx].num_graphs} ; edge_index[::, 10:15]: {subgraph[data_batch_idx].edge_index[::, 10:15]}')
 
-            logger.debug('Peeking info of data instance:')
-            for batch_idx, batch_data in enumerate(data_loader):
-                if 2 < batch_idx < (len(data_loader)-1):  # only peek the first 2 and last batches
-                    continue
-                for data_batch_idx in range(self.model_cfg['batch_size']):
-                    if data_batch_idx > 0:  # only peek the first data instance in the batch_data
-                        continue
-                    data_x_nodes_list = unbatch(batch_data[data_batch_idx].x, batch_data[data_batch_idx].batch)
-                    data_x_edges_idx_list = unbatch_edge_index(batch_data[data_batch_idx].edge_index, batch_data[data_batch_idx].batch)
+                    x_nodes_list = unbatch(subgraph[data_batch_idx].x, subgraph[data_batch_idx].batch)
+                    x_edge_index_list = unbatch_edge_index(subgraph[data_batch_idx].edge_index, subgraph[data_batch_idx].batch)
+                    num_nodes = x_nodes_list[0].shape[0]
                     batch_edge_attr_start_idx = 0
                     for seq_t in range(loader_seq_len):
                         if 3 < seq_t < (loader_seq_len-2):  # only peek the first 3 and last 2 seq_t
                             continue
-                        batch_edge_attr_end_idx = data_x_edges_idx_list[seq_t].shape[1] + batch_edge_attr_start_idx
-                        data_x_nodes = data_x_nodes_list[seq_t]
-                        data_x_edges_idx = data_x_edges_idx_list[seq_t]
-                        data_x_edges = batch_data[data_batch_idx].edge_attr[batch_edge_attr_start_idx: batch_edge_attr_end_idx]
-                        data_y = batch_data[data_batch_idx].y[seq_t]
-                        data_y_nodes = data_y.x
-                        data_y_edges = data_y.edge_attr
-                        data_y_edges_idx = data_y.edge_index
+                        batch_edge_attr_end_idx = x_edge_index_list[seq_t].shape[1] + batch_edge_attr_start_idx
+                        x_nodes = x_nodes_list[seq_t]
+                        x_edge_index = x_edge_index_list[seq_t]
+                        x_edge_attr = subgraph[data_batch_idx].edge_attr[batch_edge_attr_start_idx: batch_edge_attr_end_idx]
+                        x_graph_adj = torch.sparse_coo_tensor(x_edge_index, x_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                        data_y = subgraph[data_batch_idx].y[seq_t]
+                        y_nodes = data_y.x
+                        y_edge_index = data_y.edge_index
+                        y_edge_attr = data_y.edge_attr
+                        y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                         batch_edge_attr_start_idx = batch_edge_attr_end_idx
 
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x.shape at t{seq_t}: {data_x_nodes.shape} \n batch{batch_idx}_data{data_batch_idx}_x[:5] at t{seq_t}:\n{data_x_nodes[:5]}")
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x_edges.shape at t{seq_t}: {data_x_edges.shape} \n batch{batch_idx}_data{data_batch_idx}_x_edges[:5] at t{seq_t}:\n{data_x_edges[:5]}")
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_x_edges_idx.shape at t{seq_t}: {data_x_edges_idx.shape} \n batch{batch_idx}_data{data_batch_idx}_x_edges_idx[:5] at t{seq_t}:\n{data_x_edges_idx[::, :5]}")
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y.shape at t{seq_t}: {data_y_nodes.shape} \n batch{batch_idx}_data{data_batch_idx}_y[:5] at t{seq_t}:\n{data_y_nodes[:5]}")
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y_edges.shape at t{seq_t}: {data_y_edges.shape} \n batch{batch_idx}_data{data_batch_idx}_y_edges[:5] at t{seq_t}:\n{data_y_edges[:5]}")
-                        logger.debug(f"\n batch{batch_idx}_data{data_batch_idx}_y_edges_idx.shape at t{seq_t}: {data_y_edges_idx.shape} \n batch{batch_idx}_data{data_batch_idx}_y_edges_idx[:5] at t{seq_t}:\n{data_y_edges_idx[::, :5]}")
+                        logger.debug((f"\n---------------------------At batch{batch_idx} and data{data_batch_idx} and seq_t{seq_t}---------------------------\n"
+                                      f"x.shape: {x_nodes.shape}, x_edge_attr.shape: {x_edge_attr.shape}, x_edge_idx.shape: {x_edge_index.shape}, x_graph_adj.shape:{x_graph_adj.shape}\n"
+                                      f"x:\n{x_nodes}\n"
+                                      f"x_edges_idx[:5]:\n{x_edge_index[::, :5]}\n"
+                                      f"x_graph_adj:\n{x_graph_adj}\n"
+                                      f"y.shape: {y_nodes.shape}, y_edge_attr.shape: {y_edge_attr.shape}, y_edge_idx.shape: {y_edge_index.shape}, y_graph_adj.shape:{y_graph_adj.shape}\n"
+                                      f"y:\n{y_nodes}\n"
+                                      f"y_edges_idx[:5]:\n{y_edge_index[::, :5]}\n"
+                                      f"y_graph_adj:\n{y_graph_adj}\n"
+                                      f"\n---------------------------At batch{batch_idx} and data{data_batch_idx} and seq_t{seq_t}---------------------------\n"))
 
         return data_loader
 
