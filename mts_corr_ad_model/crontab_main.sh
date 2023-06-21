@@ -91,6 +91,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --seq_len)
+      seq_len="--seq_len $2"
+      shift 2
+      ;;
+
     --corr_window)
       corr_window="--corr_window $2"
       shift 2
