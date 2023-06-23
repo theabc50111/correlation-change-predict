@@ -84,6 +84,10 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
         TRAIN_SET: ['L', 'CBS', 'LNC', 'DISCA', 'UPS', 'GD', 'JNPR', 'SYY', 'XOM', 'DVN', 'MSFT', 'RHI', 'REG', 'CMI', 'AET', 'BEN', 'EQR', 'HRB', 'RRC', 'NVDA', 'FLS', 'FE', 'FLR', 'UNH', 'AEE', 'BAX', 'SJM', 'D', 'MGM', 'CAH', 'SCG', 'ANSS', 'GE', 'PX', 'MDLZ', 'AMD', 'DISH', 'PHM', 'NBL', 'COP', 'RJF', 'TWX', 'IR', 'DHR', 'AZO', 'DRI', 'CCI', 'GPN', 'CSCO', 'VLO', 'MET', 'DFS', 'ILMN', 'MON', 'NEM', 'GILD', 'ED', 'ZBH', 'LRCX', 'INTU', 'SHW', 'ROP', 'BDX', 'BBT', 'GPC', 'NKTR']
         OUTPUT_FILE_NAME_BASIS: "sp500_20082017_random_66"
+    PW_CONST_DIM_70_BKPS_0_NOISE_STD_10:
+        FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim70/pw_constant-bkps0-noise_std10.csv"
+        TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_26', 'var_28', 'var_29', 'var_30', 'var_31', 'var_32', 'var_33', 'var_34', 'var_36', 'var_38', 'var_39', 'var_40', 'var_41', 'var_42', 'var_43', 'var_44', 'var_47', 'var_48', 'var_49', 'var_50', 'var_51', 'var_52', 'var_53', 'var_54', 'var_55', 'var_56', 'var_57', 'var_58', 'var_59', 'var_60', 'var_61', 'var_62', 'var_63', 'var_64', 'var_65', 'var_67', 'var_69']
+        OUTPUT_FILE_NAME_BASIS: "pw_const_dim_70_bkps_0_noise_std_10"
     PAPER_EVA_1: 
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
         TRAIN_SET: *sp500_20082017_train_set 
