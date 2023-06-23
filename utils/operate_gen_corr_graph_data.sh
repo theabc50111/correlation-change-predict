@@ -20,7 +20,7 @@ do
                 for graph_nodes_v_mode in "${graph_nodes_v_mode_list[@]}"
                 do
                     echo "start generate data with --corr_window $corr_win --corr_stride $corr_str --filt_gra_mode $filt_gra_mode --filt_gra_quan $filt_gra_quan --graph_nodes_v_mode $graph_nodes_v_mode"
-                    python ./gen_data.py --corr_window $corr_win --corr_stride $corr_str --filt_gra_mode $filt_gra_mode --filt_gra_quan $filt_gra_quan --graph_nodes_v_mode $graph_nodes_v_mode --save_corr_data --save_corr_graph_arr
+                    python ./gen_corr_graph_data.py --corr_window $corr_win --corr_stride $corr_str --filt_gra_mode $filt_gra_mode --filt_gra_quan $filt_gra_quan --graph_nodes_v_mode $graph_nodes_v_mode --save_corr_data --save_corr_graph_arr
                 done
             done
         done
