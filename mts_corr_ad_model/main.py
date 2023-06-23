@@ -52,13 +52,13 @@ warnings.simplefilter("ignore")
 
 if __name__ == "__main__":
     args_parser = argparse.ArgumentParser()
-    args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
+    args_parser.add_argument("--data_implement", type=str, nargs='?', default="PW_CONST_DIM_70_BKPS_0_NOISE_STD_10",
                              help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     args_parser.add_argument("--batch_size", type=int, nargs='?', default=64,
                              help="input the number of batch size")
-    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=2000,
+    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
                              help="input the number of training epochs")
-    args_parser.add_argument("--seq_len", type=int, nargs='?', default=5,
+    args_parser.add_argument("--seq_len", type=int, nargs='?', default=10,
                              help="input the number of sequence length")
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
@@ -74,7 +74,7 @@ if __name__ == "__main__":
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
-    args_parser.add_argument("--train_models", type=str, nargs='*', default=["GAE"],
+    args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
                              help="input [MTSCorrAD] | [Baseline] | [GAE] | [MTSCorrAD GAE] | [MTSCorrAD Baseline GAE] to decide which models to train")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")

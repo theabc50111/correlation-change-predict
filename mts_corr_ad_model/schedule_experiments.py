@@ -12,7 +12,7 @@ discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-graph_enc_weight_l2_reg_lambda_list = ["", "--graph_enc_weight_l2_reg_lambda 0.001"]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
+graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
 drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
 drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
@@ -48,7 +48,7 @@ args_list = sorted(args_list, key=lambda x: x[5])
 
 num_models = sum([1 for x in args_list if x[4] == "" and x[13] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
 #model_timedelta_list = [timedelta(hours=3, minutes=40), timedelta(hours=5, minutes=20), timedelta(hours=10, minutes=0)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
-model_timedelta_list = [timedelta(hours=7, minutes=30), timedelta(hours=10, minutes=30), timedelta(hours=20)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
+model_timedelta_list = [timedelta(hours=4, minutes=30), timedelta(hours=6, minutes=50), timedelta(hours=13, minutes=40)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
