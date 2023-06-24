@@ -4,6 +4,7 @@
 
 ARGUMENT_LIST=(
   "log_suffix"
+  "data_implement"
   "batch_size"
   "tr_epochs"
   "save_model"
@@ -28,6 +29,7 @@ ARGUMENT_LIST=(
 
 # Default empty values of arguments
 sh_script_err_log_file="$HOME/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main_sh_err.log"
+data_implement=""
 log_suffix=""
 batch_size=""
 tr_epochs=""
@@ -74,6 +76,11 @@ while [[ $# -gt 0 ]]; do
       log_suffix="$2" # Note: In order to handle the argument containing space, the quotes around '$2': they are essential!
       log_file="$HOME/Documents/codes/correlation-change-predict/mts_corr_ad_model/crontab_main_${log_suffix}.log"
       shift 2 # The 'shift' eats a commandline argument, i.e. converts $1=a, $2=b, $3=c, $4=d into $1=b, $2=c, $3=d. shift 2 moves it all the way to $1=c, $2=d. It's done since that particular branch uses an argument, so it has to remove two things from the list (the -r and the argument following it) not just one.
+      ;;
+
+    --data_implement)
+      data_implement="--data_implement $2"
+      shift 2
       ;;
 
     --batch_size)
@@ -194,6 +201,6 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> $log_file
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> "$log_file" 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> "$log_file" 2>&1
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> $log_file

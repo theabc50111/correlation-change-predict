@@ -16,14 +16,14 @@ import yaml
 from torch.nn import MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from metrics_utils import EdgeAccuracyLoss
-from utils import split_and_norm_data
-
 from baseline_model import BaselineGRU
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
 from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
+
+from metrics_utils import EdgeAccuracyLoss
+from utils import split_and_norm_data
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
