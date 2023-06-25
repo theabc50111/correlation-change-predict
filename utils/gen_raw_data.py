@@ -113,10 +113,44 @@ def gen_pw_wave_const_data(args):
         df.to_csv(save_dir/f'pw_wave_const-bkps{n_bkps}-noise_std{sigma}.csv')
 
 
+def gen_pw_wave_linear_data(args):
+    """
+    Generate piecewise wave * linear data.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    wave_signal, bkps = rpt.pw_wavy(n, n_bkps, noise_std=0, seed=0)
+    linear_signal, bkps = pw_amplify_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
+    signal = wave_signal.reshape(n, 1)*linear_signal
+    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
+    var_names = ['var_linear_sum']+[f'var_{i}' for i in range(dim)]
+    df = pd.DataFrame(signal, index=dates, columns=var_names)
+    df.index.name = "Date"
+    logger.info(f"Generated piecewise wave_linear data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"piecewiase wave_linear data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'pw_wave_linear-bkps{n_bkps}-noise_std{sigma}.csv')
+
+
+def gen_pw_2_layers_wave_linear_data(args):
+    """
+    Generate 2 layer piecewise wave * linear data.
+    Construct the clusters for sub layer, then use the linear_sum column(response variable) of each cluster in sub layer to construct the second layer.
+    The variables of cluster in sub layer is consist of response variable and its covariates, the response variable is a linear combination of the covariates.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    wave_signal, bkps = rpt.pw_wavy(n, n_bkps, noise_std=0, seed=0)
+    linear_signal, bkps = pw_amplify_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
+    signal = wave_signal.reshape(n, 1)*linear_signal
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate raw data.')
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
-                        choices=['pw_constant', 'pw_linear', 'pw_wave_const'],
+                        choices=['pw_constant', 'pw_linear', 'pw_wave_const', 'pw_wave_linear'],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
@@ -133,3 +167,5 @@ if __name__ == '__main__':
         gen_pw_linear_data(args)
     if 'pw_wave_const' in args.data_type:
         gen_pw_wave_const_data(args)
+    if 'pw_wave_linear' in args.data_type:
+        gen_pw_wave_linear_data(args)
