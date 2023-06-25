@@ -74,8 +74,9 @@ if __name__ == "__main__":
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
-    args_parser.add_argument("--train_models", type=str, nargs='*', default=["MTSCorrAD"],
-                             help="input [MTSCorrAD] | [Baseline] | [GAE] | [MTSCorrAD GAE] | [MTSCorrAD Baseline GAE] to decide which models to train")
+    args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
+                             choices=["MTSCorrAD", "Baseline", "GAE"],
+                             help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
     args_parser.add_argument("--pretrain_decoder", type=str, nargs='?', default="",
@@ -87,7 +88,8 @@ if __name__ == "__main__":
     args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
                              help="input the weight of graph encoder weight l2 norm loss")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                             help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
+                             choices=["gru", "gru decoder", "decoder gru graph_encoder"],
+                             help="input to decide the position of drop layers, the choices are [gru, decoder, graph_encoder]")
     args_parser.add_argument("--drop_p", type=float, default=0,
                              help="input 0~1 to decide the probality of drop layers")
     args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",

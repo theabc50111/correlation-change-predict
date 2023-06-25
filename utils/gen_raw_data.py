@@ -17,6 +17,35 @@ logger_console.setFormatter(logger_formatter)
 logger.addHandler(logger_console)
 logger.setLevel(logging.INFO)
 
+
+def pw_amplify_linear(n_samples=200, n_features=1, n_bkps=3, noise_std=None, amp_coef=50, seed=None):
+    """Return piecewise linear signal and the associated changepoints.
+
+    Args:
+        n_samples (int, optional): signal length
+        n_features (int, optional): number of covariates
+        n_bkps (int, optional): number of change points
+        noise_std (float, optional): noise std. If None, no noise is added
+        seed (int): random seed
+    Returns:
+        tuple: signal of shape (n_samples, n_features+1), list of breakpoints
+    """
+    rng = np.random.default_rng(seed=seed)
+    covar = amp_coef*rng.normal(size=(n_samples, n_features))
+    linear_coeff, bkps = rpt.pw_constant(
+            n_samples=n_samples,
+            n_bkps=n_bkps,
+            n_features=n_features,
+            noise_std=None,
+            seed=seed,
+            )
+    var = np.sum(linear_coeff * covar, axis=1)
+    if noise_std is not None:
+        var += rng.normal(scale=noise_std, size=var.shape)
+    signal = np.c_[var, covar]
+    return signal, bkps
+
+
 def gen_pw_constant_data(args):
     """
     Generate piecewise constant data.
@@ -49,8 +78,7 @@ def gen_pw_linear_data(args):
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
-    signal, bkps = rpt.pw_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
-    signal = signal+abs(signal.min())+1
+    signal, bkps = pw_amplify_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = ['var_linear_sum']+[f'var_{i}' for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
@@ -87,6 +115,9 @@ def gen_pw_wave_const_data(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate raw data.')
+    parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
+                        choices=['pw_constant', 'pw_linear', 'pw_wave_const'],
+                        help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
     parser.add_argument('--noise_std', type=int, default=2, help='Input noise standard deviation. (default: 2))')
@@ -95,7 +126,10 @@ if __name__ == '__main__':
                         help="input --save_data to save raw data")
     args = parser.parse_args()
     logger.info(pformat(vars(args), indent=1, width=100, compact=True))
-    gen_pw_constant_data(args)
-    gen_pw_linear_data(args)
-    gen_pw_wave_const_data(args)
 
+    if 'pw_constant' in args.data_type:
+        gen_pw_constant_data(args)
+    if 'pw_linear' in args.data_type:
+        gen_pw_linear_data(args)
+    if 'pw_wave_const' in args.data_type:
+        gen_pw_wave_const_data(args)
