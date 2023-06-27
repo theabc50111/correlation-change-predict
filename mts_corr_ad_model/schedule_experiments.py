@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ["--data_implement PW_WAVE_CONST_DIM_60_BKPS_0_NOISE_STD_50",
-                       "--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_50",
-                       "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_50",
-                       "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_50",
-                       "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_50",
-                       "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_50"]
+data_implement_list = ["--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_30",
+                       "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30",
+                       "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_30",
+                       "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_30",
+                       "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_30"]
 seq_len_list = ["--seq_len 10"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
