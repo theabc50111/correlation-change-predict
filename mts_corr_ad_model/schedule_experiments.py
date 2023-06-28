@@ -4,12 +4,18 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ["--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_30",
+data_implement_list = ["--data_implement PW_WAVE_CONST_DIM_60_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_50",
+                       "--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_30"]
-train_models_list = ["--train_models MTSCorrAD --train_models Baseline"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
+train_models_list = ["--train_models Baseline"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 seq_len_list = ["--seq_len 10"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
@@ -56,7 +62,7 @@ args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 #    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=6, minutes=30)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+model_timedelta_list = [timedelta(hours=1, minutes=5)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
