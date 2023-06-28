@@ -9,6 +9,7 @@ data_implement_list = ["--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_N
                        "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_30"]
+train_models_list = ["--train_models MTSCorrAD --train_models Baseline"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 seq_len_list = ["--seq_len 10"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
@@ -25,10 +26,10 @@ gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
 gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = ["--gra_enc_h 16"]
 
-args_values = list(product(data_implement_list, seq_len_list, filt_mode_list, filt_quan_list, nodes_v_mode_list, discr_loss_list,
+args_values = list(product(data_implement_list, train_models_list, seq_len_list, filt_mode_list, filt_quan_list, nodes_v_mode_list, discr_loss_list,
                            discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list, graph_enc_weight_l2_reg_lambda_list, drop_pos_list,
                            drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list))
-args_keys = ["data_implement", "seq_len", "filt_mode", "filt_quan", "nodes_v_mode", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
+args_keys = ["data_implement", "train_models_list", "seq_len", "filt_mode", "filt_quan", "nodes_v_mode", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
              "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h"]
 args_list = []
 for args_value in args_values:
@@ -91,6 +92,6 @@ if __name__ == "__main__":
         home_directory = os.path.expanduser("~")
 
         cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--log_suffix {ARGS.log_suffix}", f"--cuda_device {ARGS.cuda_device}"] + list(model_args.values())
-        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
         # if x[9]==1 and x[10]==4:
         #     print(prev_model_time_len, model_args)
