@@ -5,7 +5,7 @@ from itertools import chain, product, repeat
 from pprint import pprint
 
 data_implement_list = ["--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30"]
-train_models_list = ["--train_models MTSCorrAD --train_models Baseline"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
+train_models_list = ["--train_models MTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 seq_len_list = ["--seq_len 10"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
