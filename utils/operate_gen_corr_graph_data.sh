@@ -2,11 +2,7 @@
 
 
 # Define the list of items
-dataset_list=("--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_30"
-              "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30"
-              "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_30"
-              "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_30"
-              "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_30")
+dataset_list=("--data_implement PW_WAVE_CONST_DIM_60_BKPS_0_NOISE_STD_30")
 train_items_setting="train_all"  # "train_train" "train_all"
 filt_gra_mode_list=("")  # ("--filt_gra_mode keep_abs" "--filt_gra_mode keep_positive" "--filt_gra_mode keep_strong")
 filt_gra_quan_list=("") # ("--data_implement 0.25" "--data_implement 0.5" "--data_implement 0.75")

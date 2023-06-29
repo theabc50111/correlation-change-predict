@@ -4,11 +4,7 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ["--data_implement CLUSTER_30_PW_WAVE_CONST_DIM_2_BKPS_0_NOISE_STD_30",
-                       "--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30",
-                       "--data_implement CLUSTER_4_PW_WAVE_CONST_DIM_15_BKPS_0_NOISE_STD_30",
-                       "--data_implement CLUSTER_3_PW_WAVE_CONST_DIM_20_BKPS_0_NOISE_STD_30",
-                       "--data_implement CLUSTER_2_PW_WAVE_CONST_DIM_30_BKPS_0_NOISE_STD_30"]
+data_implement_list = ["--data_implement CLUSTER_10_PW_WAVE_CONST_DIM_6_BKPS_0_NOISE_STD_30"]
 train_models_list = ["--train_models MTSCorrAD --train_models Baseline"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 seq_len_list = ["--seq_len 10"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
@@ -18,13 +14,13 @@ discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
+graph_enc_weight_l2_reg_lambda_list = ["", "--graph_enc_weight_l2_reg_lambda 0.001"]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
 drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
 drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
-gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
-gra_enc_h_list = ["--gra_enc_h 16"]
+gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 5"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 32"]
 
 args_values = list(product(data_implement_list, train_models_list, seq_len_list, filt_mode_list, filt_quan_list, nodes_v_mode_list, discr_loss_list,
                            discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list, graph_enc_weight_l2_reg_lambda_list, drop_pos_list,
@@ -56,7 +52,7 @@ args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 #    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=6, minutes=30)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+model_timedelta_list = [timedelta(hours=4, minutes=15), timedelta(hours=6, minutes=15), timedelta(hours=12, minutes=10)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
