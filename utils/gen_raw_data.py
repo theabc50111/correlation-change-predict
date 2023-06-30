@@ -53,7 +53,7 @@ def pw_rand_f1_f2_wavy(n_samples=200, n_bkps=3, noise_std=None, seed=120):
     return signal, bkps
 
 
-def pw_adapt_cov_mean_linear(n_samples=200, n_features=1, n_bkps=3, noise_std=0, cov_loc=50, seed=None):
+def pw_adapt_cov_linear_combine(n_samples=200, n_features=1, n_bkps=3, noise_std=0, cov_loc=50, seed=None):
     """Return piecewise linear signal and the associated changepoints.
 
     Args:
@@ -107,7 +107,7 @@ def gen_pw_constant_data(args):
     return signal, bkps
 
 
-def gen_pw_linear_data(args):
+def gen_pw_linear_combine_data(args):
     """
     Generate piecewise linear data.
     ref:
@@ -116,17 +116,17 @@ def gen_pw_linear_data(args):
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
-    signal, bkps = pw_adapt_cov_mean_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
+    signal, bkps = pw_adapt_cov_linear_combine(n, dim, n_bkps, noise_std=sigma, seed=0)
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = ['var_linear_sum']+[f'var_{i}' for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
     df.index.name = "Date"
-    logger.info(f"Generated piecewise linear data with shape {df.shape} and {n_bkps} change points.")
-    logger.info(f"piecewiase linear data[:5, :5]:\n{df.iloc[:5, :5]}")
+    logger.info(f"Generated piecewise linear_combine data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"piecewiase linear_combine data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'pw_linear-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'pw_linear_combine-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
 
@@ -159,72 +159,124 @@ def gen_pw_wave_const_data(args, seed=120):
     return signal, bkps
 
 
-def gen_pw_wave_linear_data(args):
+def gen_pw_wave_multiply_linear_reg_data(args, seed=120):
+    """
+    Generate piecewise wave * linear_regression data.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    rng = np.random.default_rng(seed=0)
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0, seed=seed)
+    const_signal, bkps = rpt.pw_constant(n, dim, n_bkps, noise_std=0, delta=(1, 500), seed=0)
+    linear_reg_signal = np.zeros(const_signal.shape)
+    tt = np.arange(n)
+    for i, (sub_linear_reg_signal, reg_coef) in enumerate(zip(np.split(linear_reg_signal, dim, axis=1), rng.uniform(low=-2, high=2, size=dim))):
+        sub_linear_reg_signal += (tt*reg_coef+const_signal[::, i]).reshape(-1, 1)
+    signal = wave_signal.reshape(n, 1)*linear_reg_signal
+    for i, const_linear_reg_mean in enumerate(linear_reg_signal.mean(axis=0)):
+        noise = rng.normal(scale=abs(const_linear_reg_mean*(sigma/100)), size=n)
+        signal[::, i] = signal[::, i]+noise
+    signal = signal+abs(signal.min())+1
+    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
+    var_names = [f'var_{i}' for i in range(dim)]
+    df = pd.DataFrame(signal, index=dates, columns=var_names)
+    df.index.name = "Date"
+    logger.info(f"Generated piecewise wave_multiply_linear_regression data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"Piecewise wave_multiply_linear_reg data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'pw_wave_multiply_linear_reg-bkps{n_bkps}-noise_std{sigma}.csv')
+
+    return signal, bkps
+
+
+def gen_pw_wave_add_linear_reg_data(args, seed=120):
+    """
+    Generate piecewise wave + linear_regression data.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    rng = np.random.default_rng(seed=0)
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0, seed=seed)
+    const_signal, bkps = rpt.pw_constant(n, dim, n_bkps, noise_std=0, delta=(1, 500), seed=0)
+    wave_const_signal = wave_signal.reshape(n, 1)*const_signal
+    linear_reg_signal = np.zeros(const_signal.shape)
+    tt = np.arange(n)
+    for i, (sub_linear_reg_signal, reg_coef) in enumerate(zip(np.split(linear_reg_signal, dim, axis=1), rng.uniform(low=-2, high=2, size=dim))):
+        sub_linear_reg_signal += (tt*reg_coef+const_signal[::, i]).reshape(-1, 1)
+    signal = wave_const_signal+linear_reg_signal
+    for i, const_linear_reg_mean in enumerate(linear_reg_signal.mean(axis=0)):
+        noise = rng.normal(scale=abs(const_linear_reg_mean*(sigma/100)), size=n)
+        signal[::, i] = signal[::, i]+noise
+    signal = signal+abs(signal.min())+1
+    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
+    var_names = [f'var_{i}' for i in range(dim)]
+    df = pd.DataFrame(signal, index=dates, columns=var_names)
+    df.index.name = "Date"
+    logger.info(f"Generated piecewise wave_add_linear_regression data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"Piecewise wave_add_linear_reg data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'pw_wave_add_linear_reg-bkps{n_bkps}-noise_std{sigma}.csv')
+
+    return signal, bkps
+
+
+def gen_pw_wave_linear_combine_data(args):
     """
     Generate piecewise wave * linear data.
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0)
-    linear_signal, bkps = pw_adapt_cov_mean_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
+    linear_signal, bkps = pw_adapt_cov_linear_combine(n, dim, n_bkps, noise_std=sigma, seed=0)
     signal = wave_signal.reshape(n, 1)*linear_signal
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = ['var_linear_sum']+[f'var_{i}' for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
     df.index.name = "Date"
-    logger.info(f"Generated piecewise wave_linear data with shape {df.shape} and {n_bkps} change points.")
-    logger.info(f"piecewiase wave_linear data[:5, :5]:\n{df.iloc[:5, :5]}")
+    logger.info(f"Generated piecewise wave_linear_combine data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"piecewiase wave_linear_combine data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'pw_wave_linear-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'pw_wave_linear_combine-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
 
 
-def gen_multi_cluster_pw_wave_const_data(args):
+def gen_multi_cluster_data(args, gen_data_func):
     """
-    Generate multiple cluseter piecewise wave * const data.
-    Construct the clusters by multply wave and linear data, each cluster has different wave.
-    The variables of linear data of cluster is consist of response variable and its covariates, the response variable is a linear combination of the covariates.
+    Generate multiple cluseter data.
+    Construct the clusters by data that produce by `gen_data_func`.
     """
+    gen_data_func_name = gen_data_func.__name__[7:-5]
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     n_clusters = args.n_clusters  # number of clusters
     signal = np.zeros((n, n_clusters*dim))
     for sub, cluster_idx in zip(np.split(signal, n_clusters, axis=1), range(n_clusters)):
-        cluster_signal, bkps = gen_pw_wave_const_data(args, seed=cluster_idx)
+        cluster_signal, bkps = gen_data_func(args, seed=cluster_idx)
         sub += cluster_signal
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = [f'cluster_{cluster_idx}_var_{i}' for cluster_idx in range(n_clusters) for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
     df.index.name = "Date"
-    logger.info(f"Generated {n_clusters}_clusters piecewise wave_const data with shape {df.shape} and {n_bkps} change points.")
-    logger.info(f"piecewiase wave_linear data[:5, :5]:\n{df.iloc[:5, :5]}")
+    logger.info(f"Generated clusters_{n_clusters} piecewise {gen_data_func_name} data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"clusters_{n_clusters} piecewiase {gen_data_func_name} data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{n_clusters*dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'cluster_{n_clusters}-pw_wave_const-bkps{n_bkps}-noise_std{sigma}.csv')
-
-
-def gen_pw_2_layers_wave_linear_data(args):
-    """
-    Generate 2 layer piecewise wave * linear data.
-    Construct the clusters for sub layer, then use the linear_sum column(response variable) of each cluster in sub layer to construct the second layer.
-    The variables of cluster in sub layer is consist of response variable and its covariates, the response variable is a linear combination of the covariates.
-    """
-    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
-    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0)
-    linear_signal, bkps = pw_adapt_cov_mean_linear(n, dim, n_bkps, noise_std=sigma, seed=0)
-    signal = wave_signal.reshape(n, 1)*linear_signal
+        df.to_csv(save_dir/f'cluster_{n_clusters}-pw_{gen_data_func_name}-bkps{n_bkps}-noise_std{sigma}.csv')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate raw data.')
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
-                        choices=['pw_constant', 'pw_linear', 'pw_wave_const', 'pw_wave_linear',
-                                 'multi_cluster_pw_wave_const'],
+                        choices=['pw_constant', 'pw_linear_combine', 'pw_wave_const', 'pw_wave_linear_combine',
+                                 'pw_wave_multiply_linear_reg', 'pw_wave_add_linear_reg', 'multi_cluster_pw_wave_const', 'multi_cluster'],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
@@ -234,16 +286,24 @@ if __name__ == '__main__':
     parser.add_argument("--save_data", type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help="input --save_data to save raw data")
     args = parser.parse_args()
-    assert not ("multi_cluster_pw_wave_const" in args.data_type) ^ (args.n_clusters > 0), "`n_clusters` should be set when `data_type` is 'multi_cluster_pw_wave_const'"
+    assert not ("multi_cluster" in args.data_type) ^ (args.n_clusters > 0), "`n_clusters` should be set when `data_type` is 'multi_cluster'"
+    assert not ("multi_cluster" in args.data_type) ^ (len(args.data_type) == 2), "`data_type` should contain other generate data setting when 'multi_cluster' is set"
     logger.info(pformat(vars(args), indent=1, width=100, compact=True))
 
-    if 'pw_constant' in args.data_type:
-        gen_pw_constant_data(args)
-    if 'pw_linear' in args.data_type:
-        gen_pw_linear_data(args)
-    if 'pw_wave_const' in args.data_type:
-        gen_pw_wave_const_data(args)
-    if 'pw_wave_linear' in args.data_type:
-        gen_pw_wave_linear_data(args)
-    if 'multi_cluster_pw_wave_const' in args.data_type:
-        gen_multi_cluster_pw_wave_const_data(args)
+    if 'multi_cluster' in args.data_type:
+        args.data_type.remove('multi_cluster')
+        func = locals()[f'gen_{args.data_type[0]}_data']
+        gen_multi_cluster_data(args, func)
+    else:
+        if 'pw_constant' in args.data_type:
+            gen_pw_constant_data(args)
+        if 'pw_linear_combine' in args.data_type:
+            gen_pw_linear_combine_data(args)
+        if 'pw_wave_const' in args.data_type:
+            gen_pw_wave_const_data(args)
+        if 'pw_wave_linear_combine' in args.data_type:
+            gen_pw_wave_linear_combine_data(args)
+        if 'pw_wave_multiply_linear_reg' in args.data_type:
+            gen_pw_wave_multiply_linear_reg_data(args)
+        if 'pw_wave_add_linear_reg' in args.data_type:
+            gen_pw_wave_add_linear_reg_data(args)

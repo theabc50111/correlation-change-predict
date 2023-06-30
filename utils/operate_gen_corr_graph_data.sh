@@ -2,13 +2,16 @@
 
 
 # Define the list of items
-dataset_list=("--data_implement PW_WAVE_CONST_DIM_60_BKPS_0_NOISE_STD_30")
+dataset_list=("--data_implement PW_WAVE_MULTIPLY_LINEAR_REG_DIM_60_BKPS_0_NOISE_STD_30"
+              "--data_implement PW_WAVE_ADD_LINEAR_REG_DIM_60_BKPS_0_NOISE_STD_30"
+              "--data_implement CLUSTER_2_PW_WAVE_MULTIPLY_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30"
+              "--data_implement CLUSTER_2_PW_WAVE_ADD_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30")
 train_items_setting="train_all"  # "train_train" "train_all"
 filt_gra_mode_list=("")  # ("--filt_gra_mode keep_abs" "--filt_gra_mode keep_positive" "--filt_gra_mode keep_strong")
 filt_gra_quan_list=("") # ("--data_implement 0.25" "--data_implement 0.5" "--data_implement 0.75")
 graph_nodes_v_mode_list=("--graph_nodes_v_mode all_values" "--graph_nodes_v_mode mean" "--graph_nodes_v_mode std" "--graph_nodes_v_mode mean_std")
 corr_str_list=("--corr_stride 1")
-corr_win_list=("--corr_window 10" "--corr_window 20" "--corr_window 50")
+corr_win_list=("--corr_window 10" "--corr_window 30" "--corr_window 50")
 
 # Loop through the list
 for corr_win in "${corr_win_list[@]}"
