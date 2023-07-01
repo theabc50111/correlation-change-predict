@@ -98,7 +98,7 @@ DATASETS:
         OUTPUT_FILE_NAME_BASIS: "pw_wave_add_linear_reg_dim_30_bkps_0_noise_std_30"
     PW_WAVE_MULTIPLY_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/pw_wave_multiply_linear_reg-bkps0-noise_std30.csv"
-        TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29', 'var_30', 'var_31', 'var_32', 'var_33', 'var_34', 'var_35', 'var_36', 'var_37', 'var_38', 'var_39', 'var_40', 'var_41', 'var_42', 'var_43', 'var_44', 'var_45', 'var_46', 'var_47', 'var_48', 'var_49']
+        TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']
         OUTPUT_FILE_NAME_BASIS: "pw_wave_multiply_linear_reg_dim_30_bkps_0_noise_std_30"
     PW_LINEAR_COMBINE_DIM_10_BKPS_0_NOISE_STD_2:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim10/pw_linear_combine-bkps0-noise_std2.csv"

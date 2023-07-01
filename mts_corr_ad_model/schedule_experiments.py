@@ -5,7 +5,7 @@ from itertools import chain, product, repeat
 from pprint import pprint
 
 data_implement_list = ("--data_implement PW_WAVE_ADD_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30",
-                       "--data_implement PW_WAVE_ADD_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30",
+                       "--data_implement PW_WAVE_MULTIPLY_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_2_PW_WAVE_MULTIPLY_LINEAR_REG_DIM_15_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_2_PW_WAVE_ADD_LINEAR_REG_DIM_15_BKPS_0_NOISE_STD_30")
 train_models_list = ["--train_models MTSCorrAD2"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
