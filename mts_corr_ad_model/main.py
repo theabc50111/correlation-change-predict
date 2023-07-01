@@ -16,14 +16,15 @@ import yaml
 from torch.nn import MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
+from metrics_utils import EdgeAccuracyLoss
+from utils import split_and_norm_data
+
 from baseline_model import BaselineGRU
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
 from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
-
-from metrics_utils import EdgeAccuracyLoss
-from utils import split_and_norm_data
+from mts_corr_ad_model_2 import MTSCorrAD2
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -64,7 +65,7 @@ if __name__ == "__main__":
                              help="input --save_model to save model weight and model info")
     args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                              help="input the number of stride length of correlation computing")
-    args_parser.add_argument("--corr_window", type=int, nargs='?', default=50,
+    args_parser.add_argument("--corr_window", type=int, nargs='?', default=30,
                              help="input the number of window length of correlation computing")
     args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
                              help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
-                             choices=["MTSCorrAD", "Baseline", "GAE"],
+                             choices=["MTSCorrAD", "MTSCorrAD2", "Baseline", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
@@ -130,12 +131,16 @@ if __name__ == "__main__":
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
     mts_corr_ad_model_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
     mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    mts_corr_ad_model_2_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_2_log_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
     baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}'
     gae_model_log_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
+    mts_corr_ad_model_2_dir.mkdir(parents=True, exist_ok=True)
+    mts_corr_ad_model_2_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
     gae_model_dir.mkdir(parents=True, exist_ok=True)
@@ -162,7 +167,7 @@ if __name__ == "__main__":
                        "gra_enc_h": ARGS.gra_enc_h,
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
-                       "num_edges": (norm_train_dataset["edges"].shape[1]),
+                       "num_nodes": (norm_train_dataset["nodes"].shape[2]),
                        "num_node_features": norm_train_dataset["nodes"].shape[1],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
@@ -203,6 +208,9 @@ if __name__ == "__main__":
             if "MTSCorrAD" in ARGS.train_models:
                 model = MTSCorrAD(mts_corr_ad_cfg)
                 best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            if "MTSCorrAD2" in ARGS.train_models:
+                model = MTSCorrAD2(mts_corr_ad_cfg)
+                best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
@@ -228,6 +236,8 @@ if __name__ == "__main__":
             if save_model_info:
                 if "MTSCorrAD" in ARGS.train_models:
                     model.save_model(best_model, best_model_info, model_dir=mts_corr_ad_model_dir, model_log_dir=mts_corr_ad_model_log_dir)
+                if "MTSCorrAD2" in ARGS.train_models:
+                    model.save_model(best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info, model_dir=mts_corr_ad_model_2_dir, model_log_dir=mts_corr_ad_model_2_log_dir)
                 if "Baseline" in ARGS.train_models:
                     baseline_model.save_model(best_baseline_model, best_baseline_model_info, model_dir=baseline_model_dir, model_log_dir=baseline_model_log_dir)
                 if "GAE" in ARGS.train_models:

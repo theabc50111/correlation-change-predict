@@ -44,7 +44,7 @@ class BaselineGRU(torch.nn.Module):
         self.model_cfg = model_cfg
         self.num_tr_batches = self.model_cfg['num_tr_batches']
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
-        self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_edges"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
+        self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.loss_fn = MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
@@ -255,7 +255,7 @@ if __name__ == "__main__":
                               "gru_in_dim": (norm_train_dataset['edges'].shape[1])**2,
                               "gru_l": ARGS.gru_l,
                               "gru_h": ARGS.gru_h,
-                              "num_edges": (norm_train_dataset["edges"].shape[1]),
+                              "num_nodes": (norm_train_dataset["nodes"].shape[2]),
                               "decoder": MLPDecoder}
 
     model = BaselineGRU(baseline_gru_model_cfg)
