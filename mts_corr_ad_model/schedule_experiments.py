@@ -9,7 +9,7 @@ data_implement_list = ("--data_implement PW_WAVE_ADD_LINEAR_REG_DIM_30_BKPS_0_NO
                        "--data_implement CLUSTER_2_PW_WAVE_MULTIPLY_LINEAR_REG_DIM_15_BKPS_0_NOISE_STD_30",
                        "--data_implement CLUSTER_2_PW_WAVE_ADD_LINEAR_REG_DIM_15_BKPS_0_NOISE_STD_30")
 train_models_list = ["--train_models MTSCorrAD2"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
-seq_len_list = ["--seq_len 10", "--seq_len 20"]  # ["--seq_len 5", "--seq_len 10"]
+seq_len_list = ["--seq_len 20"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
 nodes_v_mode_list = [""]  # ["", "--graph_nodes_v_mode all_values", "--graph_nodes_v_mode mean", "--graph_nodes_v_mode mean_std"]
