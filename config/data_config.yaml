@@ -100,6 +100,10 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/pw_wave_multiply_linear_reg-bkps0-noise_std30.csv"
         TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']
         OUTPUT_FILE_NAME_BASIS: "pw_wave_multiply_linear_reg_dim_30_bkps_0_noise_std_30"
+    PW_WAVE_T_SHIFT_DIM_30_BKPS_0_NOISE_STD_30:
+        FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/pw_wave_t_shift-bkps0-noise_std30.csv"
+        TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']
+        OUTPUT_FILE_NAME_BASIS: "pw_wave_t_shift_dim_30_bkps_0_noise_std_30"
     PW_LINEAR_COMBINE_DIM_10_BKPS_0_NOISE_STD_2:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim10/pw_linear_combine-bkps0-noise_std2.csv"
         TRAIN_SET: ['var_linear_sum', 'var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9']
@@ -112,9 +116,10 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/cluster_2-pw_wave_multiply_linear_reg-bkps0-noise_std30.csv"
         TRAIN_SET: ['cluster_0_var_0', 'cluster_0_var_1', 'cluster_0_var_2', 'cluster_0_var_3', 'cluster_0_var_4', 'cluster_0_var_5', 'cluster_0_var_6', 'cluster_0_var_7', 'cluster_0_var_8', 'cluster_0_var_9', 'cluster_0_var_10', 'cluster_0_var_11', 'cluster_0_var_12', 'cluster_0_var_13', 'cluster_0_var_14', 'cluster_1_var_0', 'cluster_1_var_1', 'cluster_1_var_2', 'cluster_1_var_3', 'cluster_1_var_4', 'cluster_1_var_5', 'cluster_1_var_6', 'cluster_1_var_7', 'cluster_1_var_8', 'cluster_1_var_9', 'cluster_1_var_10', 'cluster_1_var_11', 'cluster_1_var_12', 'cluster_1_var_13', 'cluster_1_var_14']
         OUTPUT_FILE_NAME_BASIS: "cluster_2_pw_wave_multiply_linear_reg_dim_15_bkps_0_noise_std_30"
-        
-        
-        
+    CLUSTER_2_PW_WAVE_T_SHIFT_DIM_15_BKPS_0_NOISE_STD_30:
+        FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/cluster_2-pw_wave_t_shift-bkps0-noise_std30.csv"
+        TRAIN_SET: ['cluster_0_var_0', 'cluster_0_var_1', 'cluster_0_var_2', 'cluster_0_var_3', 'cluster_0_var_4', 'cluster_0_var_5', 'cluster_0_var_6', 'cluster_0_var_7', 'cluster_0_var_8', 'cluster_0_var_9', 'cluster_0_var_10', 'cluster_0_var_11', 'cluster_0_var_12', 'cluster_0_var_13', 'cluster_0_var_14', 'cluster_1_var_0', 'cluster_1_var_1', 'cluster_1_var_2', 'cluster_1_var_3', 'cluster_1_var_4', 'cluster_1_var_5', 'cluster_1_var_6', 'cluster_1_var_7', 'cluster_1_var_8', 'cluster_1_var_9', 'cluster_1_var_10', 'cluster_1_var_11', 'cluster_1_var_12', 'cluster_1_var_13', 'cluster_1_var_14']
+        OUTPUT_FILE_NAME_BASIS: "cluster_2_pw_wave_t_shift_dim_15_bkps_0_noise_std_30"
     PAPER_EVA_1: 
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre.csv"
         TRAIN_SET: *sp500_20082017_train_set 

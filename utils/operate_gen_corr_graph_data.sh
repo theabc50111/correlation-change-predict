@@ -4,7 +4,8 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement PW_WAVE_MULTIPLY_LINEAR_REG_DIM_30_BKPS_0_NOISE_STD_30")
+dataset_list=("--data_implement PW_WAVE_T_SHIFT_DIM_30_BKPS_0_NOISE_STD_30"
+              "--data_implement CLUSTER_2_PW_WAVE_T_SHIFT_DIM_15_BKPS_0_NOISE_STD_30")
 
 
 train_items_setting="train_all"  # "train_train" "train_all"
