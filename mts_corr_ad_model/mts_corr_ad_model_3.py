@@ -58,17 +58,14 @@ mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 
-class MTSCorrAD2(torch.nn.Module):
+class MTSCorrAD3(torch.nn.Module):
     """
-    Multi-Time Series Correlation Anomaly Detection2 (MTSCorrAD2)
+    Multi-Time Series Correlation Anomaly Detection3 (MTSCorrAD3)
     Structure of MTSCorrAD3:
-        GRU_x ------↘
-                      -> GraphEncoder -> GRU -> Decoder
-        GRU_edges --↗
-    Note: the nodes values of input of GraphEncoder is produced by first GRU
+        GRU -> GraphEncoder -> Decoder
     """
     def __init__(self, model_cfg: dict):
-        super(MTSCorrAD2, self).__init__()
+        super(MTSCorrAD3, self).__init__()
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -76,14 +73,10 @@ class MTSCorrAD2(torch.nn.Module):
 
         # set model components
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
-        graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         num_nodes = self.model_cfg['num_nodes']
         num_edges = num_nodes**2
-        num_node_features = self.model_cfg['num_node_features']
         num_edge_features = self.model_cfg['num_edge_features']
-        self.gru1_x = GRU(num_nodes*num_node_features, num_nodes*num_node_features, self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.gru1_edges = GRU(num_edges*num_edge_features, num_edges*num_edge_features, self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
-        self.gru2 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], num_nodes, drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         if self.model_cfg["pretrain_encoder"]:
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
@@ -123,20 +116,16 @@ class MTSCorrAD2(torch.nn.Module):
         # Temporal Modeling
         gru_edge_attr, _ = self.gru1_edges(seq_edge_attr)
         temporal_edge_attr = gru_edge_attr.reshape(-1, self.model_cfg['num_edge_features'])
-        gru_x, _ = self.gru1_x(x.reshape(seq_len, -1))
-        temporal_x = gru_x.reshape(-1, self.model_cfg['num_node_features'])
 
         # Inter-series modeling
         if type(self.graph_encoder).__name__ == "GinEncoder":
-            graph_embeds = self.graph_encoder(temporal_x, seq_batch_strong_connect_edge_index, seq_batch_node_id)
+            graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id)
         elif type(self.graph_encoder).__name__ == "GineEncoder":
-            graph_embeds = self.graph_encoder(temporal_x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
+            graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
 
-        # second Temporal Modeling
-        gru_output, _ = self.gru2(graph_embeds)
 
         # Decoder (Graph Adjacency Reconstruction)
-        pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
+        pred_graph_adj = self.decoder(graph_embeds[-1])  # gru_output[-1] => only take last time-step
 
         return pred_graph_adj
 
@@ -214,7 +203,6 @@ class MTSCorrAD2(torch.nn.Module):
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
                 epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru2.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
@@ -292,6 +280,17 @@ class MTSCorrAD2(torch.nn.Module):
         get  the predictive graph_embeddings with no_grad by using part of self.forward() process
         """
         with torch.no_grad():
+            ## Inter-series modeling
+            #if type(self.graph_encoder).__name__ == "GinEncoder":
+            #    graph_embeds = self.graph_encoder(x, edge_index, seq_batch_node_id)
+            #elif type(self.graph_encoder).__name__ == "GineEncoder":
+            #    graph_embeds = self.graph_encoder(x, edge_index, seq_batch_node_id, edge_attr)
+
+            ## Temporal Modeling
+            #pred_graph_embeds, _ = self.gru2(graph_embeds)
+
+
+
             x_edge_index_list = unbatch_edge_index(edge_index, seq_batch_node_id)
             num_nodes = self.model_cfg['num_nodes']
             seq_len = len(x_edge_index_list)
@@ -310,17 +309,12 @@ class MTSCorrAD2(torch.nn.Module):
             # Temporal Modeling
             gru_edge_attr, _ = self.gru1_edges(seq_edge_attr)
             temporal_edge_attr = gru_edge_attr.reshape(-1, self.model_cfg['num_edge_features'])
-            gru_x, _ = self.gru1_x(x.reshape(seq_len, -1))
-            temporal_x = gru_x.reshape(-1, self.model_cfg['num_node_features'])
 
             # Inter-series modeling
             if type(self.graph_encoder).__name__ == "GinEncoder":
-                graph_embeds = self.graph_encoder(temporal_x, seq_batch_strong_connect_edge_index, seq_batch_node_id)
+                pred_graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id)
             elif type(self.graph_encoder).__name__ == "GineEncoder":
-                graph_embeds = self.graph_encoder(temporal_x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
-
-            # second Temporal Modeling
-            pred_graph_embeds, _ = self.gru2(graph_embeds)
+                pred_graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
 
 
         return pred_graph_embeds[-1]
@@ -502,7 +496,7 @@ if __name__ == "__main__":
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": MLPDecoder}
 
-    model = MTSCorrAD2(mts_corr_ad_cfg)
+    model = MTSCorrAD3(mts_corr_ad_cfg)
     loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
                      "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
     while (is_training is True) and (train_count < 100):
