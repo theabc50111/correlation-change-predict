@@ -76,8 +76,9 @@ class MTSCorrAD3(torch.nn.Module):
         num_nodes = self.model_cfg['num_nodes']
         num_edges = num_nodes**2
         num_edge_features = self.model_cfg['num_edge_features']
+        graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1_edges = GRU(num_edges*num_edge_features, num_edges*num_edge_features, self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
-        self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], num_nodes, drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
+        self.decoder = self.model_cfg['decoder'](graph_enc_emb_size, num_nodes, drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         if self.model_cfg["pretrain_encoder"]:
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
         if self.model_cfg["pretrain_decoder"]:
@@ -196,8 +197,8 @@ class MTSCorrAD3(torch.nn.Module):
                 self.optimizer.step()
                 self.scheduler.step()
                 # compute graph embeds
-                pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
-                y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
+                #pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                #y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
@@ -205,8 +206,8 @@ class MTSCorrAD3(torch.nn.Module):
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
-                epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
-                epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
+                #epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
+                #epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
                 # used in observation model info in console
                 log_model_info_data = data
                 log_model_info_batch_idx = batch_idx
