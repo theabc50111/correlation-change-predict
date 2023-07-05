@@ -4,7 +4,8 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
+dataset_list=("--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
+              "--data_implement POWER_2_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
 
 
 train_items_setting="train_all"  # "train_train" "train_all"

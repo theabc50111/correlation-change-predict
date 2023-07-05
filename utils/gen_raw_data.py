@@ -295,7 +295,7 @@ def gen_linear_reg_cluster_data(args, seed=120):
     signal = np.zeros((n, dim))
     signal[::, 0] = basis_signal
     for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-20, high=10, size=(dim-1, 2)))):
-        sub_signal += (basis_signal+(reg_coef*tt+reg_bias)).reshape(-1, 1)
+        sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)
     for i, signal_mean in enumerate(signal.mean(axis=0)):
         noise = rng.normal(scale=abs(signal_mean*(sigma/100)), size=n)
         signal[::, i] = signal[::, i]+noise
@@ -310,6 +310,41 @@ def gen_linear_reg_cluster_data(args, seed=120):
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
         df.to_csv(save_dir/f'linear_reg_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
+
+    return signal, bkps
+
+
+def gen_pow_2_cluster_data(args, seed=120):
+    """
+    Generate cluster data whose instances are power_2 (non-linear) correlation to each other.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    rng = np.random.default_rng(seed=0)
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0, seed=seed)
+    basis_m, basis_b = rng.uniform(low=0, high=10, size=2)
+    tt = np.arange(n)
+    basis_line = basis_m*tt+basis_b
+    basis_line_mean = basis_line.mean()
+    basis_signal = (wave_signal*basis_line_mean)+basis_line
+    signal = np.zeros((n, dim))
+    signal[::, 0] = basis_signal
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-10, high=10, size=(dim-1, 2)))):
+        sub_signal += (reg_coef*(basis_signal**2)+reg_bias).reshape(-1, 1)
+    for i, signal_mean in enumerate(signal.mean(axis=0)):
+        noise = rng.normal(scale=abs(signal_mean*(sigma/100)), size=n)
+        signal[::, i] = signal[::, i]+noise
+    signal = signal+abs(signal.min())+1
+    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
+    var_names = [f'var_{i}' for i in range(dim)]
+    df = pd.DataFrame(signal, index=dates, columns=var_names)
+    df.index.name = "Date"
+    logger.info(f"Generated power_2 cluster data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"Power 2 cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'power_2_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
 
@@ -344,7 +379,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
                         choices=['pw_constant', 'pw_linear_combine', 'pw_wave_const', 'pw_wave_linear_combine',
                                  'pw_wave_multiply_linear_reg', 'pw_wave_add_linear_reg', 'pw_wave_t_shift',
-                                 'linear_reg_cluster', 'multi_cluster'],
+                                 'linear_reg_cluster', 'pow_2_cluster', 'multi_cluster'],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
@@ -379,3 +414,5 @@ if __name__ == '__main__':
             gen_pw_wave_t_shift_data(args)
         if 'linear_reg_cluster' in args.data_type:
             gen_linear_reg_cluster_data(args)
+        if 'pow_2_cluster' in args.data_type:
+            gen_pow_2_cluster_data(args)

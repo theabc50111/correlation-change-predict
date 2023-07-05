@@ -25,6 +25,7 @@ from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
 from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
 from mts_corr_ad_model_2 import MTSCorrAD2
+from mts_corr_ad_model_3 import MTSCorrAD3
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
-                             choices=["MTSCorrAD", "MTSCorrAD2", "Baseline", "GAE"],
+                             choices=["MTSCorrAD", "MTSCorrAD2", "MTSCorrAD3", "Baseline", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
@@ -133,6 +134,8 @@ if __name__ == "__main__":
     mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_2_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}'
     mts_corr_ad_model_2_log_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    mts_corr_ad_model_3_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_3_log_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
     baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}'
@@ -141,6 +144,8 @@ if __name__ == "__main__":
     mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_2_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_2_log_dir.mkdir(parents=True, exist_ok=True)
+    mts_corr_ad_model_3_dir.mkdir(parents=True, exist_ok=True)
+    mts_corr_ad_model_3_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
     gae_model_dir.mkdir(parents=True, exist_ok=True)
@@ -209,8 +214,11 @@ if __name__ == "__main__":
                 model = MTSCorrAD(mts_corr_ad_cfg)
                 best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "MTSCorrAD2" in ARGS.train_models:
-                model = MTSCorrAD2(mts_corr_ad_cfg)
-                best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+                model_2 = MTSCorrAD2(mts_corr_ad_cfg)
+                best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info = model_2.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            if "MTSCorrAD3" in ARGS.train_models:
+                model_3 = MTSCorrAD3(mts_corr_ad_cfg)
+                best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info = model_3.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
@@ -237,7 +245,9 @@ if __name__ == "__main__":
                 if "MTSCorrAD" in ARGS.train_models:
                     model.save_model(best_model, best_model_info, model_dir=mts_corr_ad_model_dir, model_log_dir=mts_corr_ad_model_log_dir)
                 if "MTSCorrAD2" in ARGS.train_models:
-                    model.save_model(best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info, model_dir=mts_corr_ad_model_2_dir, model_log_dir=mts_corr_ad_model_2_log_dir)
+                    model_2.save_model(best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info, model_dir=mts_corr_ad_model_2_dir, model_log_dir=mts_corr_ad_model_2_log_dir)
+                if "MTSCorrAD3" in ARGS.train_models:
+                    model_3.save_model(best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info, model_dir=mts_corr_ad_model_3_dir, model_log_dir=mts_corr_ad_model_3_log_dir)
                 if "Baseline" in ARGS.train_models:
                     baseline_model.save_model(best_baseline_model, best_baseline_model_info, model_dir=baseline_model_dir, model_log_dir=baseline_model_log_dir)
                 if "GAE" in ARGS.train_models:

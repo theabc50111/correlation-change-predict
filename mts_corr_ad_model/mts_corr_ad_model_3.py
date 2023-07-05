@@ -197,8 +197,8 @@ class MTSCorrAD3(torch.nn.Module):
                 self.optimizer.step()
                 self.scheduler.step()
                 # compute graph embeds
-                #pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
-                #y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
+                pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc
@@ -206,8 +206,8 @@ class MTSCorrAD3(torch.nn.Module):
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
-                #epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
-                #epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
+                epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
+                epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
                 # used in observation model info in console
                 log_model_info_data = data
                 log_model_info_batch_idx = batch_idx
@@ -281,17 +281,6 @@ class MTSCorrAD3(torch.nn.Module):
         get  the predictive graph_embeddings with no_grad by using part of self.forward() process
         """
         with torch.no_grad():
-            ## Inter-series modeling
-            #if type(self.graph_encoder).__name__ == "GinEncoder":
-            #    graph_embeds = self.graph_encoder(x, edge_index, seq_batch_node_id)
-            #elif type(self.graph_encoder).__name__ == "GineEncoder":
-            #    graph_embeds = self.graph_encoder(x, edge_index, seq_batch_node_id, edge_attr)
-
-            ## Temporal Modeling
-            #pred_graph_embeds, _ = self.gru2(graph_embeds)
-
-
-
             x_edge_index_list = unbatch_edge_index(edge_index, seq_batch_node_id)
             num_nodes = self.model_cfg['num_nodes']
             seq_len = len(x_edge_index_list)
@@ -448,8 +437,8 @@ if __name__ == "__main__":
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
     graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    g_model_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}'
-    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    g_model_dir = current_dir / f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}'
+    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
     g_model_dir.mkdir(parents=True, exist_ok=True)
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
