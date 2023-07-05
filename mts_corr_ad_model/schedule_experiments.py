@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ("--data_implement POWER_2_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30",
-                       "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
+data_implement_list = ("--data_implement POWER_2_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30",)
+                       #"--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
 
 train_models_list = ["--train_models MTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 seq_len_list = ["--seq_len 20"]  # ["--seq_len 5", "--seq_len 10"]
