@@ -281,20 +281,27 @@ def gen_pw_wave_linear_combine_data(args):
 
 def gen_linear_reg_cluster_data(args, seed=120):
     """
-    Generate cluster data whose instances are linear correlation to each other.
+    Generate cluster data whose instances are linear correlation to basis_trend.
+    Specifing `n_bkps` to decide the number of change-point of  basis_trend.
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     rng = np.random.default_rng(seed=0)
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0, seed=seed)
-    basis_m, basis_b = rng.uniform(low=0, high=10, size=2)
-    tt = np.arange(n)
-    basis_line = basis_m*tt+basis_b
-    basis_line_mean = basis_line.mean()
-    basis_signal = (wave_signal*basis_line_mean)+basis_line
+    seg_len = int(n/(n_bkps+1))
+    n = n-(n % seg_len)  # remove remainder
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
+    basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
+    basis_b = rng.uniform(low=0, high=10, size=1)
+    tt = np.arange(seg_len)
+    basis_trend = np.zeros(n)
+    for i, basis_m in enumerate(basis_m_list):
+        basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
+        basis_b = basis_trend[(i+1)*seg_len-1]
+    basis_trend_mean = basis_trend.mean()
+    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
     signal = np.zeros((n, dim))
     signal[::, 0] = basis_signal
-    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-20, high=10, size=(dim-1, 2)))):
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-10, high=10, size=(dim-1, 2)))):
         sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)
     for i, signal_mean in enumerate(signal.mean(axis=0)):
         noise = rng.normal(scale=abs(signal_mean*(sigma/100)), size=n)
@@ -316,17 +323,24 @@ def gen_linear_reg_cluster_data(args, seed=120):
 
 def gen_pow_2_cluster_data(args, seed=120):
     """
-    Generate cluster data whose instances are power_2 (non-linear) correlation to each other.
+    Generate cluster data whose instances are power_2 (non-linear) correlation to basis_trend
+    Specifing `n_bkps` to decide the number of change-point of  basis_trend.
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     rng = np.random.default_rng(seed=0)
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, n_bkps, noise_std=0, seed=seed)
-    basis_m, basis_b = rng.uniform(low=0, high=10, size=2)
-    tt = np.arange(n)
-    basis_line = basis_m*tt+basis_b
-    basis_line_mean = basis_line.mean()
-    basis_signal = (wave_signal*basis_line_mean)+basis_line
+    seg_len = int(n/(n_bkps+1))
+    n = n-(n%seg_len)  # remove remainder
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
+    basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
+    basis_b = rng.uniform(low=0, high=10, size=1)
+    tt = np.arange(seg_len)
+    basis_trend = np.zeros(n)
+    for i, basis_m in enumerate(basis_m_list):
+        basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
+        basis_b = basis_trend[(i+1)*seg_len-1]
+    basis_trend_mean = basis_trend.mean()
+    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
     signal = np.zeros((n, dim))
     signal[::, 0] = basis_signal
     for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-10, high=10, size=(dim-1, 2)))):
