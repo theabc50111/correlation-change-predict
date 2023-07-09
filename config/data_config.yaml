@@ -116,6 +116,10 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/linear_reg_one_cluster-bkps1-noise_std30.csv"
         TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']
         OUTPUT_FILE_NAME_BASIS: "linear_reg_one_cluster_dim_30_bkps_1_noise_std_30"
+    POWER_2_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_0:
+        FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/power_2_one_cluster-bkps0-noise_std0.csv"
+        TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']
+        OUTPUT_FILE_NAME_BASIS: "power_2_one_cluster_dim_30_bkps_0_noise_std_0"
     POWER_2_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30:
         FILE_PATH: "{DIRS.DATASET_DIR}/synthetic/dim30/power_2_one_cluster-bkps0-noise_std30.csv"
         TRAIN_SET: ['var_0', 'var_1', 'var_2', 'var_3', 'var_4', 'var_5', 'var_6', 'var_7', 'var_8', 'var_9', 'var_10', 'var_11', 'var_12', 'var_13', 'var_14', 'var_15', 'var_16', 'var_17', 'var_18', 'var_19', 'var_20', 'var_21', 'var_22', 'var_23', 'var_24', 'var_25', 'var_26', 'var_27', 'var_28', 'var_29']

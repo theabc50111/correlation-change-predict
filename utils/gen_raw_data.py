@@ -281,50 +281,8 @@ def gen_pw_wave_linear_combine_data(args):
 
 def gen_linear_reg_cluster_data(args, seed=120):
     """
-    Generate cluster data whose instances are linear correlation to basis_trend.
-    Specifing `n_bkps` to decide the number of change-point of  basis_trend.
-    """
-    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
-    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
-    rng = np.random.default_rng(seed=0)
-    seg_len = int(n/(n_bkps+1))
-    n = n-(n % seg_len)  # remove remainder
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
-    basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
-    basis_b = rng.uniform(low=0, high=10, size=1)
-    tt = np.arange(seg_len)
-    basis_trend = np.zeros(n)
-    for i, basis_m in enumerate(basis_m_list):
-        basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
-        basis_b = basis_trend[(i+1)*seg_len-1]
-    basis_trend_mean = basis_trend.mean()
-    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
-    signal = np.zeros((n, dim))
-    signal[::, 0] = basis_signal
-    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-10, high=10, size=(dim-1, 2)))):
-        sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)
-    for i, signal_mean in enumerate(signal.mean(axis=0)):
-        noise = rng.normal(scale=abs(signal_mean*(sigma/100)), size=n)
-        signal[::, i] = signal[::, i]+noise
-    signal = signal+abs(signal.min())+1
-    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
-    var_names = [f'var_{i}' for i in range(dim)]
-    df = pd.DataFrame(signal, index=dates, columns=var_names)
-    df.index.name = "Date"
-    logger.info(f"Generated linear_regression cluster data with shape {df.shape} and {n_bkps} change points.")
-    logger.info(f"Linear regression cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
-    if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'linear_reg_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
-
-    return signal, bkps
-
-
-def gen_pow_2_cluster_data(args, seed=120):
-    """
-    Generate cluster data whose instances are power_2 (non-linear) correlation to basis_trend
-    Specifing `n_bkps` to decide the number of change-point of  basis_trend.
+    Generate cluster data whose instances are linear correlation to basis_signal.
+    Specifing `n_bkps` to decide the number of change-point of  basis_signal.
     """
     n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
@@ -342,12 +300,60 @@ def gen_pow_2_cluster_data(args, seed=120):
     basis_trend_mean = basis_trend.mean()
     basis_signal = (wave_signal*basis_trend_mean)+basis_trend
     signal = np.zeros((n, dim))
-    signal[::, 0] = basis_signal
-    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal[::, 1:], dim-1, axis=1), rng.uniform(low=-10, high=10, size=(dim-1, 2)))):
-        sub_signal += (reg_coef*(basis_signal**2)+reg_bias).reshape(-1, 1)
-    for i, signal_mean in enumerate(signal.mean(axis=0)):
-        noise = rng.normal(scale=abs(signal_mean*(sigma/100)), size=n)
-        signal[::, i] = signal[::, i]+noise
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
+        if i==0:
+            sub_signal += basis_signal.reshape(-1, 1)
+        else:
+            sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to basis_signal
+        # add noise after create signal
+        standard_noise = rng.normal(scale=(sigma/100), size=n).reshape(-1, 1)
+        scale_noise = sub_signal*standard_noise
+        sub_signal += scale_noise
+    signal = signal+abs(signal.min())+1
+    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
+    var_names = [f'var_{i}' for i in range(dim)]
+    df = pd.DataFrame(signal, index=dates, columns=var_names)
+    df.index.name = "Date"
+    logger.info(f"Generated linear_regression cluster data with shape {df.shape} and {n_bkps} change points.")
+    logger.info(f"Linear regression cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'linear_reg_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
+
+    return signal, bkps
+
+
+def gen_pow_2_cluster_data(args, seed=120):
+    """
+    Generate cluster data whose instances are power_2 (non-linear) correlation to basis_signal
+    Specifing `n_bkps` to decide the number of change-point of  basis_signal.
+    """
+    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
+    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    rng = np.random.default_rng(seed=0)
+    seg_len = int(n/(n_bkps+1))
+    n = n-(n%seg_len)  # remove remainder
+    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
+    basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
+    basis_b = rng.uniform(low=0, high=10, size=1)
+    tt = np.arange(seg_len)
+    basis_trend = np.zeros(n)
+    for i, basis_m in enumerate(basis_m_list):
+        basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
+        basis_b = basis_trend[(i+1)*seg_len-1]
+    basis_trend_mean = basis_trend.mean()
+    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+    signal = np.zeros((n, dim))
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
+        if i==0:
+            sub_signal += basis_signal.reshape(-1, 1)
+        else:
+            sub_signal += (reg_coef*(basis_signal**2)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of basis_signal
+        # add noise after create signal
+        standard_noise = rng.normal(scale=(sigma/100), size=n).reshape(-1, 1)
+        scale_noise = sub_signal*standard_noise
+        sub_signal += scale_noise
     signal = signal+abs(signal.min())+1
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = [f'var_{i}' for i in range(dim)]
