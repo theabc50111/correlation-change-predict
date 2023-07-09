@@ -30,3 +30,16 @@ pip install torch-geometric
 # add torch_geometric summary()
 cp /root/summary.py /opt/conda/lib/python3\.10/site-packages/torch_geometric/nn
 #cp /root/__init__.py /opt/conda/lib/python3\.10/site-packages/torch_geometric/nn
+
+# install Nike-Inc/timeseries-generator.git
+apt update && apt install -y git
+cd /root
+git clone https://github.com/Nike-Inc/timeseries-generator.git
+cd /root/timeseries-generator
+python setup.py install
+cd /opt/conda/lib/python3.10/site-packages/timeseries_generator-0.1.0-py3.10.egg/timeseries_generator
+sed -i '5s/from matplotlib.axes._subplots import SubplotBase/from matplotlib.axes import SubplotBase/' base_factor.py
+sed -i '138ixxx' holiday_factor.py
+sed -i '138s/xxx/            country_name = country_name.replace("_", "")/g' holiday_factor.py
+sed -i '97ixxx' generator.py
+sed -i '97s/xxx/            if "country" in df.columns:\n                df.loc[::, "country"] = df.loc[::, "country"].apply(lambda x:x.lower().replace("_", "").replace(" ", ""))/g' generator.py

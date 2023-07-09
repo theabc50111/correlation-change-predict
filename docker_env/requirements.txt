@@ -16,3 +16,4 @@ scikit-learn
 dynamic-yaml
 isort
 tabulate
+ruptures

@@ -8,7 +8,13 @@ import matplotlib.pylab as plt
 import numpy as np
 import pandas as pd
 import ruptures as rpt
+from pandas._libs.tslibs.timestamps import Timestamp
 from ruptures.utils import draw_bkps
+from timeseries_generator import (Generator, HolidayFactor, LinearTrend,
+                                  RandomFeatureFactor, SinusoidalFactor,
+                                  WeekdayFactor, WhiteNoise)
+from timeseries_generator.external_factors import (CountryGdpFactor,
+                                                   EUIndustryProductFactor)
 
 current_dir = Path(__file__).parent
 
@@ -30,7 +36,7 @@ def pw_rand_f1_f2_wavy(n_samples=200, n_bkps=3, noise_std=None, seed=120):
         seed (int): random seed, the frequence 1 and frequence 2 also based on seed
 
     Returns:
-        tuple: signal of shape (n_samples, 1), list of breakpoints
+        tuple: signal of shape (n_samples), list of breakpoints
     """
     # breakpoints
     bkps = draw_bkps(n_samples, n_bkps, seed=seed)
@@ -80,6 +86,64 @@ def pw_adapt_cov_linear_combine(n_samples=200, n_features=1, n_bkps=3, noise_std
     signal = np.c_[var, covar]
 
     return signal, bkps
+
+
+def nike_ts(n_samples: int = 200, country: str = "United Kingdom", start_date: str = "2010/1/1"):
+    """Return a time-series with some calender factors(week, holiday...) and external factors.
+
+    Args:
+        n_samples (int, optional): signal length
+        country (str, optional): country for setting factor
+        start_date (str, optional): string of date
+
+    Returns:
+        tuple: signal of shape (n_samples)
+    """
+    start_date = Timestamp(start_date)
+    c_gdp_factor = CountryGdpFactor(country_list=[country])
+    eu_industry_product_factor = EUIndustryProductFactor()
+    holiday_factor = HolidayFactor(
+        holiday_factor=1.5,
+        special_holiday_factors={
+            "Christmas Day": 3.
+        },
+        country_list=[country.replace(" ", "_")]
+    )
+    weekday_factor = WeekdayFactor(
+        col_name="weekend_boost_factor",
+        factor_values={0: 1.3, 4: 1.15}  # Here we assign a factor of 1.15 to Friday, and 1.3 to Sat/Sun
+    )
+    product_seasonal_components = SinusoidalFactor(
+        feature="basis_trend_seasonality",
+        col_name="basis_trend_seasonal_factor",
+        feature_values={
+            "year": {
+                "wavelength": 365.,
+                "amplitude": 0.2,
+                "phase": 365/4,
+                "mean": 1.
+            },
+        }
+    )
+    features_dict = {
+            "country": [country.lower().replace(" ", "").replace("_", "")],
+            "basis_trend_seasonality": ["year"]
+        }
+    g: Generator = Generator(
+        factors={
+            c_gdp_factor,
+            eu_industry_product_factor,
+            holiday_factor,
+            weekday_factor,
+            product_seasonal_components,
+        },
+        features=features_dict,
+        date_range=pd.date_range(start=start_date, periods=n_samples),
+        base_value=10000
+    )
+    df = g.generate()
+
+    return df['value'].values
 
 
 def gen_pw_constant_data(args):
@@ -288,8 +352,7 @@ def gen_linear_reg_cluster_data(args, seed=120):
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     rng = np.random.default_rng(seed=0)
     seg_len = int(n/(n_bkps+1))
-    n = n-(n%seg_len)  # remove remainder
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
+    n = n-(n % seg_len)  # remove remainder
     basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
     basis_b = rng.uniform(low=0, high=10, size=1)
     tt = np.arange(seg_len)
@@ -298,10 +361,15 @@ def gen_linear_reg_cluster_data(args, seed=120):
         basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
         basis_b = basis_trend[(i+1)*seg_len-1]
     basis_trend_mean = basis_trend.mean()
-    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+    if args.basis_type == "pw_rand_wavy":
+        wave_signal, bkps = pw_rand_f1_f2_wavy(n_samples=n, n_bkps=0, noise_std=0, seed=seed)
+        basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+    elif args.basis_type == "nike_ts":
+        nike_signal, bkps = nike_ts(n_samples=n), [n]
+        basis_signal = nike_signal+basis_trend
     signal = np.zeros((n, dim))
     for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
-        if i==0:
+        if i == 0:
             sub_signal += basis_signal.reshape(-1, 1)
         else:
             sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to basis_signal
@@ -319,7 +387,7 @@ def gen_linear_reg_cluster_data(args, seed=120):
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'linear_reg_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'linear_reg_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
 
@@ -333,7 +401,7 @@ def gen_pow_2_cluster_data(args, seed=120):
     n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
     rng = np.random.default_rng(seed=0)
     seg_len = int(n/(n_bkps+1))
-    n = n-(n%seg_len)  # remove remainder
+    n = n-(n % seg_len)  # remove remainder
     wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
     basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
     basis_b = rng.uniform(low=0, high=10, size=1)
@@ -343,10 +411,15 @@ def gen_pow_2_cluster_data(args, seed=120):
         basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
         basis_b = basis_trend[(i+1)*seg_len-1]
     basis_trend_mean = basis_trend.mean()
-    basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+    if args.basis_type == "pw_rand_wavy":
+        wave_signal, bkps = pw_rand_f1_f2_wavy(n_samples=n, n_bkps=0, noise_std=0, seed=seed)
+        basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+    elif args.basis_type == "nike_ts":
+        nike_signal, bkps = nike_ts(n_samples=n), [n]
+        basis_signal = nike_signal+basis_trend
     signal = np.zeros((n, dim))
     for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
-        if i==0:
+        if i== 0:
             sub_signal += basis_signal.reshape(-1, 1)
         else:
             sub_signal += (reg_coef*(basis_signal**2)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of basis_signal
@@ -354,7 +427,7 @@ def gen_pow_2_cluster_data(args, seed=120):
         standard_noise = rng.normal(scale=(sigma/100), size=n).reshape(-1, 1)
         scale_noise = sub_signal*standard_noise
         sub_signal += scale_noise
-    signal = signal+abs(signal.min())+1
+    # signal = signal+abs(signal.min())+1
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = [f'var_{i}' for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
@@ -364,7 +437,7 @@ def gen_pow_2_cluster_data(args, seed=120):
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'power_2_one_cluster-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'power_2_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
 
@@ -406,6 +479,9 @@ if __name__ == '__main__':
     parser.add_argument('--noise_std', type=int, default=2, help='Input noise standard deviation. (default: 2))')
     parser.add_argument('--n_bkps', type=int, default=0, help='Input number of change points. (default: 0)')
     parser.add_argument('--n_clusters', type=int, default=0, help='Input number of clusters. (default: 0)')
+    parser.add_argument('--basis_type', type=str, default='nike_ts', nargs='?',
+                        choices=['nike_ts', 'pw_rand_wavy'],
+                        help='Type of basis_signal to generate. (default: nike_ts)')
     parser.add_argument("--save_data", type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help="input --save_data to save raw data")
     args = parser.parse_args()
