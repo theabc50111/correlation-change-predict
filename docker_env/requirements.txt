@@ -1,4 +1,4 @@
-jupyterlab
+jupyterlab==3.2.4
 jupyterlab-vim
 ipython
 ipython-autotime
