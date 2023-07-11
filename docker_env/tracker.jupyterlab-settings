@@ -97,7 +97,7 @@
 
     // Recording timing
     // Should timing data be recorded in cell metadata
-    "recordTiming": false,
+    "recordTiming": true,
 
     // Render cell on browser idle time
     // Defines if the placeholder cells should be rendered when the browser is idle
