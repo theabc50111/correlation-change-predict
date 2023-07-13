@@ -343,13 +343,8 @@ def gen_pw_wave_linear_combine_data(args):
     return signal, bkps
 
 
-def gen_linear_reg_cluster_data(args, seed=120):
-    """
-    Generate cluster data whose instances are linear correlation to basis_signal.
-    Specifing `n_bkps` to decide the number of change-point of  basis_signal.
-    """
-    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
-    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+def gen_leader_signal(args):
+    n, dim, n_bkps = args.time_len, args.dim, args.n_bkps  # time_length(number of samples), number of variables(dimension), number of change points
     rng = np.random.default_rng(seed=0)
     seg_len = int(n/(n_bkps+1))
     n = n-(n % seg_len)  # remove remainder
@@ -363,81 +358,103 @@ def gen_linear_reg_cluster_data(args, seed=120):
     basis_trend_mean = basis_trend.mean()
     if args.basis_type == "pw_rand_wavy":
         wave_signal, bkps = pw_rand_f1_f2_wavy(n_samples=n, n_bkps=0, noise_std=0, seed=seed)
-        basis_signal = (wave_signal*basis_trend_mean)+basis_trend
+        leader_signal = (wave_signal*basis_trend_mean)+basis_trend
     elif args.basis_type == "nike_ts":
         nike_signal, bkps = nike_ts(n_samples=n), [n]
-        basis_signal = nike_signal+basis_trend
-    signal = np.zeros((n, dim))
-    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
-        if i == 0:
-            sub_signal += basis_signal.reshape(-1, 1)
-        else:
-            sub_signal += (reg_coef*basis_signal+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to basis_signal
+        leader_signal = nike_signal+basis_trend
+
+    return leader_signal, bkps
+
+
+def exec_post_processing(signal: np.array, noise_scale: float):
+    rng = np.random.default_rng(seed=0)
+    n, dim = signal.shape
+    noise_scale = noise_scale/100
+    for sub_signal in np.split(signal, dim, axis=1):
         # add noise after create signal
-        standard_noise = rng.normal(scale=(sigma/100), size=n).reshape(-1, 1)
-        scale_noise = sub_signal*standard_noise
+        standard_noise = rng.normal(loc=0, scale=0.5, size=n).reshape(-1, 1)
+        scale_noise =  noise_scale*sub_signal*standard_noise
         sub_signal += scale_noise
     signal = signal+abs(signal.min())+1
     dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
     var_names = [f'var_{i}' for i in range(dim)]
     df = pd.DataFrame(signal, index=dates, columns=var_names)
     df.index.name = "Date"
-    logger.info(f"Generated linear_regression cluster data with shape {df.shape} and {n_bkps} change points.")
+
+    return signal, df
+
+
+def gen_linear_reg_cluster_data(args, seed=120):
+    """
+    Generate cluster data whose instances are linear correlation to leader_signal.
+    Specifing `args.n_bkps` to decide the number of change-point of  leader_signal.
+    """
+    dim, noise_scale, n_bkps = args.dim, args.noise_scale, args.n_bkps
+    rng = np.random.default_rng(seed=0)
+    leader_signal, bkps = gen_leader_signal(args)
+    no_noise_signal = np.zeros((args.time_len, dim))
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(no_noise_signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
+        if i == 0:
+            sub_signal += leader_signal.reshape(-1, 1)
+        else:
+            sub_signal += (reg_coef*leader_signal+reg_bias).reshape(-1, 1)  # create follower_signal that has linear correlation to leader_signal
+    signal, df = exec_post_processing(signal=no_noise_signal, noise_scale=noise_scale)
+    logger.info(f"Generated linear_regression cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
     logger.info(f"Linear regression cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'linear_reg_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'linear_reg_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
 
     return signal, bkps
 
 
 def gen_pow_2_cluster_data(args, seed=120):
     """
-    Generate cluster data whose instances are power_2 (non-linear) correlation to basis_signal
-    Specifing `n_bkps` to decide the number of change-point of  basis_signal.
+    Generate cluster data whose instances are power_2 (non-linear) correlation to leader_signal
+    Specifing `args.n_bkps` to decide the number of change-point of  leader_signal.
     """
-    n, dim = args.time_len, args.dim  # time_length(number of samples), number of variables(dimension)
-    n_bkps, sigma = args.n_bkps, args.noise_std  # number of change points, noise standart deviation
+    dim, noise_scale, n_bkps = args.dim, args.noise_scale, args.n_bkps
     rng = np.random.default_rng(seed=0)
-    seg_len = int(n/(n_bkps+1))
-    n = n-(n % seg_len)  # remove remainder
-    wave_signal, bkps = pw_rand_f1_f2_wavy(n, 0, noise_std=0, seed=seed)
-    basis_m_list = rng.uniform(low=-10, high=10, size=(n_bkps+1, 1))
-    basis_b = rng.uniform(low=0, high=10, size=1)
-    tt = np.arange(seg_len)
-    basis_trend = np.zeros(n)
-    for i, basis_m in enumerate(basis_m_list):
-        basis_trend[i*seg_len:(i+1)*seg_len] = basis_m*tt+basis_b
-        basis_b = basis_trend[(i+1)*seg_len-1]
-    basis_trend_mean = basis_trend.mean()
-    if args.basis_type == "pw_rand_wavy":
-        wave_signal, bkps = pw_rand_f1_f2_wavy(n_samples=n, n_bkps=0, noise_std=0, seed=seed)
-        basis_signal = (wave_signal*basis_trend_mean)+basis_trend
-    elif args.basis_type == "nike_ts":
-        nike_signal, bkps = nike_ts(n_samples=n), [n]
-        basis_signal = nike_signal+basis_trend
-    signal = np.zeros((n, dim))
-    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
+    leader_signal, bkps = gen_leader_signal(args)
+    no_noise_signal = np.zeros((args.time_len, dim))
+    for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(no_noise_signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
         if i== 0:
-            sub_signal += basis_signal.reshape(-1, 1)
+            sub_signal += leader_signal.reshape(-1, 1)
         else:
-            sub_signal += (reg_coef*(basis_signal**2)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of basis_signal
-        # add noise after create signal
-        standard_noise = rng.normal(scale=(sigma/100), size=n).reshape(-1, 1)
-        scale_noise = sub_signal*standard_noise
-        sub_signal += scale_noise
-    # signal = signal+abs(signal.min())+1
-    dates = pd.to_datetime(range(n), unit='D', origin=pd.Timestamp('now'))  # create a DatetimeIndex with interval of one day
-    var_names = [f'var_{i}' for i in range(dim)]
-    df = pd.DataFrame(signal, index=dates, columns=var_names)
-    df.index.name = "Date"
-    logger.info(f"Generated power_2 cluster data with shape {df.shape} and {n_bkps} change points.")
+            sub_signal += (reg_coef*(leader_signal**2)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of leader_signal
+    signal, df = exec_post_processing(signal=no_noise_signal, noise_scale=noise_scale)
+    logger.info(f"Generated power_2 cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
     logger.info(f"Power 2 cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
         save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'power_2_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_std{sigma}.csv')
+        df.to_csv(save_dir/f'power_2_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
+
+    return signal, bkps
+
+
+def gen_t_shift_cluster_data(args, seed=120):
+    """
+    Generate  cluster data whose instances has time shift  to leader_signal.
+    Specifing `args.n_bkps` to decide the number of change-point of  leader_signal.
+    """
+    dim, noise_scale, n_bkps = args.dim, args.noise_scale, args.n_bkps
+    rng = np.random.default_rng(seed=0)
+    start_idx_list = np.array([0]+[i for i in range(100) if i%7 != 0])[:dim]
+    args.time_len += start_idx_list[-1]
+    leader_signal, bkps = gen_leader_signal(args)
+    args.time_len -= start_idx_list[-1]
+    no_noise_signal = np.zeros((args.time_len, dim))
+    for i, (sub_signal, start_idx) in enumerate(zip(np.split(no_noise_signal, dim, axis=1), start_idx_list)):
+        sub_signal += leader_signal[start_idx:start_idx+args.time_len].reshape(-1, 1)
+    signal, df = exec_post_processing(signal=no_noise_signal, noise_scale=noise_scale)
+    logger.info(f"Generated t_shift_one_cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
+    logger.info(f"Time shift cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f't_shift_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
 
     return signal, bkps
 
@@ -472,11 +489,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
                         choices=['pw_constant', 'pw_linear_combine', 'pw_wave_const', 'pw_wave_linear_combine',
                                  'pw_wave_multiply_linear_reg', 'pw_wave_add_linear_reg', 'pw_wave_t_shift',
-                                 'linear_reg_cluster', 'pow_2_cluster', 'multi_cluster'],
+                                 'linear_reg_cluster', 'pow_2_cluster', 't_shift_cluster', 'multi_cluster'],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
-    parser.add_argument('--noise_std', type=int, default=2, help='Input noise standard deviation. (default: 2))')
+    parser.add_argument('--noise_scale', type=int, default=3, help='Input noise scale in the form of percentage integer. (default: 3))')
     parser.add_argument('--n_bkps', type=int, default=0, help='Input number of change points. (default: 0)')
     parser.add_argument('--n_clusters', type=int, default=0, help='Input number of clusters. (default: 0)')
     parser.add_argument('--basis_type', type=str, default='nike_ts', nargs='?',
@@ -512,3 +529,5 @@ if __name__ == '__main__':
             gen_linear_reg_cluster_data(args)
         if 'pow_2_cluster' in args.data_type:
             gen_pow_2_cluster_data(args)
+        if 't_shift_cluster' in args.data_type:
+            gen_t_shift_cluster_data(args)

@@ -4,7 +4,9 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement POWER_2_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS_0_NOISE_STD_0")
+dataset_list=("--data_implement POWER_2_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS_0_NOISE_STD_0"
+              "--data_implement POWER_2_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS_0_NOISE_STD_3"
+              "--data_implement T_SHIFT_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS_0_NOISE_STD_3")
 
 
 train_items_setting="train_all"  # "train_train" "train_all"
