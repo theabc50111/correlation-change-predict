@@ -114,3 +114,18 @@ def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, show_inf
     logger.info("="*80)
 
     return train_dataset, val_dataset, test_dataset, sc
+
+
+def find_abs_max_cross_corr(x):
+    """Finds the index of absolute-maximum cross correlation of a signal with itself, then return the correspond cross correlation.
+
+    Args:
+      x: The signal.
+
+    Returns:
+      The sign*(abs_maximum cross correlation) of the signal with itself.
+    """
+
+    cross_correlation = np.correlate(x, x, mode='full')
+    lag = np.argmax(np.absolute(cross_correlation))
+    return cross_correlation[lag]

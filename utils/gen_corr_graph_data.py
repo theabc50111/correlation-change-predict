@@ -10,10 +10,14 @@ from pprint import pformat
 from typing import Dict, List
 
 import dynamic_yaml
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
 from tqdm import tqdm
+
+sys.path.append("/workspace/correlation-change-predict/utils")
+from utils import find_abs_max_cross_corr
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir/"../config/data_config.yaml"
@@ -38,11 +42,64 @@ def _process_index(items):
     return (item_1, item_2)
 
 
+def calculate_rolling_t_depend_pearson_corr(df: pd.DataFrame, x_column: str, y_column: str, window_size: int,  debug_plot: bool = False) -> (pd.Series, pd.Series):
+    """
+    1. Retrieve the values of df[x_column] and df[y_column] within rolling window.
+    2. calculate time-dependent-pearson-correlation of df[x_column] and df[y_column] within rolling window.
+
+    Args:
+      df: signal dataframe.
+      x_column: one of df's column, can regard as signla name of `seg_x`.
+      y_column: one of df's column, can regard as signla name of `seg_y`.
+      window_size: size of window of rolling window
+
+    Returns:
+      t_depend_pearson_corr_ser: Series of time-dependent-pearson-correlation in each rolling window.
+      t_depend_pearson_corr_lag_ser: Series of best lag of time-dependent-pearson-correlation in each rolling window.
+    """
+    shortest_segment_ts_len = int(window_size/3)
+    max_lag = window_size - shortest_segment_ts_len
+    x_rolling = df[x_column].rolling(window_size)
+    y_rolling = df[y_column].rolling(window_size)
+    t_depend_pearson_corr_ser = pd.Series(np.nan, index=df.index)
+    t_depend_pearson_corr_lag_ser = pd.Series(np.nan, index=df.index)
+    x_idx_list = [[None]*max_lag+[None]+list(range(1, max_lag+1)), list(range(shortest_segment_ts_len, window_size))+[window_size]+[None]*max_lag]
+    y_idx_list = [list(range(max_lag, 0, -1))+[0]+[None]*max_lag, [None]*max_lag+[None]+list(range(window_size-1, shortest_segment_ts_len-1, -1))]
+    k_list = np.arange(((window_size*2-2+1)-(2*(shortest_segment_ts_len-1))))
+    lag_list = k_list-np.median(k_list)
+    for i, (seg_x, seg_y) in enumerate(zip(x_rolling, y_rolling)):
+        if i >= window_size-1:
+            max_corr_coef = 0
+            for lag, ((x_start_idx, x_end_idx), (y_start_idx, y_end_idx)) in zip(lag_list, zip(zip(*x_idx_list), zip(*y_idx_list))):
+                corr_coef = np.corrcoef(seg_x[x_start_idx:x_end_idx], seg_y[y_start_idx:y_end_idx])[0, 1]
+                if max_corr_coef <= np.absolute(corr_coef):
+                    max_corr_coef = np.absolute(corr_coef)
+                    t_depend_pearson_corr_ser.iloc[i] = corr_coef
+                    t_depend_pearson_corr_lag_ser.iloc[i] = lag
+                    x_plot = seg_x[x_start_idx:x_end_idx].values
+                    y_plot = seg_y[y_start_idx:y_end_idx].values
+                    seg_x_index_plot = seg_x[x_start_idx:x_end_idx].index[[0, -1]].values
+                    seg_y_index_plot = seg_y[y_start_idx:y_end_idx].index[[0, -1]].values
+                    lag_plot = lag
+            if debug_plot:
+                plt.plot(x_plot)
+                plt.plot(y_plot)
+                plt.title(f"X_dates:{seg_x_index_plot}\nY_dates:{seg_y_index_plot}\nTime shift: {lag_plot}")
+                plt.show()
+                plt.close()
+
+    return t_depend_pearson_corr_ser, t_depend_pearson_corr_lag_ser
+
+
 def gen_item_pair_corr(items: list, dataset_df: pd.DataFrame, corr_ser_len_max: int, corr_ind: list, data_gen_cfg: dict) -> pd.DataFrame:
     """
     Generate correlation of a pair of items which select from `dataset_df`
     """
-    tmp_corr = dataset_df[items[0]].rolling(window=data_gen_cfg["CORR_WINDOW"]).corr(dataset_df[items[1]])
+    if args.corr_type == "pearson":
+        tmp_corr = dataset_df[items[0]].rolling(window=data_gen_cfg["CORR_WINDOW"]).corr(dataset_df[items[1]])
+    elif args.corr_type == "cross_corr":
+        tmp_corr, lag_ser = calculate_rolling_t_depend_pearson_corr(dataset_df, items[0], items[1], data_gen_cfg["CORR_WINDOW"])
+        logger.debug(f"Using cross_correlation mode, lag_ser[:40]:\n{lag_ser[:40]}")
     tmp_corr = tmp_corr.iloc[corr_ind]
     corr_ser_len_max = corr_ser_len_max - max(0, math.ceil((data_gen_cfg["CORR_WINDOW"]-data_gen_cfg["CORR_STRIDE"])/data_gen_cfg["CORR_STRIDE"]))  # CORR_WINDOW > CORR_STRIDE => slide window
     item_pair_corr = pd.DataFrame(tmp_corr.values.reshape(-1, corr_ser_len_max), columns=tmp_corr.index[:corr_ser_len_max], dtype="float32")
@@ -132,7 +189,7 @@ def set_corr_data(data_implement, data_cfg: dict, data_gen_cfg: dict,
                  f"\n--- arround 2008/01/09~2008/01/23 ---\n{dataset_df.loc['2008-01-09':'2008-01-23', [col_1, col_2]].corr()}")
 
     # input folder settings
-    corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"corr_data"
+    corr_data_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/"corr_data"
     corr_data_dir.mkdir(parents=True, exist_ok=True)
 
     # Load or Create Correlation Data
@@ -323,6 +380,9 @@ def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, no
 
 if __name__ == "__main__":
     data_args_parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+    data_args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
+                                  choices=["pearson", "cross_corr"],
+                                  help="input the type of correlation computing")
     data_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                                   help="input the number of stride length of correlation computing")
     data_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
@@ -383,8 +443,8 @@ if __name__ == "__main__":
                                                                            data_split_setting=args.data_split_setting,
                                                                            train_items_setting=args.train_items_setting,
                                                                            save_corr_data=args.save_corr_data)
-    gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_adj_mat"
-    filtered_gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"filtered_graph_adj_mat/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
+    gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/"graph_adj_mat"
+    filtered_gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/f"filtered_graph_adj_mat/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
     gra_node_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_node_mat"
     gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
     filtered_gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)

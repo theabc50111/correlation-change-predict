@@ -178,6 +178,9 @@ if __name__ == "__main__":
                                       help="Decide length of sequence, default: 30")
     baseline_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                       help="input --save_model to save model weight and model info")
+    baseline_args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
+                                      choices=["pearson", "cross_corr"],
+                                      help="input the type of correlation computing, the choices are [pearson, cross_corr]")
     baseline_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                                       help="input the number of stride length of correlation computing")
     baseline_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
@@ -222,15 +225,15 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
-    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    g_model_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
-    g_model_log_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/graph_adj_mat"
+    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
+    g_model_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    g_model_log_dir = current_dir / f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     g_model_dir.mkdir(parents=True, exist_ok=True)
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 
-    gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    gra_edges_data_mats = np.load(graph_adj_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    gra_nodes_data_mats = np.load(graph_node_mat_dir/f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")

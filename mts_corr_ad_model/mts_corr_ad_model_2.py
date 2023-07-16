@@ -393,6 +393,9 @@ if __name__ == "__main__":
                                          help="input the number of sequence length")
     mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                                          help="input --save_model to save model weight and model info")
+    mts_corr_ad_args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
+                                         choices=["pearson", "cross_corr"],
+                                         help="input the type of correlation computing, the choices are [pearson, cross_corr]")
     mts_corr_ad_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                                          help="input the number of stride length of correlation computing")
     mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
@@ -451,10 +454,10 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
-    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    g_model_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}'
-    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/graph_adj_mat"
+    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
+    g_model_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     g_model_dir.mkdir(parents=True, exist_ok=True)
     g_model_log_dir.mkdir(parents=True, exist_ok=True)
 

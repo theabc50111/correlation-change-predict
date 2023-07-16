@@ -64,9 +64,12 @@ if __name__ == "__main__":
                              help="input the number of sequence length")
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
+    args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
+                             choices=["pearson", "cross_corr"],
+                             help="input the type of correlation computing, the choices are [pearson, cross_corr]")
     args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                              help="input the number of stride length of correlation computing")
-    args_parser.add_argument("--corr_window", type=int, nargs='?', default=30,
+    args_parser.add_argument("--corr_window", type=int, nargs='?', default=50,
                              help="input the number of window length of correlation computing")
     args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
                              help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
@@ -128,18 +131,18 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_adj_mat"
-    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"]) / f"{output_file_name}/graph_node_mat"
-    mts_corr_ad_model_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}'
-    mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    mts_corr_ad_model_2_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}'
-    mts_corr_ad_model_2_log_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    mts_corr_ad_model_3_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}'
-    mts_corr_ad_model_3_log_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}'
-    baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
-    gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}'
-    gae_model_log_dir = current_dir/f'save_models/gae_model/{output_file_name}/corr_s{s_l}_w{w_l}/train_logs/'
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/graph_adj_mat"
+    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
+    mts_corr_ad_model_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    mts_corr_ad_model_2_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_2_log_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    mts_corr_ad_model_3_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    mts_corr_ad_model_3_log_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    gae_model_log_dir = current_dir/f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_2_dir.mkdir(parents=True, exist_ok=True)
@@ -153,8 +156,8 @@ if __name__ == "__main__":
 
     # model configuration
     is_training, train_count = True, 0
-    gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
+    gra_edges_data_mats = np.load(graph_adj_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    gra_nodes_data_mats = np.load(graph_node_mat_dir/f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
     basic_model_cfg = {"filt_mode": ARGS.filt_mode,
                        "filt_quan": ARGS.filt_quan,
