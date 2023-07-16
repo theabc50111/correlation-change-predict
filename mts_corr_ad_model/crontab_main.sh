@@ -10,6 +10,7 @@ ARGUMENT_LIST=(
   "train_models"
   "save_model"
   "seq_len"
+  "corr_type"
   "corr_window"
   "corr_stride"
   "filt_mode"
@@ -35,6 +36,7 @@ log_suffix=""
 batch_size=""
 tr_epochs=""
 seq_len=""
+corr_type=""
 corr_window=""
 corr_stride=""
 filt_mode=""
@@ -107,6 +109,11 @@ while [[ $# -gt 0 ]]; do
 
     --seq_len)
       seq_len="--seq_len $2"
+      shift 2
+      ;;
+
+    --corr_type)
+      corr_type="--corr_type $2"
       shift 2
       ;;
 
@@ -208,6 +215,6 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> $log_file
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> "$log_file" 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_type $corr_window $corr_stride $filt_mode $filt_quan $graph_nodes_v_mode $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $save_model >> "$log_file" 2>&1
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> $log_file

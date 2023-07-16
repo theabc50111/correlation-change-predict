@@ -8,7 +8,7 @@ data_implement_list = ("--data_implement T_SHIFT_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS
                        #"--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
 
 train_models_list = ["--train_models MTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
-corr_type_list = ["--corr_type cross_corr", "--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
+corr_type_list = ["--corr_type cross_corr"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
 filt_quan_list = [""]  # ["", "--filt_quan 0.25", "--filt_quan 0.5", "--filt_quan 0.75"]
