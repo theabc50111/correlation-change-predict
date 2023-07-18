@@ -4,7 +4,7 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement T_SHIFT_ONE_CLUSTER_NIKE_TS_DIM_30_BKPS_0_NOISE_STD_3")
+dataset_list=("--data_implement MERGE_CLUSTER_2_NIKE_TS_DIM_30")
 
 
 train_items_setting="train_all"  # "train_train" "train_all"
@@ -12,8 +12,8 @@ filt_gra_mode_list=("")  # ("--filt_gra_mode keep_abs" "--filt_gra_mode keep_pos
 filt_gra_quan_list=("") # ("--data_implement 0.25" "--data_implement 0.5" "--data_implement 0.75")
 graph_nodes_v_mode_list=("--graph_nodes_v_mode all_values" "--graph_nodes_v_mode mean" "--graph_nodes_v_mode std" "--graph_nodes_v_mode mean_std")
 corr_str_list=("--corr_stride 1")
-corr_win_list=("--corr_window 50")  # ("--corr_window 10" "--corr_window 30" "--corr_window 50")
-corr_type=("--corr_type cross_corr")  # ("--corr_type pearson" "--corr_type cross_corr")
+corr_win_list=("--corr_window 10" "--corr_window 30" "--corr_window 50")  # ("--corr_window 10" "--corr_window 30" "--corr_window 50")
+corr_type=("--corr_type pearson")  # ("--corr_type pearson" "--corr_type cross_corr")
 
 # Loop through the list
 for corr_type in "${corr_type[@]}"

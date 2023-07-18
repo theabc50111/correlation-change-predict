@@ -3,6 +3,7 @@ import logging
 from itertools import cycle
 from pathlib import Path
 from pprint import pformat
+from typing import List
 
 import matplotlib.pylab as plt
 import numpy as np
@@ -144,6 +145,11 @@ def nike_ts(n_samples: int = 200, country: str = "United Kingdom", start_date: s
     df = g.generate()
 
     return df['value'].values
+
+
+def specific_ts(df_path: Path, ts_name: str):
+    df = pd.read_csv(df_path)
+    return df[ts_name].values
 
 
 def gen_pw_constant_data(args):
@@ -362,6 +368,8 @@ def gen_leader_signal(args):
     elif args.basis_type == "nike_ts":
         nike_signal, bkps = nike_ts(n_samples=n), [n]
         leader_signal = nike_signal+basis_trend
+    elif args.basis_type == "specific_ts":
+        leader_signal, bkps = specific_ts(args.specific_ts_path, args.specific_ts_var), [n]
 
     return leader_signal, bkps
 
@@ -484,12 +492,35 @@ def gen_multi_cluster_data(args, gen_data_func):
         df.to_csv(save_dir/f'cluster_{n_clusters}-pw_{gen_data_func_name}-bkps{n_bkps}-noise_std{sigma}.csv')
 
 
+def merge_multi_cluster_data(df_path_list: List[Path]):
+    """
+    Generate multiple cluseter data.
+    Construct the clusters by specific dataframes.
+    """
+    n_clusters = len(df_path_list)
+    df = pd.DataFrame()
+    for i, df_path in enumerate(df_path_list):
+        tmp_df = pd.read_csv(df_path, index_col=["Date"])
+        tmp_df.columns = [f"cluster_{i}_{col}" for col in tmp_df.columns]
+        df = pd.concat((df, tmp_df), axis=1)
+    logger.info(f"Merge specific dataframes to form a clusters_{n_clusters} data with shape {df.shape}")
+    logger.info(f"specific dataframes:{[path.stem for path in df_path_list]}")
+    logger.info(f"Merge multi cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
+    if args.save_data:
+        save_dir = current_dir/f'../dataset/synthetic/dim{len(df.columns)}/{df_path_list[0].stem}/{df_path_list[1].stem}'
+        save_dir.mkdir(parents=True, exist_ok=True)
+        df.to_csv(save_dir/f'merge_cluster_{n_clusters}.csv')
+
+    return df.values
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate raw data.')
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
                         choices=['pw_constant', 'pw_linear_combine', 'pw_wave_const', 'pw_wave_linear_combine',
                                  'pw_wave_multiply_linear_reg', 'pw_wave_add_linear_reg', 'pw_wave_t_shift',
-                                 'linear_reg_cluster', 'pow_2_cluster', 't_shift_cluster', 'multi_cluster'],
+                                 'linear_reg_cluster', 'pow_2_cluster', 't_shift_cluster', 'multi_cluster', "merge_multi_cluster"],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
     parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
@@ -497,19 +528,31 @@ if __name__ == '__main__':
     parser.add_argument('--n_bkps', type=int, default=0, help='Input number of change points. (default: 0)')
     parser.add_argument('--n_clusters', type=int, default=0, help='Input number of clusters. (default: 0)')
     parser.add_argument('--basis_type', type=str, default='nike_ts', nargs='?',
-                        choices=['nike_ts', 'pw_rand_wavy'],
+                        choices=['nike_ts', 'pw_rand_wavy', 'specific_ts'],
                         help='Type of basis_signal to generate. (default: nike_ts)')
+    parser.add_argument('--specific_ts_path', type=str, default=None,
+                        help='Input path of specific_ts. (default: None)')
+    parser.add_argument('--specific_ts_var', type=str, default=None,
+                        help='Input variable name of specific_ts. (default: None)')
+    parser.add_argument('--merge_df_paths', type=str, default=None, nargs='+',
+                        help='Input paths of dataframes to merge. (default: None)')
     parser.add_argument("--save_data", type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help="input --save_data to save raw data")
     args = parser.parse_args()
     assert bool("multi_cluster" in args.data_type) == bool(args.n_clusters >= 2), "`n_clusters` should be set when `data_type` is 'multi_cluster'"
     assert bool("multi_cluster" in args.data_type) == bool(len(args.data_type) == 2), "`data_type` should contain another generate data setting when 'multi_cluster' is set"
+    assert bool("specific_ts" in args.basis_type) == bool(args.specific_ts_path), "`specific_ts_path` should be set when `basis_type` is 'specific_ts'"
+    assert bool("specific_ts" in args.basis_type) == bool(args.specific_ts_var), "`specific_ts_var` should be set when `basis_type` is 'specific_ts'"
+    assert bool("merge_multi_cluster" in args.data_type) == bool(args.merge_df_paths), "`merge_df_paths` should be set when `data_type` is 'merge_multi_cluster'"
     logger.info(pformat(vars(args), indent=1, width=100, compact=True))
 
     if 'multi_cluster' in args.data_type:
         args.data_type.remove('multi_cluster')
         func = locals()[f'gen_{args.data_type[0]}_data']
         gen_multi_cluster_data(args, func)
+    elif 'merge_multi_cluster' in args.data_type:
+        df_path_list = [Path(path) for path in args.merge_df_paths]
+        merge_multi_cluster_data(df_path_list)
     else:
         if 'pw_constant' in args.data_type:
             gen_pw_constant_data(args)
