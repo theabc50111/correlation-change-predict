@@ -69,7 +69,7 @@ if __name__ == "__main__":
                              help="input the type of correlation computing, the choices are [pearson, cross_corr]")
     args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
                              help="input the number of stride length of correlation computing")
-    args_parser.add_argument("--corr_window", type=int, nargs='?', default=50,
+    args_parser.add_argument("--corr_window", type=int, nargs='?', default=30,
                              help="input the number of window length of correlation computing")
     args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
                              help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")

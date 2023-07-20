@@ -170,8 +170,7 @@ def gen_pw_constant_data(args):
     logger.info(f"Generated piecewise constant data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"piecewiase constant data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_constant-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -194,8 +193,7 @@ def gen_pw_linear_combine_data(args):
     logger.info(f"Generated piecewise linear_combine data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"piecewiase linear_combine data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_linear_combine-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -222,8 +220,7 @@ def gen_pw_wave_const_data(args, seed=120):
     logger.info(f"Generated piecewise wave_constant data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"Piecewise wave_constant data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_wave_const-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -254,8 +251,7 @@ def gen_pw_wave_t_shift_data(args, seed=120):
     logger.info(f"Generated piecewise wave_t_shift data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"Piecewise wave_t_shift data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_wave_t_shift-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -286,8 +282,7 @@ def gen_pw_wave_multiply_linear_reg_data(args, seed=120):
     logger.info(f"Generated piecewise wave_multiply_linear_regression data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"Piecewise wave_multiply_linear_reg data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_wave_multiply_linear_reg-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -319,8 +314,7 @@ def gen_pw_wave_add_linear_reg_data(args, seed=120):
     logger.info(f"Generated piecewise wave_add_linear_regression data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"Piecewise wave_add_linear_reg data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_wave_add_linear_reg-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -342,8 +336,7 @@ def gen_pw_wave_linear_combine_data(args):
     logger.info(f"Generated piecewise wave_linear_combine data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"piecewiase wave_linear_combine data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'pw_wave_linear_combine-bkps{n_bkps}-noise_std{sigma}.csv')
 
     return signal, bkps
@@ -410,34 +403,33 @@ def gen_linear_reg_cluster_data(args, seed=120):
     logger.info(f"Generated linear_regression cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
     logger.info(f"Linear regression cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'linear_reg_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
 
     return signal, bkps
 
 
-def gen_pow_2_cluster_data(args, seed=120):
+def gen_power_cluster_data(args, seed=120):
     """
-    Generate cluster data whose instances are power_2 (non-linear) correlation to leader_signal
-    Specifing `args.n_bkps` to decide the number of change-point of  leader_signal.
+    Generate cluster data whose instances are power ($$X_n = m_n*X_{leader}+b_n$$)(non-linear) correlation to leader_signal
+    Specifing `args.n_bkps` to decide the number of change-point of leader_signal.
     """
     dim, noise_scale, n_bkps = args.dim, args.noise_scale, args.n_bkps
+    basis_type, power = args.basis_type, args.power
     rng = np.random.default_rng(seed=0)
     leader_signal, bkps = gen_leader_signal(args)
     no_noise_signal = np.zeros((args.time_len, dim))
     for i, (sub_signal, (reg_coef, reg_bias)) in enumerate(zip(np.split(no_noise_signal, dim, axis=1), rng.uniform(low=-10, high=10, size=(dim, 2)))):
-        if i== 0:
+        if i == 0:
             sub_signal += leader_signal.reshape(-1, 1)
         else:
-            sub_signal += (reg_coef*(leader_signal**2)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of leader_signal
+            sub_signal += (reg_coef*(leader_signal**power)+reg_bias).reshape(-1, 1)  # create sub_variable that has linear correlation to power_2 of leader_signal
     signal, df = exec_post_processing(signal=no_noise_signal, noise_scale=noise_scale)
-    logger.info(f"Generated power_2 cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
-    logger.info(f"Power 2 cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
+    logger.info(f"Generated power_{power} cluster data with shape {df.shape} and basis_type {basis_type} and {n_bkps} change points.")
+    logger.info(f"Power {power} cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
-        df.to_csv(save_dir/f'power_2_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
+        save_dir = set_save_dir(args)
+        df.to_csv(save_dir/f'power_{str(power).replace(".", "_")}_one_cluster-{basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
 
     return signal, bkps
 
@@ -448,8 +440,7 @@ def gen_t_shift_cluster_data(args, seed=120):
     Specifing `args.n_bkps` to decide the number of change-point of  leader_signal.
     """
     dim, noise_scale, n_bkps = args.dim, args.noise_scale, args.n_bkps
-    rng = np.random.default_rng(seed=0)
-    start_idx_list = np.array([0]+[i for i in range(100) if i%7 != 0])[:dim]
+    start_idx_list = np.array([0]+[i for i in range(100) if i % 7 != 0])[:dim]
     args.time_len += start_idx_list[-1]
     leader_signal, bkps = gen_leader_signal(args)
     args.time_len -= start_idx_list[-1]
@@ -460,8 +451,7 @@ def gen_t_shift_cluster_data(args, seed=120):
     logger.info(f"Generated t_shift_one_cluster data with shape {df.shape} and basis_type {args.basis_type} and {n_bkps} change points.")
     logger.info(f"Time shift cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f't_shift_one_cluster-{args.basis_type}-bkps{n_bkps}-noise_scale{noise_scale}.csv')
 
     return signal, bkps
@@ -487,8 +477,7 @@ def gen_multi_cluster_data(args, gen_data_func):
     logger.info(f"Generated clusters_{n_clusters} piecewise {gen_data_func_name} data with shape {df.shape} and {n_bkps} change points.")
     logger.info(f"clusters_{n_clusters} piecewiase {gen_data_func_name} data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{n_clusters*dim}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'cluster_{n_clusters}-pw_{gen_data_func_name}-bkps{n_bkps}-noise_std{sigma}.csv')
 
 
@@ -507,12 +496,29 @@ def merge_multi_cluster_data(df_path_list: List[Path]):
     logger.info(f"specific dataframes:{[path.stem for path in df_path_list]}")
     logger.info(f"Merge multi cluster data[:5, :5]:\n{df.iloc[:5, :5]}")
     if args.save_data:
-        save_dir = current_dir/f'../dataset/synthetic/dim{len(df.columns)}/{df_path_list[0].stem}/{df_path_list[1].stem}'
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = set_save_dir(args)
         df.to_csv(save_dir/f'merge_cluster_{n_clusters}.csv')
 
     return df.values
 
+
+def set_save_dir(args):
+    """
+    Set the save directory.
+    """
+    if args.n_clusters:
+        save_dir = current_dir/f'../dataset/synthetic/dim{args.n_cluster*args.dim}'
+    elif args.merge_df_paths:
+        dim = sum(len(pd.read_csv(Path(path), index_col=["Date"]).columns) for path in args.merge_df_paths)
+        dir_tree = "/".join([str(Path(path).stem) for path in args.merge_df_paths])
+        save_dir = current_dir/f'../dataset/synthetic/dim{dim}/merge_cluster_ts/{dir_tree}'
+    elif args.specific_ts_path:
+        save_dir = current_dir/f'../dataset/synthetic/dim{args.dim}/basis_specific_ts/{Path(args.specific_ts_path).stem}'
+    else:
+        save_dir = current_dir/f'../dataset/synthetic/dim{args.dim}'
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    return save_dir
 
 
 if __name__ == '__main__':
@@ -520,16 +526,18 @@ if __name__ == '__main__':
     parser.add_argument('--data_type', type=str, default=['pw_constant'], nargs='+',
                         choices=['pw_constant', 'pw_linear_combine', 'pw_wave_const', 'pw_wave_linear_combine',
                                  'pw_wave_multiply_linear_reg', 'pw_wave_add_linear_reg', 'pw_wave_t_shift',
-                                 'linear_reg_cluster', 'pow_2_cluster', 't_shift_cluster', 'multi_cluster', "merge_multi_cluster"],
+                                 'linear_reg_cluster', 'power_cluster', 't_shift_cluster',
+                                 'multi_cluster', "merge_multi_cluster"],
                         help='Type of data to generate. (default: pw_constant)')
     parser.add_argument('--time_len', type=int, default=2600, help='Input time length. (default: 2600)')
-    parser.add_argument('--dim', type=int, default=70, help='Input dimension(number of variable). (default: 70)')
+    parser.add_argument('--dim', type=int, default=30, help='Input dimension(number of variable). (default: 30)')
     parser.add_argument('--noise_scale', type=int, default=3, help='Input noise scale in the form of percentage integer. (default: 3))')
     parser.add_argument('--n_bkps', type=int, default=0, help='Input number of change points. (default: 0)')
     parser.add_argument('--n_clusters', type=int, default=0, help='Input number of clusters. (default: 0)')
     parser.add_argument('--basis_type', type=str, default='nike_ts', nargs='?',
                         choices=['nike_ts', 'pw_rand_wavy', 'specific_ts'],
                         help='Type of basis_signal to generate. (default: nike_ts)')
+    parser.add_argument('--power', type=float, default=None, help='Input power of basis_signal.')
     parser.add_argument('--specific_ts_path', type=str, default=None,
                         help='Input path of specific_ts. (default: None)')
     parser.add_argument('--specific_ts_var', type=str, default=None,
@@ -539,6 +547,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_data", type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help="input --save_data to save raw data")
     args = parser.parse_args()
+    assert bool("power_cluster" in args.data_type) == bool(args.power), "`power` should be set when `data_type` is 'power_cluster'"
     assert bool("multi_cluster" in args.data_type) == bool(args.n_clusters >= 2), "`n_clusters` should be set when `data_type` is 'multi_cluster'"
     assert bool("multi_cluster" in args.data_type) == bool(len(args.data_type) == 2), "`data_type` should contain another generate data setting when 'multi_cluster' is set"
     assert bool("specific_ts" in args.basis_type) == bool(args.specific_ts_path), "`specific_ts_path` should be set when `basis_type` is 'specific_ts'"
@@ -570,7 +579,7 @@ if __name__ == '__main__':
             gen_pw_wave_t_shift_data(args)
         if 'linear_reg_cluster' in args.data_type:
             gen_linear_reg_cluster_data(args)
-        if 'pow_2_cluster' in args.data_type:
-            gen_pow_2_cluster_data(args)
+        if 'power_cluster' in args.data_type:
+            gen_power_cluster_data(args)
         if 't_shift_cluster' in args.data_type:
             gen_t_shift_cluster_data(args)

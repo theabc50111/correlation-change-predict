@@ -4,7 +4,7 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement MERGE_CLUSTER_2_NIKE_TS_DIM_30")
+dataset_list=("--data_implement MERGE_CLUSTER_4_NIKE_TS_DIM_60")
 
 
 train_items_setting="train_all"  # "train_train" "train_all"
