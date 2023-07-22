@@ -326,6 +326,28 @@ def gen_filtered_corr_mat_thru_t(src_dir: Path, data_gen_cfg: dict, filter_mode:
         np.save(save_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy", res_mats)
 
 
+def gen_discretize_corr_mat_thru_t(src_dir: Path, data_gen_cfg: dict, bins: int = 0, save_dir: Path = None):
+    """
+    Create filttered correlation matrix by given conditions.
+    - data_gen_cfg: dict of data generation config, used to write config on file name
+    """
+    s_l, w_l = data_gen_cfg["CORR_STRIDE"], data_gen_cfg["CORR_WINDOW"]
+    corr_mats = np.load(src_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
+    res_mats = corr_mats.copy()
+    quan_bins = [np.quantile(res_mats, q) for q in np.linspace(0, 1, bins+1)]
+    discretize_mats = np.digitize(res_mats, quan_bins, True)
+    discretize_mats[discretize_mats == 0] = 1
+    discretize_mats = discretize_mats.astype(np.float32)
+    discretize_values = np.linspace(-1, 1, bins)
+    for discretize_tag, discretize_value in zip(np.unique(discretize_mats), discretize_values):
+        discretize_mats[discretize_mats == discretize_tag] = discretize_value
+
+    logger.info(f"\nReturn discretize matrices.shape:{discretize_mats.shape}"
+                f"\nUnique values and correspond counts of discretize matrices:\n{np.unique(discretize_mats, return_counts=True)}")
+    if save_dir:
+        np.save(save_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy", discretize_mats)
+
+
 def gen_nodes_mat_thru_t(target_df, corr_dates: pd.Index, data_gen_cfg: dict, nodes_v_mode: str = "all_values", save_dir: Path = None):
     """
     Generate nodes' values matrix through time points
@@ -416,6 +438,8 @@ if __name__ == "__main__":
                                        f"    - keep_abs : transform all negative correlation to positive")
     data_args_parser.add_argument("--filt_gra_quan", type=float, nargs='?', default=0.5,
                                   help="Decide filtering quantile")
+    data_args_parser.add_argument("--discrete_bin", type=int, nargs='?', default=3,
+                                  help="Decide the number of discrete bin")
     data_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default="all_values",
                                   help=f"Decide mode of nodes' vaules of graph_nodes_matrix\n"
                                        f"    - all_values : use all values inside window as nodes' values\n"
@@ -445,10 +469,12 @@ if __name__ == "__main__":
                                                                            save_corr_data=args.save_corr_data)
     gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/"graph_adj_mat"
     filtered_gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/f"filtered_graph_adj_mat/{args.filt_gra_mode}-quan{str(args.filt_gra_quan).replace('.', '')}"
+    discretize_gra_adj_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/f"{args.corr_type}"/f"discretize_graph_adj_mat/discrete_bin{args.discrete_bin}"
     gra_node_mat_dir = Path(DATA_CFG["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}"/"graph_node_mat"
     gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
     filtered_gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
     gra_node_mat_dir.mkdir(parents=True, exist_ok=True)
+    discretize_gra_adj_mat_dir.mkdir(parents=True, exist_ok=True)
     gen_corr_mat_thru_t(corr_dataset=setted_corr_dataset,
                         target_df=aimed_target_df,
                         data_gen_cfg=DATA_GEN_CFG,
@@ -460,6 +486,10 @@ if __name__ == "__main__":
                                  filter_mode=args.filt_gra_mode,
                                  quantile=args.filt_gra_quan,
                                  save_dir=filtered_gra_adj_mat_dir if args.save_corr_graph_arr else None)
+    gen_discretize_corr_mat_thru_t(src_dir=gra_adj_mat_dir,
+                                   data_gen_cfg=DATA_GEN_CFG,
+                                   bins=args.discrete_bin,
+                                   save_dir=discretize_gra_adj_mat_dir if args.save_corr_graph_arr else None)
     gen_nodes_mat_thru_t(target_df=aimed_target_df,
                          corr_dates=setted_corr_dataset.columns,
                          data_gen_cfg=DATA_GEN_CFG,
