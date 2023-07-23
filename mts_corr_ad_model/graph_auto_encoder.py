@@ -99,6 +99,7 @@ class GAE(torch.nn.Module):
         best_model_info = {"num_training_graphs": len(train_data),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
+                           "discrete_bin": self.model_cfg['discrete_bin'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
                            "batches_per_epoch": self.num_tr_batches,
                            "epochs": epochs,
@@ -289,8 +290,10 @@ if __name__ == "__main__":
                                  help="input the number of window length of correlation computing")
     gae_args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
                                  help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
-    gae_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=0.5,
+    gae_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=None,
                                  help="input the filtered quantile of graph edges")
+    gae_args_parser.add_argument("--discrete_bin", type=int, nargs='?', default=None,
+                                 help="input the number of discrete bins of graph edges")
     gae_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                                  help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
     gae_args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
@@ -312,6 +315,9 @@ if __name__ == "__main__":
     gae_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                                  help="input the number of graph embedding hidden size of graph_encoder")
     ARGS = gae_args_parser.parse_args()
+    assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
+    assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
+    assert (bool(ARGS.filt_mode) != bool(ARGS.discrete_bin)) or (ARGS.filt_mode is None and ARGS.discrete_bin is None), "filt_mode and discrete_bin must be both not input or one input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -332,7 +338,13 @@ if __name__ == "__main__":
     logger.info(f"===== pytorch running on:{device} =====")
 
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}" if ARGS.filt_mode else Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/graph_adj_mat"
+    if ARGS.filt_mode:
+        graph_adj_mode_dir = f"filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}"
+    elif ARGS.discrete_bin:
+        graph_adj_mode_dir = f"discretize_graph_adj_mat/discrete_bin{ARGS.discrete_bin}"
+    else:
+        graph_adj_mode_dir = "graph_adj_mat"
+    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/{graph_adj_mode_dir}"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
     g_model_dir = current_dir / f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     g_model_log_dir = current_dir / f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
@@ -358,6 +370,7 @@ if __name__ == "__main__":
 
     gae_cfg = {"filt_mode": ARGS.filt_mode,
                "filt_quan": ARGS.filt_quan,
+               "discrete_bin": ARGS.discrete_bin,
                "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                "tr_epochs": ARGS.tr_epochs,
                "batch_size": ARGS.batch_size,
