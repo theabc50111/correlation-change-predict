@@ -56,7 +56,7 @@ warnings.simplefilter("ignore")
 
 
 class GraphTimeSeriesDataset(Dataset):
-    def __init__(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, model_cfg: dict, show_log: bool = True):
+    def __init__(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, target_mats: np.ndarray, model_cfg: dict, show_log: bool = True):
         """
         Create list of graph data:
         In order to make the `DataLoader` combine sequencial graphs into a `Data` object, the arrange of self.data_list will not be sequencial.
@@ -82,7 +82,7 @@ class GraphTimeSeriesDataset(Dataset):
         self.seq_len = model_cfg['seq_len']
         graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
         graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        y_graph_adj_mats = graph_adj_mats
+        y_graph_adj_mats = target_mats
         final_batch_head = ((graph_time_len//self.batch_size)-1)*self.batch_size
         last_seq_len = graph_time_len-final_batch_head-self.batch_size
         data_list = []
@@ -199,7 +199,7 @@ class MTSCorrAD(torch.nn.Module):
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
-    def forward(self, x, edge_index, seq_batch_node_id, edge_attr, *unused_args):
+    def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """
         Operate when model called
         """
@@ -214,6 +214,16 @@ class MTSCorrAD(torch.nn.Module):
 
         # Decoder (Graph Adjacency Reconstruction)
         pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
+        if output_type == "discretize":
+            bins = torch.tensor(self.model_cfg['output_bins'])
+            num_bins = len(bins)-1
+            tmp_tensor = torch.bucketize(pred_graph_adj, bins, right=True)
+            tmp_tensor[tmp_tensor == 0] = 1
+            tmp_tensor[tmp_tensor > num_bins] = num_bins
+            discretize_values = np.linspace(-1, 1, num_bins)
+            for discretize_tag, discretize_value in zip(torch.unique(tmp_tensor), discretize_values):
+                tmp_tensor[tmp_tensor == discretize_tag] = discretize_value
+            pred_graph_adj = tmp_tensor
 
         return pred_graph_adj
 
@@ -222,6 +232,7 @@ class MTSCorrAD(torch.nn.Module):
         Training MTSCorrAD Model
         """
         # In order to make original function of nn.Module.train() work, we need to override it
+
         super().train(mode=mode)
         if train_data is None:
             return self
@@ -229,7 +240,8 @@ class MTSCorrAD(torch.nn.Module):
         best_model_info = {"num_training_graphs": len(train_data),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
-                           "discrete_bin": self.model_cfg['discrete_bin'],
+                           "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
+                           "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
                            "batches_per_epoch": self.num_tr_batches,
                            "epochs": epochs,
@@ -247,7 +259,7 @@ class MTSCorrAD(torch.nn.Module):
         best_model = []
 
         num_nodes = self.model_cfg["num_nodes"]
-        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
+        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "gra_enc_weight_l2_reg": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
@@ -263,9 +275,9 @@ class MTSCorrAD(torch.nn.Module):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+                    edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=loss_fns["fn_args"]["EdgeAccuracyLoss()"].get("atol", 0.05), rtol=0).mean()
                     batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
                     loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
@@ -318,14 +330,14 @@ class MTSCorrAD(torch.nn.Module):
             assert sum(map(abs, best_model_info['gra_enc_grad_history'])) > 0, f"Sum of gradient of MTSCorrAD.graph_encoder in epoch_{epoch_i}:{sum(map(abs, best_model_info['gra_enc_grad_history']))}"
             # observe model info in console
             if epoch_i == 0:
-                best_model_info["model_structure"] = str(self) + "\n" + "="*100 + "\n" + str(summary(self, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, max_depth=20))
+                best_model_info["model_structure"] = str(self) + "\n" + "="*100 + "\n" + str(summary(self, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, self.model_cfg["output_type"], max_depth=20))
                 if show_model_info:
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
+                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
 
@@ -334,14 +346,15 @@ class MTSCorrAD(torch.nn.Module):
         test_loss = 0
         test_edge_acc = 0
         num_nodes = self.model_cfg["num_nodes"]
-        test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
+        test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], target_mats=test_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
         with torch.no_grad():
             for batch_data in test_loader:
                 for data_batch_idx in range(self.model_cfg['batch_size']):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
+                    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
                     test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
@@ -381,12 +394,12 @@ class MTSCorrAD(torch.nn.Module):
 
         return pred_graph_embeds[-1]
 
-    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, loader_seq_len : int,  show_log: bool = True, show_debug_info: bool = False):
+    def create_pyg_data_loaders(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, target_mats: np.ndarray, loader_seq_len : int,  show_log: bool = True, show_debug_info: bool = False):
         """
         Create Pytorch Geometric DataLoaders
         """
         # Create an instance of the GraphTimeSeriesDataset
-        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, model_cfg=self.model_cfg, show_log=show_log)
+        dataset = GraphTimeSeriesDataset(graph_adj_mats,  graph_nodes_mats, target_mats, model_cfg=self.model_cfg, show_log=show_log)
         # Create mini-batches
         data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
 
@@ -435,165 +448,3 @@ class MTSCorrAD(torch.nn.Module):
                                       f"\n---------------------------At batch{batch_idx} and data{data_batch_idx} and seq_t{seq_t}---------------------------\n"))
 
         return data_loader
-
-
-if __name__ == "__main__":
-    mts_corr_ad_args_parser = argparse.ArgumentParser()
-    mts_corr_ad_args_parser.add_argument("--data_implement", type=str, nargs='?', default="SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX",
-                                         help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
-    mts_corr_ad_args_parser.add_argument("--batch_size", type=int, nargs='?', default=10,
-                                         help="input the number of batch size")
-    mts_corr_ad_args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=300,
-                                         help="input the number of training epochs")
-    mts_corr_ad_args_parser.add_argument("--seq_len", type=int, nargs='?', default=30,
-                                         help="input the number of sequence length")
-    mts_corr_ad_args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
-                                         help="input --save_model to save model weight and model info")
-    mts_corr_ad_args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
-                                         choices=["pearson", "cross_corr"],
-                                         help="input the type of correlation computing, the choices are [pearson, cross_corr]")
-    mts_corr_ad_args_parser.add_argument("--corr_stride", type=int, nargs='?', default=1,
-                                         help="input the number of stride length of correlation computing")
-    mts_corr_ad_args_parser.add_argument("--corr_window", type=int, nargs='?', default=10,
-                                         help="input the number of window length of correlation computing")
-    mts_corr_ad_args_parser.add_argument("--filt_mode", type=str, nargs='?', default=None,
-                                         help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
-    mts_corr_ad_args_parser.add_argument("--filt_quan", type=float, nargs='?', default=None,
-                                         help="input the filtered quantile of graph edges")
-    mts_corr_ad_args_parser.add_argument("--discrete_bin", type=int, nargs='?', default=None,
-                                         help="input the number of discrete bins of graph edges")
-    mts_corr_ad_args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
-                                         help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
-    mts_corr_ad_args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
-                                         help="input the path of pretrain encoder weights")
-    mts_corr_ad_args_parser.add_argument("--pretrain_decoder", type=str, nargs='?', default="",
-                                         help="input the path of pretrain decoder weights")
-    mts_corr_ad_args_parser.add_argument("--learning_rate", type=float, nargs='?', default=0.0001,
-                                         help="input the learning rate of training")
-    mts_corr_ad_args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0.01,
-                                         help="input the weight decay of training")
-    mts_corr_ad_args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
-                                         help="input the weight of graph encoder weight l2 norm loss")
-    mts_corr_ad_args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                                         help="input [gru] | [gru decoder] | [decoder gru graph_encoder] to decide the position of drop layers")
-    mts_corr_ad_args_parser.add_argument("--drop_p", type=float, default=0,
-                                         help="input 0~1 to decide the probality of drop layers")
-    mts_corr_ad_args_parser.add_argument("--gra_enc", type=str, nargs='?', default="gine",
-                                         help="input the type of graph encoder")
-    mts_corr_ad_args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="add",
-                                         help="input the type of aggregator of graph encoder")
-    mts_corr_ad_args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=1,  # range:1~n, for graph encoder after the second layer,
-                                         help="input the number of graph laryers of graph_encoder")
-    mts_corr_ad_args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
-                                         help="input the number of graph embedding hidden size of graph_encoder")
-    mts_corr_ad_args_parser.add_argument("--gru_l", type=int, nargs='?', default=3,  # range:1~n, for gru
-                                         help="input the number of stacked-layers of gru")
-    mts_corr_ad_args_parser.add_argument("--gru_h", type=int, nargs='?', default=None,
-                                         help="input the number of gru hidden size")
-    ARGS = mts_corr_ad_args_parser.parse_args()
-    assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
-    assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
-    assert (bool(ARGS.filt_mode) != bool(ARGS.discrete_bin)) or (ARGS.filt_mode is None and ARGS.discrete_bin is None), "filt_mode and discrete_bin must be both not input or one input"
-    logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
-
-    # Data implement & output setting & testset setting
-    # data implement setting
-    data_implement = ARGS.data_implement
-    # train set setting
-    train_items_setting = "-train_train"  # -train_train|-train_all
-    # setting of name of output files and pictures title
-    output_file_name = data_cfg["DATASETS"][data_implement]['OUTPUT_FILE_NAME_BASIS'] + train_items_setting
-    # setting of output files
-    save_model_info = ARGS.save_model
-    # set devide of pytorch
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    torch.cuda.set_device(device)
-    torch.set_default_tensor_type(torch.cuda.DoubleTensor if torch.cuda.is_available() else torch.DoubleTensor)
-    torch.autograd.set_detect_anomaly(True)  # for debug grad
-    logger.info(f"===== file_name basis:{output_file_name} =====")
-    logger.info(f"===== pytorch running on:{device} =====")
-
-    s_l, w_l = ARGS.corr_stride, ARGS.corr_window
-    if ARGS.filt_mode:
-        graph_adj_mode_dir = f"filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}"
-    elif ARGS.discrete_bin:
-        graph_adj_mode_dir = f"discretize_graph_adj_mat/discrete_bin{ARGS.discrete_bin}"
-    else:
-        graph_adj_mode_dir = "graph_adj_mat"
-    graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/{graph_adj_mode_dir}"
-    graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
-    g_model_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
-    g_model_log_dir = current_dir / f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
-    g_model_dir.mkdir(parents=True, exist_ok=True)
-    g_model_log_dir.mkdir(parents=True, exist_ok=True)
-
-    # model configuration
-    is_training, train_count = True, 0
-    gra_edges_data_mats = np.load(graph_adj_mat_dir / f"corr_s{s_l}_w{w_l}_adj_mat.npy")
-    gra_nodes_data_mats = np.load(graph_node_mat_dir / f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
-    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
-    # show info
-    logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
-    logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
-    logger.info(f"gra_nodes_data_mats.max:{np.nanmax(gra_nodes_data_mats)}, gra_nodes_data_mats.min:{np.nanmin(gra_nodes_data_mats)}")
-    logger.info(f"norm_train_nodes_data_mats.max:{np.nanmax(norm_train_dataset['nodes'])}, norm_train_nodes_data_mats.min:{np.nanmin(norm_train_dataset['nodes'])}")
-    logger.info(f"norm_val_nodes_data_mats.max:{np.nanmax(norm_val_dataset['nodes'])}, norm_val_nodes_data_mats.min:{np.nanmin(norm_val_dataset['nodes'])}")
-    logger.info(f"norm_test_nodes_data_mats.max:{np.nanmax(norm_test_dataset['nodes'])}, norm_test_nodes_data_mats.min:{np.nanmin(norm_test_dataset['nodes'])}")
-    logger.info(f'Training set   = {len(norm_train_dataset["edges"])} graphs')
-    logger.info(f'Validation set = {len(norm_val_dataset["edges"])} graphs')
-    logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
-    logger.info("="*80)
-
-    mts_corr_ad_cfg = {"filt_mode": ARGS.filt_mode,
-                       "filt_quan": ARGS.filt_quan,
-                       "discrete_bin": ARGS.discrete_bin,
-                       "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
-                       "tr_epochs": ARGS.tr_epochs,
-                       "batch_size": ARGS.batch_size,
-                       "seq_len": ARGS.seq_len,
-                       "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
-                                       "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
-                                       "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
-                       "pretrain_encoder": ARGS.pretrain_encoder,
-                       "pretrain_decoder": ARGS.pretrain_decoder,
-                       "learning_rate": ARGS.learning_rate,
-                       "weight_decay": ARGS.weight_decay,
-                       "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
-                       "drop_pos": ARGS.drop_pos,
-                       "drop_p": ARGS.drop_p,
-                       "gra_enc_aggr": ARGS.gra_enc_aggr,
-                       "gra_enc_l": ARGS.gra_enc_l,
-                       "gra_enc_h": ARGS.gra_enc_h,
-                       "gru_l": ARGS.gru_l,
-                       "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
-                       "num_nodes": (norm_train_dataset["nodes"].shape[2]),
-                       "num_node_features": norm_train_dataset["nodes"].shape[1],
-                       "num_edge_features": 1,
-                       "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
-                       "decoder": MLPDecoder}
-
-    model = MTSCorrAD(mts_corr_ad_cfg)
-    loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
-                     "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
-    while (is_training is True) and (train_count < 100):
-        try:
-            train_count += 1
-            g_best_model, g_best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
-        except AssertionError as e:
-            logger.error(f"\n{e}")
-        except Exception as e:
-            is_training = False
-            error_class = e.__class__.__name__  # 取得錯誤類型
-            detail = e.args[0]  # 取得詳細內容
-            cl, exc, tb = sys.exc_info()  # 取得Call Stack
-            last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
-            file_name = last_call_stack[0]  # 取得發生的檔案名稱
-            line_num = last_call_stack[1]  # 取得發生的行號
-            func_name = last_call_stack[2]  # 取得發生的函數名稱
-            err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
-            logger.error(f"===\n{err_msg}")
-            logger.error(f"===\n{traceback.extract_tb(tb)}")
-        else:
-            is_training = False
-            if save_model_info:
-                model.save_model(g_best_model, g_best_model_info, model_dir=g_model_dir, model_log_dir=g_model_log_dir)

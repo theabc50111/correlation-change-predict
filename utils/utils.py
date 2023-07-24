@@ -69,7 +69,7 @@ def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Pa
     return corr_property_df
 
 
-def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, show_info: bool = False):
+def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, target_mats: np.ndarray, show_info: bool = False):
     """
     split dataset to train, validation, test
     normalize these dataset
@@ -81,12 +81,20 @@ def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, show_inf
     train_dataset = {"edges": edges_mats[:int(num_graphs * 0.9)], "nodes": nodes_mats[:int(num_graphs * 0.9)]}
     val_dataset = {"edges": edges_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)], "nodes": nodes_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]}
     test_dataset = {"edges": edges_mats[int(num_graphs * 0.95):], "nodes": nodes_mats[int(num_graphs * 0.95):]}
+    if target_mats is not None:
+        train_dataset["target"] = target_mats[:int(num_graphs * 0.9)]
+        val_dataset["target"] = target_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]
+        test_dataset["target"] = target_mats[int(num_graphs * 0.95):]
+    else:
+        train_dataset["target"] = train_dataset["edges"]
+        val_dataset["target"] = val_dataset["edges"]
+        test_dataset["target"] = test_dataset["edges"]
     sc = StandardScaler()
 
     if (train_dataset["nodes"] == 1).all() or (train_dataset["nodes"] == 0).all():
         return train_dataset, val_dataset, test_dataset, sc
 
-    # normalize dataset
+    # normalize graph nodes data
     all_timesteps, num_features, num_nodes = nodes_mats.shape
     val_timesteps = val_dataset['nodes'].shape[0]
     stacked_tr_nodes_arr = train_dataset["nodes"].transpose(0, 2, 1).reshape(-1, num_features)
@@ -103,7 +111,7 @@ def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, show_inf
     val_dataset['nodes'] = norm_val_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
     test_dataset['nodes'] = norm_test_nodes_arr.reshape(-1, num_nodes, num_features).transpose(0, 2, 1)
     logger.info("===== Normalization info =====")
-    logger.info(f"Number of features seen during fit: {sc.n_features_in_}\nvariance for each feature: {sc.var_}\nmean for each feature: {sc.mean_}\nscale for each feature: {sc.scale_}")
+    logger.info(f"Graph_nodes, Number of features seen during fit: {sc.n_features_in_}\nvariance for each feature: {sc.var_}\nmean for each feature: {sc.mean_}\nscale for each feature: {sc.scale_}")
 
     if show_info:
         logger.info("===== Before normalization =====")

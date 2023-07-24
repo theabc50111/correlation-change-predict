@@ -62,8 +62,6 @@ if __name__ == "__main__":
                              help="input the number of training epochs")
     args_parser.add_argument("--seq_len", type=int, nargs='?', default=10,
                              help="input the number of sequence length")
-    args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
-                             help="input --save_model to save model weight and model info")
     args_parser.add_argument("--corr_type", type=str, nargs='?', default="pearson",
                              choices=["pearson", "cross_corr"],
                              help="input the type of correlation computing, the choices are [pearson, cross_corr]")
@@ -75,10 +73,14 @@ if __name__ == "__main__":
                              help="input the filtered mode of graph edges, look up the options by execute python ywt_library/data_module.py -h")
     args_parser.add_argument("--filt_quan", type=float, nargs='?', default=None,
                              help="input the filtered quantile of graph edges")
-    args_parser.add_argument("--discrete_bin", type=int, nargs='?', default=None,
-                             help="input the number of discrete bins of graph edges")
+    args_parser.add_argument("--quan_discrete_bins", type=int, nargs='?', default=None,
+                             help="input the number of quantile discrete bins of graph edges")
+    args_parser.add_argument("--custom_discrete_bins", type=float, nargs='*', default=None,
+                             help="input the custom discrete boundaries(bins) of graph edges")
     args_parser.add_argument("--graph_nodes_v_mode", type=str, nargs='?', default=None,
                              help="Decide mode of nodes' vaules of graph_nodes_matrix, look up the options by execute python ywt_library/data_module.py -h")
+    args_parser.add_argument("--target_mats_path", type=str, nargs='?', default=None,
+                             help="input the relative path of target matrices, the base directory of path is data_cfg[DIR][PIPELINE_DATA_DIR])/data_cfg[DATASETS][data_implement][OUTPUT_FILE_NAME_BASIS] + train_items_setting")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
@@ -113,10 +115,18 @@ if __name__ == "__main__":
                              help="input the number of gru hidden size")
     args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=0.05,
                              help="input the absolute tolerance of edge acc loss")
+    args_parser.add_argument("--output_type", type=str, nargs='?', default=None,
+                             choices=["discretize"],
+                             help="input the type of output, the choices are [discretize]")
+    args_parser.add_argument("--output_bins", type=float, nargs='*', default=None,
+                             help="input the bins of output")
+    args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                             help="input --save_model to save model weight and model info")
     ARGS = args_parser.parse_args()
     assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
-    assert (bool(ARGS.filt_mode) != bool(ARGS.discrete_bin)) or (ARGS.filt_mode is None and ARGS.discrete_bin is None), "filt_mode and discrete_bin must be both not input or one input"
+    assert (bool(ARGS.filt_mode) != bool(ARGS.quan_discrete_bins)) or (ARGS.filt_mode is None and ARGS.quan_discrete_bins is None), "filt_mode and quan_discrete_bins must be both not input or one input"
+    assert (ARGS.output_type == "discretize") == (ARGS.output_bins is not None), "output_type and output_bins must be both input or not input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -139,12 +149,15 @@ if __name__ == "__main__":
     s_l, w_l = ARGS.corr_stride, ARGS.corr_window
     if ARGS.filt_mode:
         graph_adj_mode_dir = f"filtered_graph_adj_mat/{ARGS.filt_mode}-quan{str(ARGS.filt_quan).replace('.', '')}"
-    elif ARGS.discrete_bin:
-        graph_adj_mode_dir = f"discretize_graph_adj_mat/discrete_bin{ARGS.discrete_bin}"
+    elif ARGS.quan_discrete_bins:
+        graph_adj_mode_dir = f"quan_discretize_graph_adj_mat/bins{ARGS.quan_discrete_bins}"
+    elif ARGS.custom_discrete_bins:
+        graph_adj_mode_dir = f"custom_discretize_graph_adj_mat/bins_{'_'.join((str(f) for f in ARGS.custom_discrete_bins)).replace('.', '')}"
     else:
         graph_adj_mode_dir = "graph_adj_mat"
     graph_adj_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.corr_type}/{graph_adj_mode_dir}"
     graph_node_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/graph_node_mat"
+    target_mat_dir = Path(data_cfg["DIRS"]["PIPELINE_DATA_DIR"])/f"{output_file_name}/{ARGS.target_mats_path}"
     mts_corr_ad_model_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     mts_corr_ad_model_log_dir = current_dir/f'save_models/mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_2_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
@@ -170,10 +183,12 @@ if __name__ == "__main__":
     is_training, train_count = True, 0
     gra_edges_data_mats = np.load(graph_adj_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     gra_nodes_data_mats = np.load(graph_node_mat_dir/f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
-    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(gra_edges_data_mats, gra_nodes_data_mats)
+    target_mats = np.load(target_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy") if ARGS.target_mats_path else None
+    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(edges_mats=gra_edges_data_mats, nodes_mats=gra_nodes_data_mats, target_mats=target_mats)
     basic_model_cfg = {"filt_mode": ARGS.filt_mode,
                        "filt_quan": ARGS.filt_quan,
-                       "discrete_bin": ARGS.discrete_bin,
+                       "quan_discrete_bins": ARGS.quan_discrete_bins,
+                       "custom_discrete_bins": ARGS.custom_discrete_bins,
                        "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                        "tr_epochs": ARGS.tr_epochs,
                        "batch_size": ARGS.batch_size,
@@ -192,7 +207,9 @@ if __name__ == "__main__":
                        "num_node_features": norm_train_dataset["nodes"].shape[1],
                        "num_edge_features": 1,
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
-                       "decoder": MLPDecoder}
+                       "decoder": MLPDecoder,
+                       "output_type": ARGS.output_type,
+                       "output_bins": ARGS.output_bins}
 
     mts_corr_ad_cfg = basic_model_cfg.copy()
     baseline_gru_cfg = basic_model_cfg.copy()
