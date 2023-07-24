@@ -111,6 +111,8 @@ if __name__ == "__main__":
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
+    args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=0.05,
+                             help="input the absolute tolerance of edge acc loss")
     ARGS = args_parser.parse_args()
     assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
@@ -220,7 +222,7 @@ if __name__ == "__main__":
     logger.info("="*80)
 
     loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
-                     "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {}}}
+                     "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {"atol": ARGS.edge_acc_loss_atol}}}
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1

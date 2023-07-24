@@ -495,5 +495,3 @@ if __name__ == "__main__":
                          data_gen_cfg=DATA_GEN_CFG,
                          nodes_v_mode=args.graph_nodes_v_mode,
                          save_dir=gra_node_mat_dir if args.save_corr_graph_arr else None)
-
-

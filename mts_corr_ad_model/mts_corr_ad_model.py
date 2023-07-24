@@ -82,6 +82,7 @@ class GraphTimeSeriesDataset(Dataset):
         self.seq_len = model_cfg['seq_len']
         graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
         graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        y_graph_adj_mats = graph_adj_mats
         final_batch_head = ((graph_time_len//self.batch_size)-1)*self.batch_size
         last_seq_len = graph_time_len-final_batch_head-self.batch_size
         data_list = []
@@ -93,8 +94,8 @@ class GraphTimeSeriesDataset(Dataset):
                 batch_data_list = []
                 for data_batch_idx in range(self.batch_size):
                     g_t = batch_head + seq_t + data_batch_idx
-                    edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t + 1])), axis=1))
-                    edge_attr_next_t = torch.tensor(graph_adj_mats[g_t + 1][~np.isnan(graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float64)
+                    edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(y_graph_adj_mats[g_t + 1])), axis=1))
+                    edge_attr_next_t = torch.tensor(y_graph_adj_mats[g_t + 1][~np.isnan(y_graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float64)
                     node_attr_next_t = torch.tensor(graph_nodes_mats[g_t + 1], dtype=torch.float64)
                     data_y = Data(x=node_attr_next_t, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
                     edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t])), axis=1))

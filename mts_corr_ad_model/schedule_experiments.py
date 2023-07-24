@@ -25,12 +25,13 @@ gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
 gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 32"]
+edge_acc_loss_atol_list = ["--edge_acc_loss_atol 0.33"]  # ["--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 
 args_values = list(product(data_implement_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, discrete_bin_list, nodes_v_mode_list, discr_loss_list,
                            discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list, graph_enc_weight_l2_reg_lambda_list, drop_pos_list,
-                           drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list))
+                           drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list, edge_acc_loss_atol_list))
 args_keys = ["data_implement", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "discrete_bin", "nodes_v_mode", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
-             "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h"]
+             "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "edge_acc_loss_atol"]
 args_list = []
 for args_value in args_values:
     args_dict = dict(zip(args_keys, args_value))
@@ -92,6 +93,6 @@ if __name__ == "__main__":
         home_directory = os.path.expanduser("~")
 
         cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--log_suffix {ARGS.log_suffix}", f"--cuda_device {ARGS.cuda_device}"] + list(model_args.values())
-        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
+        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
         # if x[9]==1 and x[10]==4:
         #     print(prev_model_time_len, model_args)
