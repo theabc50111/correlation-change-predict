@@ -217,12 +217,12 @@ class MTSCorrAD(torch.nn.Module):
         if output_type == "discretize":
             bins = torch.tensor(self.model_cfg['output_bins'])
             num_bins = len(bins)-1
-            tmp_tensor = torch.bucketize(pred_graph_adj, bins, right=True)
-            tmp_tensor[tmp_tensor == 0] = 1
-            tmp_tensor[tmp_tensor > num_bins] = num_bins
+            tmp_tensor = torch.bucketize(pred_graph_adj, bins, right=True).to(torch.float64)
+            tmp_tensor = torch.clamp(tmp_tensor, min=1, max=num_bins, out=tmp_tensor)
+            tmp_tensor.requires_grad = True
             discretize_values = np.linspace(-1, 1, num_bins)
             for discretize_tag, discretize_value in zip(torch.unique(tmp_tensor), discretize_values):
-                tmp_tensor[tmp_tensor == discretize_tag] = discretize_value
+                tmp_tensor = torch.where(tmp_tensor == discretize_tag, discretize_value, tmp_tensor)
             pred_graph_adj = tmp_tensor
 
         return pred_graph_adj
@@ -237,7 +237,7 @@ class MTSCorrAD(torch.nn.Module):
         if train_data is None:
             return self
 
-        best_model_info = {"num_training_graphs": len(train_data),
+        best_model_info = {"num_training_graphs": len(train_data['edges']),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
                            "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],

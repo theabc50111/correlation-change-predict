@@ -254,7 +254,7 @@ if __name__ == "__main__":
                 best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info = model_3.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
-                best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset['edges'], val_data=norm_val_dataset['edges'], epochs=ARGS.tr_epochs)
+                best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, epochs=ARGS.tr_epochs)
             if "GAE" in ARGS.train_models:
                 gae_model = GAE(gae_cfg)
                 best_gae_model, best_gae_model_info = gae_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)

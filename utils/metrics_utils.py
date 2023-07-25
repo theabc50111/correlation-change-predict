@@ -88,6 +88,7 @@ class EdgeAccuracyLoss(torch.nn.Module):
         super(EdgeAccuracyLoss, self).__init__()
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, atol: float = 0.05) -> torch.Tensor:
-        edge_acc = np.isclose(input.cpu().detach().numpy(), target.cpu().detach().numpy(), atol=atol, rtol=0).mean()
+        edge_acc = torch.isclose(input, target, atol=atol, rtol=0).to(torch.float64).mean()
+        edge_acc.requires_grad = True
         loss = 1 - edge_acc
-        return torch.tensor(loss)
+        return loss
