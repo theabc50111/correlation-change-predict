@@ -49,6 +49,7 @@ class BaselineGRU(torch.nn.Module):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
+
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
         gru_output, gru_hn = self.gru(x)
         # Decoder (Graph Adjacency Reconstruction)
@@ -56,15 +57,13 @@ class BaselineGRU(torch.nn.Module):
             pred = self.decoder(gru_output[data_batch_idx, -1, :])  # gru_output[-1] => only take last time-step
             pred_graph_adj = pred.reshape(1, -1) if data_batch_idx == 0 else torch.cat((pred_graph_adj, pred.reshape(1, -1)), dim=0)
         if output_type == "discretize":
-            bins = torch.tensor(self.model_cfg['output_bins'])
+            bins = torch.tensor(self.model_cfg['output_bins']).reshape(-1, 1)
             num_bins = len(bins)-1
-            tmp_tensor = torch.bucketize(pred_graph_adj, bins, right=True).to(torch.float64)
-            tmp_tensor = torch.clamp(tmp_tensor, min=1, max=num_bins, out=tmp_tensor)
-            tmp_tensor.requires_grad = True
+            bins = torch.concat((bins[:-1], bins[1:]), dim=1)
             discretize_values = np.linspace(-1, 1, num_bins)
-            for discretize_tag, discretize_value in zip(torch.unique(tmp_tensor), discretize_values):
-                tmp_tensor = torch.where(tmp_tensor == discretize_tag, discretize_value, tmp_tensor)
-            pred_graph_adj = tmp_tensor
+            for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
+                pred_graph_adj = torch.where((pred_graph_adj <= upper) & (pred_graph_adj > lower), discretize_value, pred_graph_adj)
+            pred_graph_adj = torch.where(pred_graph_adj < bins.min(), bins.min(), pred_graph_adj)
 
         return pred_graph_adj
 
@@ -87,7 +86,6 @@ class BaselineGRU(torch.nn.Module):
                            "optimizer": str(self.optimizer),
                            "loss_fn": str(self.loss_fn.__name__ if hasattr(self.loss_fn, '__name__') else str(self.loss_fn)),
                            "min_val_loss": float('inf')}
-        batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
 
         best_model = []
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
@@ -95,6 +93,7 @@ class BaselineGRU(torch.nn.Module):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gru_gradient": torch.zeros(1), "decoder_gradient": torch.zeros(1)}
             # Train on batches
+            batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             for batch_data in batch_data_generator:
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])

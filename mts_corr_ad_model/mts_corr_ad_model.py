@@ -214,16 +214,15 @@ class MTSCorrAD(torch.nn.Module):
 
         # Decoder (Graph Adjacency Reconstruction)
         pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
+
         if output_type == "discretize":
-            bins = torch.tensor(self.model_cfg['output_bins'])
+            bins = torch.tensor(self.model_cfg['output_bins']).reshape(-1, 1)
             num_bins = len(bins)-1
-            tmp_tensor = torch.bucketize(pred_graph_adj, bins, right=True).to(torch.float64)
-            tmp_tensor = torch.clamp(tmp_tensor, min=1, max=num_bins, out=tmp_tensor)
-            tmp_tensor.requires_grad = True
+            bins = torch.concat((bins[:-1], bins[1:]), dim=1)
             discretize_values = np.linspace(-1, 1, num_bins)
-            for discretize_tag, discretize_value in zip(torch.unique(tmp_tensor), discretize_values):
-                tmp_tensor = torch.where(tmp_tensor == discretize_tag, discretize_value, tmp_tensor)
-            pred_graph_adj = tmp_tensor
+            for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
+                pred_graph_adj = torch.where((pred_graph_adj <= upper) & (pred_graph_adj > lower), discretize_value, pred_graph_adj)
+            pred_graph_adj = torch.where(pred_graph_adj < bins.min(), bins.min(), pred_graph_adj)
 
         return pred_graph_adj
 
@@ -296,6 +295,7 @@ class MTSCorrAD(torch.nn.Module):
                 batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
+
                 # compute graph embeds
                 pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                 y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
