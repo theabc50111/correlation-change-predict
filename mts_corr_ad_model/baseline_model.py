@@ -101,7 +101,7 @@ class BaselineGRU(torch.nn.Module):
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
                 batch_loss = self.loss_fn(pred, y)
-                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=self.model_cfg['edge_acc_loss_atol'], rtol=0).mean()
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
@@ -146,7 +146,7 @@ class BaselineGRU(torch.nn.Module):
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
                 batch_loss = self.loss_fn(pred, y)
-                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
+                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=self.model_cfg['edge_acc_loss_atol'], rtol=0).mean()
                 test_edge_acc += edge_acc / num_batches
                 test_loss += batch_loss / num_batches
 
