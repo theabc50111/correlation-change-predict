@@ -75,9 +75,9 @@ class BaselineGRU(torch.nn.Module):
 
         best_model_info = {"num_training_graphs": len(train_data['edges']),
                            "filt_mode": self.model_cfg['filt_mode'],
+                           "filt_quan": self.model_cfg['filt_quan'],
                            "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
                            "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
-                           "filt_quan": self.model_cfg['filt_quan'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
                            "batches_per_epoch": ceil(len(train_data['edges'])//self.model_cfg['batch_size']),
                            "epochs": epochs,
@@ -85,8 +85,11 @@ class BaselineGRU(torch.nn.Module):
                            "seq_len": self.model_cfg['seq_len'],
                            "optimizer": str(self.optimizer),
                            "loss_fn": str(self.loss_fn.__name__ if hasattr(self.loss_fn, '__name__') else str(self.loss_fn)),
-                           "min_val_loss": float('inf')}
-
+                           "min_val_loss": float('inf'),
+                           "output_type": self.model_cfg['output_type'],
+                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
+                           "target_mats_bins": self.model_cfg['target_mats_bins'],
+                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol']}
         best_model = []
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):

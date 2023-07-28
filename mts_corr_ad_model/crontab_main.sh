@@ -155,7 +155,8 @@ while [[ $# -gt 0 ]]; do
       ;;
 
     --custom_discrete_bins)
-      custom_discrete_bins="--custom_discrete_bins $2"
+      custom_discrete_bins_args+=("$2")
+      custom_discrete_bins="--custom_discrete_bins ${custom_discrete_bins_args[@]}"
       shift 2
       ;;
 

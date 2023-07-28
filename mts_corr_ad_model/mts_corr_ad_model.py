@@ -254,7 +254,11 @@ class MTSCorrAD(torch.nn.Module):
                            "drop_p": self.model_cfg["drop_p"],
                            "graph_enc": type(self.graph_encoder).__name__,
                            "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
-                           "min_val_loss": float('inf')}
+                           "min_val_loss": float('inf'),
+                           "output_type": self.model_cfg['output_type'],
+                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
+                           "target_mats_bins": self.model_cfg['target_mats_bins'],
+                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol']}
         best_model = []
 
         num_nodes = self.model_cfg["num_nodes"]

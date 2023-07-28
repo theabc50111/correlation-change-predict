@@ -188,7 +188,7 @@ if __name__ == "__main__":
     basic_model_cfg = {"filt_mode": ARGS.filt_mode,
                        "filt_quan": ARGS.filt_quan,
                        "quan_discrete_bins": ARGS.quan_discrete_bins,
-                       "custom_discrete_bins": ARGS.custom_discrete_bins,
+                       "custom_discrete_bins": '_'.join((str(f) for f in ARGS.custom_discrete_bins)).replace('.', '') if ARGS.custom_discrete_bins else None,
                        "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                        "tr_epochs": ARGS.tr_epochs,
                        "batch_size": ARGS.batch_size,
@@ -209,7 +209,9 @@ if __name__ == "__main__":
                        "graph_encoder": GineEncoder if ARGS.gra_enc == "gine" else GinEncoder,
                        "decoder": MLPDecoder,
                        "output_type": ARGS.output_type,
-                       "output_bins": ARGS.output_bins}
+                       "output_bins": ARGS.output_bins,
+                       "target_mats_bins": ARGS.target_mats_path.split("/")[-1] if ARGS.target_mats_path else None,
+                       "edge_acc_loss_atol": ARGS.edge_acc_loss_atol}
 
     mts_corr_ad_cfg = basic_model_cfg.copy()
     baseline_gru_cfg = basic_model_cfg.copy()
