@@ -31,6 +31,7 @@ ARGUMENT_LIST=(
   "gru_l"
   "gru_h"
   "edge_acc_loss_atol"
+  "use_bin_edge_acc_loss"
   "output_type"
   "output_bins"
 )
@@ -63,6 +64,7 @@ gra_enc_h=""
 gru_l=""
 gru_h=""
 edge_acc_loss_atol=""
+use_bin_edge_acc_loss=""
 output_type=""
 output_bins=""
 save_model=""
@@ -111,11 +113,6 @@ while [[ $# -gt 0 ]]; do
     --train_models)
       train_models_args+=("$2")
       train_models="--train_models ${train_models_args[@]}"
-      shift 2
-      ;;
-
-    --save_model)
-      save_model="--save_model"
       shift 2
       ;;
 
@@ -231,6 +228,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --use_bin_edge_acc_loss)
+      use_bin_edge_acc_loss="--use_bin_edge_acc_loss"
+      shift 2
+      ;;
+
     --output_type)
       output_type="--output_type $2"
       shift 2
@@ -239,6 +241,11 @@ while [[ $# -gt 0 ]]; do
     --output_bins)
       output_bins_args+=("$2")
       output_bins="--output_bins ${output_bins_args[@]}"
+      shift 2
+      ;;
+
+    --save_model)
+      save_model="--save_model"
       shift 2
       ;;
 
@@ -259,6 +266,6 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> $log_file
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_type $corr_window $corr_stride $filt_mode $filt_quan $quan_discrete_bins $custom_discrete_bins $graph_nodes_v_mode $target_mats_path $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $edge_acc_loss_atol $output_type $output_bins $save_model >> "$log_file" 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_type $corr_window $corr_stride $filt_mode $filt_quan $quan_discrete_bins $custom_discrete_bins $graph_nodes_v_mode $target_mats_path $cuda_device $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gru_l $gru_h $edge_acc_loss_atol $use_bin_edge_acc_loss $output_type $output_bins $save_model >> "$log_file" 2>&1
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> $log_file
