@@ -16,9 +16,6 @@ import yaml
 from torch.nn import MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from metrics_utils import EdgeAccuracyLoss
-from utils import split_and_norm_data
-
 from baseline_model import BaselineGRU
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
@@ -26,6 +23,9 @@ from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
 from mts_corr_ad_model_2 import MTSCorrAD2
 from mts_corr_ad_model_3 import MTSCorrAD3
+
+from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
+from utils import convert_str_bins_list, split_and_norm_data
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -113,8 +113,10 @@ if __name__ == "__main__":
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
-    args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=0.05,
+    args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
                              help="input the absolute tolerance of edge acc loss")
+    args_parser.add_argument("--use_bin_edge_acc_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
+                             help="input --use_bin_edge_acc_loss to use BinsEdgeaccuracyLoss")
     args_parser.add_argument("--output_type", type=str, nargs='?', default=None,
                              choices=["discretize"],
                              help="input the type of output, the choices are [discretize]")
@@ -127,6 +129,8 @@ if __name__ == "__main__":
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
     assert (bool(ARGS.filt_mode) != bool(ARGS.quan_discrete_bins)) or (ARGS.filt_mode is None and ARGS.quan_discrete_bins is None), "filt_mode and quan_discrete_bins must be both not input or one input"
     assert (ARGS.output_type == "discretize") == (ARGS.output_bins is not None), "output_type and output_bins must be both input or not input"
+    assert bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol can only be selected one as input."
+    assert bool(ARGS.use_bin_edge_acc_loss) == bool(ARGS.target_mats_path), "use_bin_edge_acc_loss and target_mats_path must be both input or not input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -211,7 +215,8 @@ if __name__ == "__main__":
                        "output_type": ARGS.output_type,
                        "output_bins": ARGS.output_bins,
                        "target_mats_bins": ARGS.target_mats_path.split("/")[-1] if ARGS.target_mats_path else None,
-                       "edge_acc_loss_atol": ARGS.edge_acc_loss_atol}
+                       "edge_acc_loss_atol": ARGS.edge_acc_loss_atol,
+                       "use_bin_edge_acc_loss": ARGS.use_bin_edge_acc_loss}
 
     mts_corr_ad_cfg = basic_model_cfg.copy()
     baseline_gru_cfg = basic_model_cfg.copy()
@@ -240,8 +245,15 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    loss_fns_dict = {"fns": [MSELoss(), EdgeAccuracyLoss()],
-                     "fn_args": {"MSELoss()": {}, "EdgeAccuracyLoss()": {"atol": ARGS.edge_acc_loss_atol}}}
+    loss_fns_dict = {"fns": [MSELoss()],
+                     "fn_args": {"MSELoss()": {}}}
+    if ARGS.use_bin_edge_acc_loss is True:
+        bins_list = convert_str_bins_list(ARGS.target_mats_path.split("/")[-1])
+        loss_fns_dict["fns"].append(BinsEdgeAccuracyLoss())
+        loss_fns_dict["fn_args"].update({"BinsEdgeAccuracyLoss()": {"bins_list": bins_list}})
+    else:
+        loss_fns_dict["fns"].append(EdgeAccuracyLoss())
+        loss_fns_dict["fn_args"].update({"EdgeAccuracyLoss()": {"atol": ARGS.edge_acc_loss_atol}})
     while (is_training is True) and (train_count < 100):
         try:
             train_count += 1

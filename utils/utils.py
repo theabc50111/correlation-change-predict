@@ -137,3 +137,25 @@ def find_abs_max_cross_corr(x):
     cross_correlation = np.correlate(x, x, mode='full')
     lag = np.argmax(np.absolute(cross_correlation))
     return cross_correlation[lag]
+
+
+def convert_str_bins_list(str_bins: str) -> list:
+    """Converts a string of bins to a list of bins.
+
+    Args:
+      str_bins: A string of bins.
+
+    Returns:
+      A list of bins.
+    """
+
+    bins_list = []
+    for str_bin in str_bins.replace("bins_", "").split("_"):
+        if "-" in str_bin:
+            new_str_bin = str_bin[:2]+"."+str_bin[2:]
+            bins_list.append(float(new_str_bin))
+        else:
+            new_str_bin = str_bin[:1]+"."+str_bin[1:]
+            bins_list.append(float(new_str_bin))
+
+    return bins_list

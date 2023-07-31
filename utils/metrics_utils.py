@@ -92,3 +92,27 @@ class EdgeAccuracyLoss(torch.nn.Module):
         edge_acc.requires_grad = True
         loss = 1 - edge_acc
         return loss
+
+
+class BinsEdgeAccuracyLoss(torch.nn.Module):
+    def __init__(self):
+        super(BinsEdgeAccuracyLoss, self).__init__()
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor, bins_list: list) -> torch.Tensor:
+        bins = torch.tensor(bins_list).reshape(-1, 1)
+        num_bins = len(bins)-1
+        bins = torch.concat((bins[:-1], bins[1:]), dim=1)
+        edge_correct = 0
+        discretize_values = np.linspace(-1, 1, num_bins)
+        for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
+            bin_center = (lower + upper) / 2
+            atol = (upper - lower) / 2
+            mask_input = torch.where((input > lower) & (input <= upper), input, -12345)
+            convert_target = torch.where(target == discretize_value, bin_center, 12345)
+            edge_correct += torch.isclose(mask_input, convert_target, atol=atol, rtol=0).sum()
+        lowest_bin_mask_input = torch.where(input == bins.min(), input, -12345)  # For the case of lowest bin
+        edge_correct += torch.isclose(lowest_bin_mask_input, target, atol=0, rtol=0).sum()  # For the case of lowest bin
+        edge_acc = edge_correct / torch.numel(input)
+        edge_acc.requires_grad = True
+        loss = 1 - edge_acc
+        return loss

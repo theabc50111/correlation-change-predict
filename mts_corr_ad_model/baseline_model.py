@@ -20,9 +20,9 @@ from torch_geometric.nn.models.autoencoder import InnerProductDecoder
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from utils import split_and_norm_data
-
 from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
+
+from utils import split_and_norm_data
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -89,7 +89,8 @@ class BaselineGRU(torch.nn.Module):
                            "output_type": self.model_cfg['output_type'],
                            "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
                            "target_mats_bins": self.model_cfg['target_mats_bins'],
-                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol']}
+                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
+                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
         best_model = []
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):

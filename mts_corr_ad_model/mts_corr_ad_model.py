@@ -26,9 +26,6 @@ from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from metrics_utils import EdgeAccuracyLoss
-from utils import split_and_norm_data
-
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
 
@@ -258,7 +255,8 @@ class MTSCorrAD(torch.nn.Module):
                            "output_type": self.model_cfg['output_type'],
                            "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
                            "target_mats_bins": self.model_cfg['target_mats_bins'],
-                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol']}
+                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
+                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
         best_model = []
 
         num_nodes = self.model_cfg["num_nodes"]
@@ -280,16 +278,16 @@ class MTSCorrAD(torch.nn.Module):
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=loss_fns["fn_args"]["EdgeAccuracyLoss()"].get("atol", 0.05), rtol=0).mean()
-                    batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
-                    loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
-                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
                         batch_loss += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
                         epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+                        if "EdgeAcc" in fn_name:
+                            edge_acc = 1-loss
+                            batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
@@ -360,15 +358,15 @@ class MTSCorrAD(torch.nn.Module):
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    edge_acc = np.isclose(pred_graph_adj.cpu().detach().numpy(), y_graph_adj.cpu().detach().numpy(), atol=0.05, rtol=0).mean()
-                    test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
-                    loss_fns["fn_args"]["MSELoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
-                    loss_fns["fn_args"]["EdgeAccuracyLoss()"].update({"input": pred_graph_adj, "target":  y_graph_adj})
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
                         test_loss += loss/(self.num_val_batches*self.model_cfg['batch_size'])
+                        if "EdgeAcc" in fn_name:
+                            edge_acc = 1-loss
+                            test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
 
         return test_loss, test_edge_acc
 
