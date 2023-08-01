@@ -224,17 +224,10 @@ if __name__ == "__main__":
     mts_corr_ad_cfg = basic_model_cfg.copy()
     baseline_gru_cfg = basic_model_cfg.copy()
     gae_cfg = basic_model_cfg.copy()
-    ###mts_corr_ad_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
-    ###                                  "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
-    ###                                  "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
     mts_corr_ad_cfg["pretrain_encoder"] = ARGS.pretrain_encoder
     mts_corr_ad_cfg["pretrain_decoder"] = ARGS.pretrain_decoder
-    ###baseline_gru_cfg["num_tr_batches"] = ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size)
     baseline_gru_cfg["gru_in_dim"] = (norm_train_dataset['edges'].shape[1])**2
     gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
-    ###gae_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
-    ###                          "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
-    ###                          "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
 
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
