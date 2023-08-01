@@ -18,7 +18,7 @@ import matplotlib as mpl
 import numpy as np
 import torch
 import yaml
-from torch.nn import GRU, MSELoss
+from torch.nn import GRU
 from torch.optim.lr_scheduler import ConstantLR, MultiStepLR, SequentialLR
 from torch_geometric.data import Data, DataLoader, Dataset
 from torch_geometric.nn import summary
@@ -186,13 +186,11 @@ class MTSCorrAD(torch.nn.Module):
         if self.model_cfg["pretrain_decoder"]:
             self.decoder.load_state_dict(torch.load(self.model_cfg["pretrain_decoder"]))
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
         self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
         observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
-        self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
@@ -269,7 +267,6 @@ class MTSCorrAD(torch.nn.Module):
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             for batch_idx, batch_data in enumerate(train_loader):
-                self.optimizer.zero_grad()
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)
                 for data_batch_idx in range(self.model_cfg['batch_size']):
@@ -283,17 +280,18 @@ class MTSCorrAD(torch.nn.Module):
                         loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        batch_loss += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
-                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])
+                        batch_loss += loss/self.model_cfg['batch_size']
+                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
                         if "EdgeAcc" in fn_name:
                             edge_acc = 1-loss
-                            batch_edge_acc += edge_acc/(self.num_tr_batches*self.model_cfg['batch_size'])
+                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
                     batch_loss += gra_enc_weight_l2_penalty
                 else:
                     gra_enc_weight_l2_penalty = 0
+                self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
@@ -302,9 +300,9 @@ class MTSCorrAD(torch.nn.Module):
                 pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                 y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
-                epoch_metrics["tr_loss"] += batch_loss
-                epoch_metrics["tr_edge_acc"] += batch_edge_acc
-                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty
+                epoch_metrics["tr_loss"] += batch_loss/self.num_tr_batches
+                epoch_metrics["tr_edge_acc"] += batch_edge_acc/self.num_tr_batches
+                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty/self.num_tr_batches
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
@@ -351,6 +349,8 @@ class MTSCorrAD(torch.nn.Module):
         test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], target_mats=test_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
         with torch.no_grad():
             for batch_data in test_loader:
+                batch_loss = torch.zeros(1)
+                batch_edge_acc = torch.zeros(1)
                 for data_batch_idx in range(self.model_cfg['batch_size']):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
@@ -363,10 +363,12 @@ class MTSCorrAD(torch.nn.Module):
                         loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
-                        test_loss += loss/(self.num_val_batches*self.model_cfg['batch_size'])
+                        batch_loss += loss/self.model_cfg['batch_size']
                         if "EdgeAcc" in fn_name:
                             edge_acc = 1-loss
-                            test_edge_acc += edge_acc/(self.num_val_batches*self.model_cfg['batch_size'])
+                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                test_loss += batch_loss/self.num_val_batches
+                test_edge_acc += batch_edge_acc/self.num_val_batches
 
         return test_loss, test_edge_acc
 

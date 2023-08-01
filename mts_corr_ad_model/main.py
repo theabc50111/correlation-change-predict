@@ -16,6 +16,9 @@ import yaml
 from torch.nn import MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
+from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
+from utils import convert_str_bins_list, split_and_norm_data
+
 from baseline_model import BaselineGRU
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
@@ -23,9 +26,6 @@ from graph_auto_encoder import GAE
 from mts_corr_ad_model import MTSCorrAD
 from mts_corr_ad_model_2 import MTSCorrAD2
 from mts_corr_ad_model_3 import MTSCorrAD3
-
-from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
-from utils import convert_str_bins_list, split_and_norm_data
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -196,6 +196,9 @@ if __name__ == "__main__":
                        "graph_nodes_v_mode": ARGS.graph_nodes_v_mode,
                        "tr_epochs": ARGS.tr_epochs,
                        "batch_size": ARGS.batch_size,
+                       "num_batches": {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
+                                       "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
+                                       "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)},
                        "seq_len": ARGS.seq_len,
                        "learning_rate": ARGS.learning_rate,
                        "weight_decay": ARGS.weight_decay,
@@ -221,17 +224,17 @@ if __name__ == "__main__":
     mts_corr_ad_cfg = basic_model_cfg.copy()
     baseline_gru_cfg = basic_model_cfg.copy()
     gae_cfg = basic_model_cfg.copy()
-    mts_corr_ad_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
-                                      "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
-                                      "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
+    ###mts_corr_ad_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
+    ###                                  "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
+    ###                                  "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
     mts_corr_ad_cfg["pretrain_encoder"] = ARGS.pretrain_encoder
     mts_corr_ad_cfg["pretrain_decoder"] = ARGS.pretrain_decoder
-    baseline_gru_cfg["num_tr_batches"] = ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size)
+    ###baseline_gru_cfg["num_tr_batches"] = ceil(len(norm_train_dataset['edges']-1)/ARGS.batch_size)
     baseline_gru_cfg["gru_in_dim"] = (norm_train_dataset['edges'].shape[1])**2
     gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
-    gae_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
-                              "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
-                              "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
+    ###gae_cfg["num_batches"] = {"train": ((len(norm_train_dataset["edges"])-1)//ARGS.batch_size),
+    ###                          "val": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size),
+    ###                          "test": ((len(norm_val_dataset["edges"])-1)//ARGS.batch_size)}
 
     # show info
     logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
@@ -268,7 +271,7 @@ if __name__ == "__main__":
                 best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info = model_3.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
-                best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, epochs=ARGS.tr_epochs)
+                best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs)
             if "GAE" in ARGS.train_models:
                 gae_model = GAE(gae_cfg)
                 best_gae_model, best_gae_model_info = gae_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)

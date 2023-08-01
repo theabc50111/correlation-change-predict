@@ -2,6 +2,7 @@
 # coding: utf-8
 import argparse
 import copy
+import functools
 import json
 import logging
 import sys
@@ -20,9 +21,9 @@ from torch_geometric.nn.models.autoencoder import InnerProductDecoder
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
-
 from utils import split_and_norm_data
+
+from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -42,12 +43,19 @@ class BaselineGRU(torch.nn.Module):
     def __init__(self, model_cfg: dict, **unused_kwargs):
         super(BaselineGRU, self).__init__()
         self.model_cfg = model_cfg
-        self.num_tr_batches = self.model_cfg['num_tr_batches']
+        # create data loader
+        self.num_tr_batches = self.model_cfg["num_batches"]['train']
+
+        # set model components
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        self.loss_fn = MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
+        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
+        observe_model_cfg['optimizer'] = str(self.optimizer)
+        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
+
+        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
@@ -67,24 +75,28 @@ class BaselineGRU(torch.nn.Module):
 
         return pred_graph_adj
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, epochs: int = 1000):
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000):
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
         if train_data is None:
             return self
 
+        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         best_model_info = {"num_training_graphs": len(train_data['edges']),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
                            "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
                            "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": ceil(len(train_data['edges'])//self.model_cfg['batch_size']),
+                           "batches_per_epoch": num_batches,
                            "epochs": epochs,
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
                            "optimizer": str(self.optimizer),
-                           "loss_fn": str(self.loss_fn.__name__ if hasattr(self.loss_fn, '__name__') else str(self.loss_fn)),
+                           "opt_scheduler": {},
+                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
+                           "drop_pos": self.model_cfg["drop_pos"],
+                           "drop_p": self.model_cfg["drop_p"],
                            "min_val_loss": float('inf'),
                            "output_type": self.model_cfg['output_type'],
                            "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
@@ -92,17 +104,28 @@ class BaselineGRU(torch.nn.Module):
                            "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
                            "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
         best_model = []
-        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1), "gru_gradient": torch.zeros(1), "decoder_gradient": torch.zeros(1)}
+            epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             for batch_data in batch_data_generator:
+                batch_loss = torch.zeros(1)
+                batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
-                batch_loss = self.loss_fn(pred, y)
-                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=self.model_cfg['edge_acc_loss_atol'], rtol=0).mean()
+                for fn in loss_fns["fns"]:
+                    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                    loss_fns["fn_args"][fn_name].update({"input": pred, "target":  y})
+                    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                    loss = partial_fn()
+                    batch_loss += loss
+                    epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
+                    if "EdgeAcc" in fn_name:
+                        edge_acc = 1-loss
+                        batch_edge_acc += edge_acc
+
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
@@ -113,7 +136,7 @@ class BaselineGRU(torch.nn.Module):
                 epoch_metrics["decoder_gradient"] += sum([p.grad.sum() for p in self.decoder.parameters() if p.grad is not None])/num_batches
 
             # Validation
-            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data)
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns)
 
             # record training history and save best model
             for k, v in epoch_metrics.items():
@@ -135,7 +158,7 @@ class BaselineGRU(torch.nn.Module):
 
         return best_model, best_model_info
 
-    def test(self, test_data: np.ndarray = None):
+    def test(self, test_data: np.ndarray = None, loss_fns: dict = None):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
@@ -143,11 +166,22 @@ class BaselineGRU(torch.nn.Module):
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil(len(test_data['edges'])//self.model_cfg['batch_size'])+1
             for batch_data in batch_data_generator:
+                batch_loss = torch.zeros(1)
+                batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
                 pred, y = pred.reshape(1, -1), y.reshape(1, -1)
-                batch_loss = self.loss_fn(pred, y)
-                edge_acc = np.isclose(pred.cpu().detach().numpy(), y.cpu().detach().numpy(), atol=self.model_cfg['edge_acc_loss_atol'], rtol=0).mean()
+
+                for fn in loss_fns["fns"]:
+                    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                    loss_fns["fn_args"][fn_name].update({"input": pred, "target":  y})
+                    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                    loss = partial_fn()
+                    batch_loss += loss
+                    if "EdgeAcc" in fn_name:
+                        edge_acc = 1-loss
+                        batch_edge_acc += edge_acc
+
                 test_edge_acc += edge_acc / num_batches
                 test_loss += batch_loss / num_batches
 
