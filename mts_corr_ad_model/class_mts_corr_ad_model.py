@@ -5,11 +5,13 @@ import copy
 import functools
 import json
 import logging
+import os
 import sys
 import traceback
 import warnings
 from collections import OrderedDict
 from datetime import datetime
+from itertools import product
 from pathlib import Path
 from pprint import pformat
 
@@ -18,16 +20,20 @@ import matplotlib as mpl
 import numpy as np
 import torch
 import yaml
-from torch.nn import GRU
+from torch.nn import GRU, MSELoss, Softmax
 from torch.optim.lr_scheduler import ConstantLR, MultiStepLR, SequentialLR
-from torch_geometric.data import Data, DataLoader, Dataset
+from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn import summary
 from torch_geometric.utils import unbatch, unbatch_edge_index
 from tqdm import tqdm
 
 sys.path.append("/workspace/correlation-change-predict/utils")
+from metrics_utils import EdgeAccuracyLoss
+from utils import split_and_norm_data
+
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
+from mts_corr_ad_model import GraphTimeSeriesDataset
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -52,125 +58,12 @@ mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 
-class GraphTimeSeriesDataset(Dataset):
-    def __init__(self, graph_adj_mats: np.ndarray, graph_nodes_mats: np.ndarray, target_mats: np.ndarray, model_cfg: dict, show_log: bool = True):
-        """
-        Create list of graph data:
-        In order to make the `DataLoader` combine sequencial graphs into a `Data` object, the arrange of self.data_list will not be sequencial.
-        For example, in the case of batch_size=3 and seq_len=5, the arrange of self.data_list is:
-            |<----batch_size---->|
-            |                    |
-        [[graph_t0, graph_t1, graph_t2],  ----------
-         [graph_t1, graph_t2, graph_t3],      ↓
-         [graph_t2, graph_t3, graph_t4],   seq_len
-         [graph_t3, graph_t4, graph_t5],      ↑
-         [graph_t4, graph_t5, graph_t6],  ----------
-         [graph_t3, graph_t4, graph_t5],  ----------
-         [graph_t4, graph_t5, graph_t6],      ↓
-         [graph_t5, graph_t6, graph_t7],   seq_len
-         [graph_t6, graph_t7, graph_t8],      ↑
-         [graph_t7, graph_t8, graph_t9],  ----------
-                        .
-                        .
-                        .
-         [graph_tn-2, graph_tn-1, graph_tn]]
-        """
-        self.batch_size = model_cfg['batch_size']
-        self.seq_len = model_cfg['seq_len']
-        graph_nodes_mats = graph_nodes_mats.transpose(0, 2, 1)
-        graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        y_graph_adj_mats = target_mats
-        final_batch_head = ((graph_time_len//self.batch_size)-1)*self.batch_size
-        last_seq_len = graph_time_len-final_batch_head-self.batch_size
-        data_list = []
-        for batch_head in range(0, final_batch_head+1, self.batch_size):
-            seq_data_list = []
-            for seq_t in range(self.seq_len):
-                if batch_head == final_batch_head and seq_t > last_seq_len:
-                    break
-                batch_data_list = []
-                for data_batch_idx in range(self.batch_size):
-                    g_t = batch_head + seq_t + data_batch_idx
-                    edge_index_next_t = torch.tensor(np.stack(np.where(~np.isnan(y_graph_adj_mats[g_t + 1])), axis=1))
-                    edge_attr_next_t = torch.tensor(y_graph_adj_mats[g_t + 1][~np.isnan(y_graph_adj_mats[g_t + 1])].reshape(-1, 1), dtype=torch.float64)
-                    node_attr_next_t = torch.tensor(graph_nodes_mats[g_t + 1], dtype=torch.float64)
-                    data_y = Data(x=node_attr_next_t, edge_index=edge_index_next_t.t().contiguous(), edge_attr=edge_attr_next_t)
-                    edge_index = torch.tensor(np.stack(np.where(~np.isnan(graph_adj_mats[g_t])), axis=1))
-                    edge_attr = torch.tensor(graph_adj_mats[g_t][~np.isnan(graph_adj_mats[g_t])].reshape(-1, 1), dtype=torch.float64)
-                    node_attr = torch.tensor(graph_nodes_mats[g_t], dtype=torch.float64)
-                    data = Data(x=node_attr, y=data_y, edge_index=edge_index.t().contiguous(), edge_attr=edge_attr)
-                    batch_data_list.append(data)
-                seq_data_list.append(batch_data_list)
-            data_list.extend(seq_data_list)
-        self.data_list = data_list
-
-        if show_log:
-            logger.info(f"Time length of graphs: {graph_time_len}")
-            logger.info(f"The length of Dataset is: {len(data_list)}")
-            logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
-            logger.info(f"data.x.shape: {data.x.shape}; data.y.x.shape: {data.y.x.shape}; data.edge_index.shape: {data.edge_index.shape}; data.edge_attr.shape: {data.edge_attr.shape}")
-
-    def __len__(self):
-        """
-        Return the length of dataset
-        Computation of length of dataset:
-        graph_time_len = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        len(self.data_list) = (graph_time_len//self.model_cfg['batch_size']) * self.model_cfg['seq_len']
-        """
-        return len(self.data_list)
-
-    def __getitem__(self, idx):
-        """
-        Return a batch_data. For example, when idx is "0", `__getitem__()` will return a list that contains batch_size graphs:
-        | __get_item__ idx |         batch_size         |
-             idx=0 ----->  [graph_t0, graph_t1, graph_t2]
-
-        In order to make the `DataLoader` combine sequencial graphs into a `Data` objects, the arrange of self.data_list will not be sequencial.
-        !!!So the return of `__getitem__()` will not be sequencial either!!!
-        For example, when batch_size is "3" and seq_len is 5, `__getitem__()` will return:
-        | __get_item__ idx |         batch_size         |
-        |                  |                            |
-             idx=0 ----->  [graph_t0, graph_t1, graph_t2]----------
-             idx=1 ----->  [graph_t1, graph_t2, graph_t3]    ↓
-             idx=2 ----->  [graph_t2, graph_t3, graph_t4] seq_len
-             idx=3 ----->  [graph_t3, graph_t4, graph_t5]    ↑
-             idx=4 ----->  [graph_t4, graph_t5, graph_t6]----------
-             idx=5 ----->  [graph_t3, graph_t4, graph_t5]----------
-             idx=6 ----->  [graph_t4, graph_t5, graph_t6]    ↓
-             idx=7 ----->  [graph_t5, graph_t6, graph_t7] seq_len
-             idx=8 ----->  [graph_t6, graph_t7, graph_t8]    ↑
-             idx=9 ----->  [graph_t7, graph_t8, graph_t9]----------
-            idx=10 ----->  [graph_t6, graph_t7, graph_t8]------------
-            idx=11 ----->  [graph_t7, graph_t8, graph_t9]      ↓
-            idx=12 ----->  [graph_t8, graph_t9, graph_t10]  seq_len
-            idx=13 ----->  [graph_t9, graph_t10, graph_t11]    ↑
-            idx=14 ----->  [graph_t10, graph_t11, graph_t12]---------
-        """
-        batch_data = self.data_list[idx]
-
-        return batch_data
-
-    def len(self) -> int:
-        r"""
-        Returns the number of graphs stored in the dataset.
-        Implement this to match abstract base class.
-        """
-        return self.__len__()
-
-    def get(self, idx: int) -> list:
-        r"""
-        Gets the data object at index :obj:`idx`.
-        Implement this to match abstract base class.
-        """
-        return self.__getitem__(idx)
-
-
-class MTSCorrAD(torch.nn.Module):
+class ClassMTSCorrAD(torch.nn.Module):
     """
     Multi-Time Series Correlation Anomaly Detection (MTSCorrAD)
     """
     def __init__(self, model_cfg: dict):
-        super(MTSCorrAD, self).__init__()
+        super(ClassMTSCorrAD, self).__init__()
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -181,6 +74,10 @@ class MTSCorrAD(torch.nn.Module):
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
+        self.fc1 = torch.nn.Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)
+        self.fc2 = torch.nn.Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)
+        self.fc3 = torch.nn.Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)
+        self.softmax = Softmax(dim=1)
         if self.model_cfg["pretrain_encoder"]:
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
         if self.model_cfg["pretrain_decoder"]:
@@ -209,17 +106,14 @@ class MTSCorrAD(torch.nn.Module):
 
         # Decoder (Graph Adjacency Reconstruction)
         pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
+        flatten_pred_graph_adj = pred_graph_adj.view(1, -1)
+        fc1_output = self.fc1(flatten_pred_graph_adj)
+        fc2_output = self.fc2(flatten_pred_graph_adj)
+        fc3_output = self.fc3(flatten_pred_graph_adj)
+        logits = torch.cat([fc1_output, fc2_output, fc3_output], dim=0).t()
+        outputs = self.softmax(logits)
 
-        if output_type == "discretize":
-            bins = torch.tensor(self.model_cfg['output_bins']).reshape(-1, 1)
-            num_bins = len(bins)-1
-            bins = torch.concat((bins[:-1], bins[1:]), dim=1)
-            discretize_values = np.linspace(-1, 1, num_bins)
-            for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
-                pred_graph_adj = torch.where((pred_graph_adj <= upper) & (pred_graph_adj > lower), discretize_value, pred_graph_adj)
-            pred_graph_adj = torch.where(pred_graph_adj < bins.min(), bins.min(), pred_graph_adj)
-
-        return pred_graph_adj
+        return outputs
 
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
         """
@@ -273,17 +167,22 @@ class MTSCorrAD(torch.nn.Module):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
+                    pred_prob = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
+                    preds = torch.argmax(pred_prob, dim=1)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                    y_labels = (y_graph_adj.view(-1)+1).to(torch.long)
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
+                        loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
                         batch_loss += loss/self.model_cfg['batch_size']
                         epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
                         if "EdgeAcc" in fn_name:
                             edge_acc = 1-loss
+                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                        else:
+                            edge_acc = torch.mean((preds == y_labels).to(torch.float32))
                             batch_edge_acc += edge_acc/self.model_cfg['batch_size']
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
@@ -337,7 +236,7 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
+                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npreds:\n{preds}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
 
@@ -355,17 +254,23 @@ class MTSCorrAD(torch.nn.Module):
                     data = batch_data[data_batch_idx]
                     x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
+                    pred_prob = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
+                    preds = torch.argmax(pred_prob, dim=1)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                    y_labels = (y_graph_adj.view(-1)+1).to(torch.long)
                     for fn in loss_fns["fns"]:
                         fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
+                        loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target":  y_labels})
                         partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
                         loss = partial_fn()
                         batch_loss += loss/self.model_cfg['batch_size']
                         if "EdgeAcc" in fn_name:
                             edge_acc = 1-loss
                             batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                        else:
+                            edge_acc = torch.mean((preds == y_labels).to(torch.float32))
+                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+
                 test_loss += batch_loss/self.num_val_batches
                 test_edge_acc += batch_edge_acc/self.num_val_batches
 

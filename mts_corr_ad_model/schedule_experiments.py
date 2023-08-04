@@ -7,7 +7,7 @@ from pprint import pprint
 data_implement_list = ("--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH",)
                        #"--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
 
-train_models_list = ["--train_models MTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
+train_models_list = ["--train_models ClassMTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
@@ -28,8 +28,8 @@ gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
 gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 32"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
-use_edge_acc_bins_list = ["--use_bin_edge_acc_loss true"]  # ["", "--use_bin_edge_acc_loss true"]
-output_type_list = [""]  # ["--output_type discretize"]
+use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
+output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
 output_bins_list = [""]  # ["--output_bins -1 --output_bins -0.25 --output_bins --output_bins 0.25 --output_bins 1", "--output_bins -1 --output_bins -0.5 --output_bins 0 --output_bins 0.5 --output_bins 1", "--output_bins -1 --output_bins 0 --output_bins 1"]
 
 args_values = list(product(data_implement_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
@@ -63,7 +63,7 @@ args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 #    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=7, minutes=35), timedelta(hours=5, minutes=35)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+model_timedelta_list = [timedelta(hours=7, minutes=20), timedelta(hours=5, minutes=35)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list

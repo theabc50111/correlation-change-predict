@@ -13,13 +13,14 @@ import dynamic_yaml
 import numpy as np
 import torch
 import yaml
-from torch.nn import MSELoss
+from torch.nn import CrossEntropyLoss, MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
 from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
 from utils import convert_str_bins_list, split_and_norm_data
 
 from baseline_model import BaselineGRU
+from class_mts_corr_ad_model import ClassMTSCorrAD
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
 from graph_auto_encoder import GAE
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
-                             choices=["MTSCorrAD", "MTSCorrAD2", "MTSCorrAD3", "Baseline", "GAE"],
+                             choices=["MTSCorrAD", "MTSCorrAD2", "MTSCorrAD3", "ClassMTSCorrAD", "Baseline", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--use_bin_edge_acc_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --use_bin_edge_acc_loss to use BinsEdgeaccuracyLoss")
     args_parser.add_argument("--output_type", type=str, nargs='?', default=None,
-                             choices=["discretize"],
+                             choices=["discretize", "class_probability"],
                              help="input the type of output, the choices are [discretize]")
     args_parser.add_argument("--output_bins", type=float, nargs='*', default=None,
                              help="input the bins of output")
@@ -128,9 +129,12 @@ if __name__ == "__main__":
     assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
     assert (bool(ARGS.filt_mode) != bool(ARGS.quan_discrete_bins)) or (ARGS.filt_mode is None and ARGS.quan_discrete_bins is None), "filt_mode and quan_discrete_bins must be both not input or one input"
-    assert (ARGS.output_type == "discretize") == (ARGS.output_bins is not None), "output_type and output_bins must be both input or not input"
-    assert bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol can only be selected one as input."
-    assert bool(ARGS.use_bin_edge_acc_loss) == bool(ARGS.target_mats_path), "use_bin_edge_acc_loss and target_mats_path must be both input or not input"
+    assert ARGS.output_bins is None or ARGS.output_type == "discretize", "output_bins must be input when output_type is discretize"
+    assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
+    assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
+    assert "ClassMTSCorrAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
+    assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
+    assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -168,6 +172,8 @@ if __name__ == "__main__":
     mts_corr_ad_model_2_log_dir = current_dir/f'save_models/mts_corr_ad_model_2/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_3_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     mts_corr_ad_model_3_log_dir = current_dir/f'save_models/mts_corr_ad_model_3/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    class_mts_corr_ad_model_dir = current_dir/f'save_models/class_mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    class_mts_corr_ad_model_log_dir = current_dir/f'save_models/class_mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
@@ -178,6 +184,8 @@ if __name__ == "__main__":
     mts_corr_ad_model_2_log_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_3_dir.mkdir(parents=True, exist_ok=True)
     mts_corr_ad_model_3_log_dir.mkdir(parents=True, exist_ok=True)
+    class_mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
+    class_mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
     gae_model_dir.mkdir(parents=True, exist_ok=True)
@@ -243,7 +251,11 @@ if __name__ == "__main__":
 
     loss_fns_dict = {"fns": [MSELoss()],
                      "fn_args": {"MSELoss()": {}}}
-    if ARGS.use_bin_edge_acc_loss is True:
+    if ARGS.output_type == "class_probability":
+        loss_fns_dict["fns"].clear(); loss_fns_dict["fn_args"].clear()
+        loss_fns_dict["fns"].append(CrossEntropyLoss())
+        loss_fns_dict["fn_args"].update({"CrossEntropyLoss()": {}})
+    elif ARGS.use_bin_edge_acc_loss is True:
         bins_list = convert_str_bins_list(ARGS.target_mats_path.split("/")[-1])
         loss_fns_dict["fns"].append(BinsEdgeAccuracyLoss())
         loss_fns_dict["fn_args"].update({"BinsEdgeAccuracyLoss()": {"bins_list": bins_list}})
@@ -262,6 +274,9 @@ if __name__ == "__main__":
             if "MTSCorrAD3" in ARGS.train_models:
                 model_3 = MTSCorrAD3(mts_corr_ad_cfg)
                 best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info = model_3.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+            if "ClassMTSCorrAD" in ARGS.train_models:
+                class_model = ClassMTSCorrAD(mts_corr_ad_cfg)
+                best_class_mts_corr_ad_model, best_class_mts_corr_ad_model_info = class_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs)
@@ -291,6 +306,8 @@ if __name__ == "__main__":
                     model_2.save_model(best_mts_corr_ad_2_model, best_mts_corr_ad_2_model_info, model_dir=mts_corr_ad_model_2_dir, model_log_dir=mts_corr_ad_model_2_log_dir)
                 if "MTSCorrAD3" in ARGS.train_models:
                     model_3.save_model(best_mts_corr_ad_3_model, best_mts_corr_ad_3_model_info, model_dir=mts_corr_ad_model_3_dir, model_log_dir=mts_corr_ad_model_3_log_dir)
+                if "ClassMTSCorrAD" in ARGS.train_models:
+                    class_model.save_model(best_class_mts_corr_ad_model, best_class_mts_corr_ad_model_info, model_dir=class_mts_corr_ad_model_dir, model_log_dir=class_mts_corr_ad_model_log_dir)
                 if "Baseline" in ARGS.train_models:
                     baseline_model.save_model(best_baseline_model, best_baseline_model_info, model_dir=baseline_model_dir, model_log_dir=baseline_model_log_dir)
                 if "GAE" in ARGS.train_models:
