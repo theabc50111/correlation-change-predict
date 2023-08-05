@@ -20,6 +20,7 @@ from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
 from utils import convert_str_bins_list, split_and_norm_data
 
 from baseline_model import BaselineGRU
+from class_baseline_model import ClassBaselineGRU
 from class_mts_corr_ad_model import ClassMTSCorrAD
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
-                             choices=["MTSCorrAD", "MTSCorrAD2", "MTSCorrAD3", "ClassMTSCorrAD", "Baseline", "GAE"],
+                             choices=["MTSCorrAD", "MTSCorrAD2", "MTSCorrAD3", "ClassMTSCorrAD", "Baseline", "ClassBaseline", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
@@ -133,6 +134,7 @@ if __name__ == "__main__":
     assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
     assert "ClassMTSCorrAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
+    assert "ClassBaseline" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
@@ -176,6 +178,8 @@ if __name__ == "__main__":
     class_mts_corr_ad_model_log_dir = current_dir/f'save_models/class_mts_corr_ad_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     baseline_model_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     baseline_model_log_dir = current_dir/f'save_models/baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
+    class_baseline_model_dir = current_dir/f'save_models/class_baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
+    class_baseline_model_log_dir = current_dir/f'save_models/class_baseline_gru/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     gae_model_dir = current_dir/f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}'
     gae_model_log_dir = current_dir/f'save_models/gae_model/{output_file_name}/{ARGS.corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
     mts_corr_ad_model_dir.mkdir(parents=True, exist_ok=True)
@@ -188,6 +192,8 @@ if __name__ == "__main__":
     class_mts_corr_ad_model_log_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_dir.mkdir(parents=True, exist_ok=True)
     baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
+    class_baseline_model_dir.mkdir(parents=True, exist_ok=True)
+    class_baseline_model_log_dir.mkdir(parents=True, exist_ok=True)
     gae_model_dir.mkdir(parents=True, exist_ok=True)
     gae_model_log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -280,6 +286,9 @@ if __name__ == "__main__":
             if "Baseline" in ARGS.train_models:
                 baseline_model = BaselineGRU(baseline_gru_cfg)
                 best_baseline_model, best_baseline_model_info = baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs)
+            if "ClassBaseline" in ARGS.train_models:
+                class_baseline_model = ClassBaselineGRU(baseline_gru_cfg)
+                best_class_baseline_model, best_class_baseline_model_info = class_baseline_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs)
             if "GAE" in ARGS.train_models:
                 gae_model = GAE(gae_cfg)
                 best_gae_model, best_gae_model_info = gae_model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
@@ -310,5 +319,7 @@ if __name__ == "__main__":
                     class_model.save_model(best_class_mts_corr_ad_model, best_class_mts_corr_ad_model_info, model_dir=class_mts_corr_ad_model_dir, model_log_dir=class_mts_corr_ad_model_log_dir)
                 if "Baseline" in ARGS.train_models:
                     baseline_model.save_model(best_baseline_model, best_baseline_model_info, model_dir=baseline_model_dir, model_log_dir=baseline_model_log_dir)
+                if "ClassBaseline" in ARGS.train_models:
+                    class_baseline_model.save_model(best_class_baseline_model, best_class_baseline_model_info, model_dir=class_baseline_model_dir, model_log_dir=class_baseline_model_log_dir)
                 if "GAE" in ARGS.train_models:
                     gae_model.save_model(best_gae_model, best_gae_model_info, model_dir=gae_model_dir, model_log_dir=gae_model_log_dir)
