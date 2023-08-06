@@ -20,13 +20,13 @@ discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-graph_enc_weight_l2_reg_lambda_list = ["--graph_enc_weight_l2_reg_lambda 0.001"]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
-drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
+drop_pos_list = ["--drop_pos gru", "--drop_pos decoder", "--drop_pos gru decoder"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = ["--drop_p 0.5"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
-gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
-gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 32"]
+gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = ["--gra_enc_h 16"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
 output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
@@ -63,7 +63,7 @@ args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 #    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=7, minutes=20), timedelta(hours=5, minutes=35)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+model_timedelta_list = [timedelta(hours=7, minutes=20)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
