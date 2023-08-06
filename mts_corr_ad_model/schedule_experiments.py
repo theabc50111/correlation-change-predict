@@ -21,12 +21,14 @@ discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "-
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
 graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = ["--drop_pos gru", "--drop_pos decoder", "--drop_pos gru decoder"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
-drop_p_list = ["--drop_p 0.5"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
 gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = ["--gra_enc_h 16"]
+gru_l_list = ["--gru_l 1", "--gur_l 2"]
+gru_h_list = ["--gru_h 40", "--gru_h 80"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
 output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
@@ -34,10 +36,10 @@ output_bins_list = [""]  # ["--output_bins -1 --output_bins -0.25 --output_bins 
 
 args_values = list(product(data_implement_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
                            custom_discrete_bins_list, nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list,
-                           graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list,
+                           graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list, gru_l_list, gru_h_list,
                            edge_acc_loss_atol_list, use_edge_acc_bins_list, output_type_list, output_bins_list))
 args_keys = ["data_implement", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "quan_discrete_bins", "custom_discrete_bins", "nodes_v_mode", "target_mats_path", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
-             "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "edge_acc_loss_atol", "use_edge_acc_bins", "output_type", "output_bins"]
+             "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gru_l", "gru_h", "edge_acc_loss_atol", "use_edge_acc_bins", "output_type", "output_bins"]
 args_list = []
 for args_value in args_values:
     args_dict = dict(zip(args_keys, args_value))
