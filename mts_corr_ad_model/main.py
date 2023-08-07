@@ -99,7 +99,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
                              help="input the weight of graph encoder weight l2 norm loss")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                             choices=["gru", "gru decoder", "decoder gru graph_encoder"],
+                             choices=["gru", "decoder", "graph_encoder"],
                              help="input to decide the position of drop layers, the choices are [gru, decoder, graph_encoder]")
     args_parser.add_argument("--drop_p", type=float, default=0,
                              help="input 0~1 to decide the probality of drop layers")
