@@ -107,10 +107,12 @@ if __name__ == "__main__":
                              help="input the type of graph encoder")
     args_parser.add_argument("--gra_enc_aggr", type=str, nargs='?', default="add",
                              help="input the type of aggregator of graph encoder")
-    args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=2,  # range:1~n, for graph encoder after the second layer,
-                             help="input the number of graph laryers of graph_encoder")
+    args_parser.add_argument("--gra_enc_l", type=int, nargs='?', default=2,  # range:1~n, for graph encoder layer,
+                             help="input the number of gnn laryers of graph_encoder")
     args_parser.add_argument("--gra_enc_h", type=int, nargs='?', default=4,
                              help="input the number of graph embedding hidden size of graph_encoder")
+    args_parser.add_argument("--gra_enc_mlp_l", type=int, nargs='?', default=2,  # range:1~n, for graph encoder mlp layer,
+                             help="input the number of graph mlp laryers of graph_encoder")
     args_parser.add_argument("--gru_l", type=int, nargs='?', default=2,  # range:1~n, for gru
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
@@ -222,6 +224,7 @@ if __name__ == "__main__":
                        "gra_enc_aggr": ARGS.gra_enc_aggr,
                        "gra_enc_l": ARGS.gra_enc_l,
                        "gra_enc_h": ARGS.gra_enc_h,
+                       "gra_enc_mlp_l": ARGS.gra_enc_mlp_l,
                        "gru_l": ARGS.gru_l,
                        "gru_h": ARGS.gru_h if ARGS.gru_h else ARGS.gra_enc_l*ARGS.gra_enc_h,
                        "num_nodes": (norm_train_dataset["nodes"].shape[2]),

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+from itertools import chain, repeat
 from math import sqrt
 from typing import List
 
@@ -16,25 +17,21 @@ class GineEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINEconv
     gra_enc_h: output size of hidden layer of GINEconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, num_edge_features: int, drop_p: float, drop_pos: List[str], **unused_kwargs):
+    def __init__(self, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, gra_enc_mlp_l: int, num_node_features: int, num_edge_features: int, drop_p: float, drop_pos: List[str], **unused_kwargs):
         super(GineEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gine_convs = torch.nn.ModuleList()
         self.gra_enc_h = gra_enc_h
 
+        one_layer_mlp = [Linear(gra_enc_h, gra_enc_h), BatchNorm1d(gra_enc_h), ReLU()]
+        first_gin_mlp = [Linear(num_node_features, gra_enc_h), BatchNorm1d(gra_enc_h), ReLU()] + list(chain.from_iterable(repeat(one_layer_mlp, gra_enc_mlp_l-1))) + [Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0)]
+        gin_mlp = list(chain.from_iterable(repeat(one_layer_mlp, gra_enc_mlp_l))) + [Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0)]
         for i in range(self.gra_enc_l):
             if i:
-                nn = Sequential(Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
+                nn = Sequential(*gin_mlp)
+
             else:
-                nn = Sequential(Linear(num_node_features, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
+                nn = Sequential(*first_gin_mlp)
             self.gine_convs.append(GINEConv(nn, edge_dim=num_edge_features, aggr=gra_enc_aggr))
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr):
@@ -79,25 +76,21 @@ class GinEncoder(torch.nn.Module):
     gra_enc_l: Number of layers of GINconv
     gra_enc_h: output size of hidden layer of GINconv
     """
-    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, drop_p: float, drop_pos: List[str], **unused_kwargs):
+    def __init__(self, num_node_features: int, gra_enc_l: int, gra_enc_h: int, gra_enc_aggr: str, gra_enc_mlp_l: int, drop_p: float, drop_pos: List[str], **unused_kwargs):
         super(GinEncoder, self).__init__()
         self.gra_enc_l = gra_enc_l
         self.gin_convs = torch.nn.ModuleList()
         self.gra_enc_h = gra_enc_h
 
-        for i in range(gra_enc_l):
+        one_layer_mlp = [Linear(gra_enc_h, gra_enc_h), BatchNorm1d(gra_enc_h), ReLU()]
+        first_gin_mlp = [Linear(num_node_features, gra_enc_h), BatchNorm1d(gra_enc_h), ReLU()] + list(chain.from_iterable(repeat(one_layer_mlp, gra_enc_mlp_l-1))) + [Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0)]
+        gin_mlp = list(chain.from_iterable(repeat(one_layer_mlp, gra_enc_mlp_l))) + [Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0)]
+        for i in range(self.gra_enc_l):
             if i:
-                nn = Sequential(Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
+                nn = Sequential(*gin_mlp)
+
             else:
-                nn = Sequential(Linear(num_node_features, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Linear(gra_enc_h, gra_enc_h),
-                                BatchNorm1d(gra_enc_h), ReLU(),
-                                Dropout(p=drop_p if "graph_encoder" in drop_pos else 0.0))
+                nn = Sequential(*first_gin_mlp)
             self.gin_convs.append(GINConv(nn, aggr=gra_enc_aggr))
 
     def forward(self, x, edge_index, seq_batch_node_id, *unused_args):
