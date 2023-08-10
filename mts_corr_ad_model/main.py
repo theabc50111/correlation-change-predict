@@ -99,7 +99,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
                              help="input the weight of graph encoder weight l2 norm loss")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
-                             choices=["gru", "decoder", "graph_encoder"],
+                             choices=["gru", "decoder", "graph_encoder", "class_fc"],
                              help="input to decide the position of drop layers, the choices are [gru, decoder, graph_encoder]")
     args_parser.add_argument("--drop_p", type=float, default=0,
                              help="input 0~1 to decide the probality of drop layers")
@@ -137,6 +137,7 @@ if __name__ == "__main__":
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
     assert "ClassMTSCorrAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
     assert "ClassBaseline" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
+    assert "class_fc" not in ARGS.drop_pos or ARGS.output_type == "class_probability", "output_type must be class_probability when class_fc in drop_pos"
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))

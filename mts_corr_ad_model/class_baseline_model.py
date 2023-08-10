@@ -16,7 +16,8 @@ import dynamic_yaml
 import numpy as np
 import torch
 import yaml
-from torch.nn import GRU, BatchNorm1d, Dropout, Linear, MSELoss, Softmax
+from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, Sequential,
+                      Softmax)
 from torch_geometric.nn.models.autoencoder import InnerProductDecoder
 from tqdm import tqdm
 
@@ -49,9 +50,9 @@ class ClassBaselineGRU(torch.nn.Module):
         # set model components
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        self.fc1 = Linear(self.model_cfg['num_nodes']**2, self.model_cfg['num_nodes']**2)
-        self.fc2 = Linear(self.model_cfg['num_nodes']**2, self.model_cfg['num_nodes']**2)
-        self.fc3 = Linear(self.model_cfg['num_nodes']**2, self.model_cfg['num_nodes']**2)
+        self.fc1 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc2 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc3 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.softmax = Softmax(dim=0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
