@@ -60,7 +60,11 @@ warnings.simplefilter("ignore")
 
 class ClassMTSCorrAD(torch.nn.Module):
     """
-    Multi-Time Series Correlation Anomaly Detection (MTSCorrAD)
+    Classification-Multi-Time Series Correlation Anomaly Detection (MTSCorrAD)
+    Structure of MTSCorrAD3:
+                                        ↗ --> FC1 --↘
+        GraphEncoder -> GRU -> Decoder -----> FC2 --> Softmax
+                                        ↘ --> FC3 --↗
     """
     def __init__(self, model_cfg: dict):
         super(ClassMTSCorrAD, self).__init__()
