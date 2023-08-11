@@ -74,9 +74,18 @@ class ClassMTSCorrAD(torch.nn.Module):
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1 = GRU(graph_enc_emb_size, self.model_cfg["gru_h"], self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        self.fc1 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
-        self.fc2 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
-        self.fc3 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc1 = Sequential(OrderedDict([
+                                          ("class_fc1", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc1_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+                                          ]))
+        self.fc2 = Sequential(OrderedDict([
+                                          ("class_fc2", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc2_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+                                          ]))
+        self.fc3 = Sequential(OrderedDict([
+                                          ("class_fc3", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc3_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+                                          ]))
         self.softmax = Softmax(dim=1)
         if self.model_cfg["pretrain_encoder"]:
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))

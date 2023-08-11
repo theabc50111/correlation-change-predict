@@ -156,12 +156,14 @@ class MLPDecoder(torch.nn.Module):
     def __init__(self, fc1_in_dim: int, sqrt_fc1_out_dim: int, drop_p: float = 0.0):
         super(MLPDecoder, self).__init__()
         self.fc1_out_dim = sqrt_fc1_out_dim**2
-        self.fc1 = Linear(fc1_in_dim, self.fc1_out_dim)
-        self.dropout = Dropout(p=drop_p)
+        self.decoder_fc1 = Linear(fc1_in_dim, self.fc1_out_dim)
+        self.decoder_relu = ReLU()
+        self.decoder_dropout = Dropout(p=drop_p)
         self.fc1_is_dropout = drop_p > 0.0
 
     def forward(self, enc_output: torch.Tensor, has_sigmoid: bool = False):
-        fc1_output = self.fc1(enc_output)
-        fc1_output = self.dropout(fc1_output) if self.fc1_is_dropout else fc1_output
+        fc1_output = self.decoder_fc1(enc_output)
+        fc1_output = self.decoder_relu(fc1_output)
+        fc1_output = self.decoder_dropout(fc1_output) if self.fc1_is_dropout else fc1_output
         pred_graph_adj = fc1_output.reshape(int(sqrt(self.fc1_out_dim)), -1)
         return pred_graph_adj
