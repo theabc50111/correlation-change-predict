@@ -20,7 +20,7 @@ import matplotlib as mpl
 import numpy as np
 import torch
 import yaml
-from torch.nn import GRU, Dropout, Linear, MSELoss, Sequential, Softmax
+from torch.nn import GRU, Dropout, Linear, MSELoss, ReLU, Sequential, Softmax
 from torch.optim.lr_scheduler import ConstantLR, MultiStepLR, SequentialLR
 from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn import summary
@@ -80,14 +80,17 @@ class ClassMTSCorrAD(torch.nn.Module):
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.fc1 = Sequential(OrderedDict([
                                           ("class_fc1", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc1_relu", ReLU()),
                                           ("class_fc1_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
                                           ]))
         self.fc2 = Sequential(OrderedDict([
                                           ("class_fc2", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc2_relu", ReLU()),
                                           ("class_fc2_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
                                           ]))
         self.fc3 = Sequential(OrderedDict([
                                           ("class_fc3", Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2)),
+                                          ("class_fc3_relu", ReLU()),
                                           ("class_fc3_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
                                           ]))
         self.softmax = Softmax(dim=1)
