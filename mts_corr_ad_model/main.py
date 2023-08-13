@@ -60,7 +60,7 @@ if __name__ == "__main__":
                              help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     args_parser.add_argument("--batch_size", type=int, nargs='?', default=64,
                              help="input the number of batch size")
-    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1000,
+    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=3000,
                              help="input the number of training epochs")
     args_parser.add_argument("--seq_len", type=int, nargs='?', default=10,
                              help="input the number of sequence length")

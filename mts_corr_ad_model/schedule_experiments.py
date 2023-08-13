@@ -4,9 +4,8 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ("--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH",)
-                       #"--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30")
-
+data_implement_list = ["--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
+batch_size_list = [""]
 train_models_list = ["--train_models ClassMTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
@@ -19,28 +18,29 @@ target_mats_path_list = ["--target_mats_path pearson/custom_discretize_graph_adj
 discr_loss_list = [""]  # ["" , "--discr_loss"]
 discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "--discr_loss_r 0.001"]
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
+learning_rate_list = ["--learning_rate 0.0005", "--learning_rate 0.0001", "--learning_rate 0.00001"]  # ["--learn_rate 0.0001", "--learn_rate 0.0005", "--learn_rate 0.001", "--learn_rate 0.005", "--learn_rate 0.01", "--learn_rate 0.05", "--learn_rate 0.1"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
-graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
-drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+graph_enc_weight_l2_reg_lambda_list = ["", "--graph_enc_weight_l2_reg_lambda 0.01"]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
+drop_pos_list = ["--drop_pos class_fc"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = ["--drop_p 0.3"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
-gra_enc_aggr_list = [""]  # ["", "mean", "add", "max"]
+gra_enc_aggr_list = ["--gra_enc_aggr add", "--gra_enc_aggr max"]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "--gra_enc_aggr max"]
 gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = ["--gra_enc_h 16"]
-gra_enc_mlp_l_list = ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 3"]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
-gru_l_list = [""]
-gru_h_list = [""]
+gra_enc_mlp_l_list = [""]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
+gru_l_list = [""]  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
+gru_h_list = [""]  # ["--gru_h 40", "--gru_h 80", "--gru_h 160", "--gru_h 320", "--gru_h 640"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
 output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
 output_bins_list = [""]  # ["--output_bins -1 --output_bins -0.25 --output_bins --output_bins 0.25 --output_bins 1", "--output_bins -1 --output_bins -0.5 --output_bins 0 --output_bins 0.5 --output_bins 1", "--output_bins -1 --output_bins 0 --output_bins 1"]
 
-args_values = list(product(data_implement_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
-                           custom_discrete_bins_list, nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, weight_decay_list,
+args_values = list(product(data_implement_list, batch_size_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
+                           custom_discrete_bins_list, nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, learning_rate_list, weight_decay_list,
                            graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list, gra_enc_mlp_l_list, gru_l_list, gru_h_list,
                            edge_acc_loss_atol_list, use_edge_acc_bins_list, output_type_list, output_bins_list))
-args_keys = ["data_implement", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "quan_discrete_bins", "custom_discrete_bins", "nodes_v_mode", "target_mats_path", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
-             "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "edge_acc_loss_atol", "use_edge_acc_bins", "output_type", "output_bins"]
+args_keys = ["data_implement", "batch_size", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "quan_discrete_bins", "custom_discrete_bins", "nodes_v_mode", "target_mats_path", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
+             "learning_rate", "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "edge_acc_loss_atol", "use_edge_acc_bins", "output_type", "output_bins"]
 args_list = []
 for args_value in args_values:
     args_dict = dict(zip(args_keys, args_value))
@@ -66,7 +66,7 @@ args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 #    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 
 num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=7, minutes=20)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+model_timedelta_list = [timedelta(hours=23, minutes=0)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
@@ -100,8 +100,6 @@ if __name__ == "__main__":
         # print({"operate time length of previous model": prev_model_time_len, "model argumets": model_args})
         model_start_t = experiments_start_t if i == 0 else model_start_t + prev_model_time_len
         home_directory = os.path.expanduser("~")
-
         cron_args = [model_start_t.strftime("%M %H %d %m")+" *", home_directory, ARGS.script, f"--log_suffix {ARGS.log_suffix}", f"--cuda_device {ARGS.cuda_device}"] + list(model_args.values())
-        print("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} --save_model true".format(*cron_args))
-        # if x[9]==1 and x[10]==4:
-        #     print(prev_model_time_len, model_args)
+        args_cloze = " ".join(repeat("{}", len(model_args.values())))
+        print(("{} {}/Documents/codes/correlation-change-predict/mts_corr_ad_model/{} {} {} "+args_cloze+" --save_model true").format(*cron_args))
