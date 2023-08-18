@@ -256,7 +256,6 @@ class MTSCorrAD(torch.nn.Module):
                            "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
                            "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
         best_model = []
-
         num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
@@ -304,7 +303,7 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/self.num_tr_batches
                 epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty/self.num_tr_batches
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["gru_grad"] += sum(p.grad.sum() for layer in self.modules() if isinstance(layer, GRU) for p in layer.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
