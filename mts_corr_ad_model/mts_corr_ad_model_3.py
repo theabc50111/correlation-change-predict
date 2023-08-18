@@ -121,9 +121,8 @@ class MTSCorrAD3(MTSCorrAD):
         elif type(self.graph_encoder).__name__ == "GineEncoder":
             graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
 
-
         # Decoder (Graph Adjacency Reconstruction)
-        pred_graph_adj = self.decoder(graph_embeds[-1])  # gru_output[-1] => only take last time-step
+        pred_graph_adj = self.decoder(graph_embeds[-1])  # graph_embeds[-1] => only take last time-step
 
         if output_type == "discretize":
             bins = torch.tensor(self.model_cfg['output_bins']).reshape(-1, 1)

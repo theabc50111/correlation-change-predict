@@ -121,7 +121,9 @@ class ClassMTSCorrAD(MTSCorrAD):
         gru_output, _ = self.gru1(graph_embeds)
 
         # Decoder (Graph Adjacency Reconstruction)
-        pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
+        pred_graph_adj = self.decoder(graph_embeds[-1])  # graph_embeds[-1] => only take last time-step
+
+        # Classification layers
         flatten_pred_graph_adj = pred_graph_adj.view(1, -1)
         fc1_output = self.fc1(flatten_pred_graph_adj)
         fc2_output = self.fc2(flatten_pred_graph_adj)
