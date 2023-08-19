@@ -121,7 +121,7 @@ class ClassMTSCorrAD(MTSCorrAD):
         gru_output, _ = self.gru1(graph_embeds)
 
         # Decoder (Graph Adjacency Reconstruction)
-        pred_graph_adj = self.decoder(graph_embeds[-1])  # graph_embeds[-1] => only take last time-step
+        pred_graph_adj = self.decoder(gru_output[-1])  # gru_output[-1] => only take last time-step
 
         # Classification layers
         flatten_pred_graph_adj = pred_graph_adj.view(1, -1)
@@ -221,7 +221,7 @@ class ClassMTSCorrAD(MTSCorrAD):
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/self.num_tr_batches
                 epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty/self.num_tr_batches
                 epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["gru_grad"] += sum(p.grad.sum() for p in self.gru1.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["gru_grad"] += sum(p.grad.sum() for layer in self.modules() if isinstance(layer, GRU) for p in layer.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())

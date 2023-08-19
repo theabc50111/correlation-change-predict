@@ -6,7 +6,7 @@ from pprint import pprint
 
 data_implement_list = ["--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
 batch_size_list = [""]
-train_models_list = ["--train_models ClassMTSCorrAD"]  # ["", "--train_models MTSCorrAD", "--train_models MTSCorrAD --train_models Baseline", "--train_models MTSCorrAD --train_models Baseline --train_models GAE"]
+train_models_list = ["--train_models CLASSMTSCORRAD"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]

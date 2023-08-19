@@ -79,7 +79,7 @@ class ClassBaselineGRU(torch.nn.Module):
 
         return batch_pred_prob
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000):
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000, **unused_kwargs):
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
         if train_data is None:

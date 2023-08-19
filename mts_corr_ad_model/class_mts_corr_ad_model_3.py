@@ -155,6 +155,41 @@ class ClassMTSCorrAD3(ClassMTSCorrAD):
 
         return outputs
 
+
+    def get_pred_embeddings(self, x, edge_index, seq_batch_node_id, edge_attr, *unused_args):
+        """
+        get  the predictive graph_embeddings with no_grad by using part of self.forward() process
+        """
+        with torch.no_grad():
+            x_edge_index_list = unbatch_edge_index(edge_index, seq_batch_node_id)
+            num_nodes = self.model_cfg['num_nodes']
+            seq_len = len(x_edge_index_list)
+            batch_edge_attr_start_idx = 0
+            seq_edge_attr = torch.zeros((seq_len, num_nodes*num_nodes))
+            seq_batch_strong_connect_edge_index = torch.zeros((2, seq_len*num_nodes**2), dtype=torch.int64)
+            for seq_t in range(seq_len):
+                batch_edge_attr_end_idx = x_edge_index_list[seq_t].shape[1] + batch_edge_attr_start_idx
+                x_edge_index = x_edge_index_list[seq_t]
+                x_edge_attr = edge_attr[batch_edge_attr_start_idx: batch_edge_attr_end_idx]
+                x_graph_adj = torch.sparse_coo_tensor(x_edge_index, x_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
+                seq_edge_attr[seq_t] = x_graph_adj.reshape(-1)
+                batch_edge_attr_start_idx = batch_edge_attr_end_idx
+                seq_batch_strong_connect_edge_index[::, seq_t*num_nodes**2:(seq_t+1)*num_nodes**2] = torch.tensor(list(product(range(seq_t*num_nodes, (seq_t+1)*num_nodes), repeat=2)), dtype=torch.int64).t().contiguous()
+
+            # Temporal Modeling
+            gru_edge_attr, _ = self.gru1_edges(seq_edge_attr)
+            temporal_edge_attr = gru_edge_attr.reshape(-1, self.model_cfg['num_edge_features'])
+
+            # Inter-series modeling
+            if type(self.graph_encoder).__name__ == "GinEncoder":
+                pred_graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id)
+            elif type(self.graph_encoder).__name__ == "GineEncoder":
+                pred_graph_embeds = self.graph_encoder(x, seq_batch_strong_connect_edge_index, seq_batch_node_id, temporal_edge_attr)
+
+
+        return pred_graph_embeds[-1]
+
+
     ###def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
     ###    """
     ###    Training MTSCorrAD Model
