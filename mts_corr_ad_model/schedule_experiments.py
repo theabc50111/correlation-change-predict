@@ -6,7 +6,7 @@ from pprint import pprint
 
 data_implement_list = ["--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
 batch_size_list = [""]
-train_models_list = ["--train_models CLASSMTSCORRAD3"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
+train_models_list = ["--train_models CLASSBASELINE"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
@@ -21,15 +21,15 @@ discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_dis
 learning_rate_list = [""]  # ["--learn_rate 0.0001", "--learn_rate 0.0005", "--learn_rate 0.001", "--learn_rate 0.005", "--learn_rate 0.01", "--learn_rate 0.05", "--learn_rate 0.1"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
 graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
-drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
+drop_pos_list = ["", "--drop_pos gru"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_p_list = ["", "--drop_p 0.01", "--drop_p 0.025", "--drop_p 0.05", "--drop_p 0.075", "--drop_p 0.1", "--drop_p 0.2"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "--gra_enc_aggr max"]
-gra_enc_l_list = ["--gra_enc_l 1", "--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
-gra_enc_h_list = ["--gra_enc_h 4", "--gra_enc_h 16", "--gra_enc_h 64"]
+gra_enc_l_list = [""]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = [""]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"
 gra_enc_mlp_l_list = [""]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
 gru_l_list = [""]  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
-gru_h_list = [""]  # ["--gru_h 40", "--gru_h 80", "--gru_h 160", "--gru_h 320", "--gru_h 640"]
+gru_h_list = ["--gru_h 100"]  # ["--gru_h 40", "--gru_h 80", "--gru_h 100", "--gru_h 320", "--gru_h 640"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
 output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
@@ -53,25 +53,30 @@ args_list = list(filter(lambda x: not ((not x["filt_mode"] and x["filt_quan"]) o
 args_list = list(filter(lambda x: not ((not x["discr_loss"] and x["discr_loss_r"]) or (x["discr_loss"] and not x["discr_loss_r"])), args_list))
 args_list = list(filter(lambda x: not ((not x["discr_loss"] and x["discr_pred_disp_r"]) or (x["discr_loss"] and not x["discr_pred_disp_r"])), args_list))
 args_list = list(filter(lambda x: not ((not x["drop_pos"] and x["drop_p"]) or (x["drop_pos"] and not x["drop_p"])), args_list))  # Eliminate cases where either one of {drop_p, drop_pos} is null.
-args_list = sorted(args_list, key=lambda x: int(x["gra_enc_h"].replace("--gra_enc_h ", "")))
-args_list = sorted(args_list, key=lambda x: int(x["gra_enc_l"].replace("--gra_enc_l ", "")), reverse=True)
+args_list = sorted(args_list, key=lambda x: int(x["gra_enc_h"].replace("--gra_enc_h ", ""))) if set(map(lambda x: x['gra_enc_h'], args_list)) != {""} else args_list
+args_list = sorted(args_list, key=lambda x: int(x["gra_enc_l"].replace("--gra_enc_l ", "")), reverse=True) if set(map(lambda x: x['gra_enc_l'], args_list)) != {""} else args_list
 args_list = sorted(args_list, key=lambda x: x["discr_loss"])
 
-#if "--discr_loss" in discr_loss_list:
-#    num_models = sum([1 for x in args_list if x[3] == "--discr_loss" and x[10] == "--gra_enc_l 5" and x[11] == "--gra_enc_h 16"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
-#    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1),  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
-#                            timedelta(hours=1, minutes=10), timedelta(hours=1, minutes=40), timedelta(hours=3, minutes=20), timedelta(hours=3, minutes=5)]
-#else:
-#    num_models = sum([1 for x in args_list if x[3] == "" and x[10] == "--gra_enc_l 1" and x[11] == "--gra_enc_h 4"])  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
-#    model_timedelta_list = [timedelta(minutes=20), timedelta(minutes=55), timedelta(hours=1, minutes=20), timedelta(hours=1)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
-
-num_models = sum([1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == "--gra_enc_l 2"])  # the main reasons for model operation time: discr_loss, gra_enc_l
-model_timedelta_list = [timedelta(hours=14, minutes=0), timedelta(hours=16, minutes=30)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+if set(map(lambda x: x['gra_enc_l'], args_list)) != {""}:
+    gra_enc_l_values_set = set(map(lambda x: x['gra_enc_l'], args_list))
+    gra_enc_l_values_set.discard("")
+    gra_enc_l_pop_value = gra_enc_l_values_set.pop()
+    num_models = sum(1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == gra_enc_l_pop_value)  # the main reasons for model operation time: discr_loss, gra_enc_l
+    model_timedelta_list = [timedelta(hours=14, minutes=0), timedelta(hours=16, minutes=30)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
+    gru_l_values_set = set(map(lambda x: x['gru_l'], args_list))
+    gru_l_values_set.discard("")
+    gru_l_pop_value = gru_l_values_set.pop()
+    num_models = sum(1 for x in args_list if x['gru_l'] == gru_l_pop_value)  # the main reasons for model operation time: discr_loss, gra_enc_l, gra_enc_h
+    model_timedelta_list = [timedelta(hours=2, minutes=40)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
+else:
+    num_models = len(args_list)
+    model_timedelta_list = [timedelta(hours=2, minutes=40)]
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
 model_timedelta_list.pop()
-assert len(args_list) == len(model_timedelta_list), f"The order of elements of model_timedelta_list〔length: {len(model_timedelta_list)}〕 should comply with the order of args_list: 〔length: {len(args_list)}〕"
+assert len(args_list) == len(model_timedelta_list), f"The order of elements of model_timedelta_list〔length: {len(model_timedelta_list)}〕 should comply with the order of args_list: 〔length: {len(args_list)}〕.\nps. model_timedelta_list is based on num_modelsm num_models: {num_models}"
 print(f"# len of experiments: {len(args_list)}")
 
 if __name__ == "__main__":
