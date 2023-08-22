@@ -221,16 +221,10 @@ class MTSCorrAD(torch.nn.Module):
 
         return pred_graph_adj
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
+    def init_best_model_info(self, train_data: dict, loss_fns: dict, epochs: int):
         """
-        Training MTSCorrAD Model
+        Initialize best_model_info
         """
-        # In order to make original function of nn.Module.train() work, we need to override it
-
-        super().train(mode=mode)
-        if train_data is None:
-            return self
-
         best_model_info = {"num_training_graphs": len(train_data['edges']),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
@@ -241,9 +235,17 @@ class MTSCorrAD(torch.nn.Module):
                            "epochs": epochs,
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
+                           "opt_lr": self.model_cfg['learning_rate'],
+                           "opt_weight_decay": self.model_cfg['weight_decay'],
                            "optimizer": str(self.optimizer),
                            "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
-                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
+                           "gru_l": self.model_cfg['gru_l'],
+                           "gru_h": self.model_cfg['gru_h'],
+                           "gra_enc_l": self.model_cfg['gra_enc_l'],
+                           "gra_enc_h": self.model_cfg['gra_enc_h'],
+                           "gra_enc_mlp_l": self.model_cfg['gra_enc_mlp_l'],
+                           "decoder": self.model_cfg['decoder'].__name__,
+                           "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
                            "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],
@@ -255,6 +257,20 @@ class MTSCorrAD(torch.nn.Module):
                            "target_mats_bins": self.model_cfg['target_mats_bins'],
                            "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
                            "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
+
+        return best_model_info
+
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
+        """
+        Training MTSCorrAD Model
+        """
+        # In order to make original function of nn.Module.train() work, we need to override it
+
+        super().train(mode=mode)
+        if train_data is None:
+            return self
+
+        best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])

@@ -57,7 +57,6 @@ class BaselineGRU(torch.nn.Module):
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
-
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
         gru_output, gru_hn = self.gru(x)
         # Decoder (Graph Adjacency Reconstruction)
@@ -75,26 +74,28 @@ class BaselineGRU(torch.nn.Module):
 
         return pred_graph_adj
 
-    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000, **unused_kwargs):
-        # In order to make original function of nn.Module.train() work, we need to override it
-        super().train(mode=mode)
-        if train_data is None:
-            return self
-
-        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+    def init_best_model_info(self, train_data: dict, loss_fns: dict, epochs: int):
+        """
+        Initialize best_model_info
+        """
         best_model_info = {"num_training_graphs": len(train_data['edges']),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],
                            "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
                            "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
                            "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": num_batches,
+                           "batches_per_epoch": ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1,
                            "epochs": epochs,
                            "batch_size": self.model_cfg['batch_size'],
                            "seq_len": self.model_cfg['seq_len'],
+                           "opt_lr": self.model_cfg['learning_rate'],
+                           "opt_weight_decay": self.model_cfg['weight_decay'],
                            "optimizer": str(self.optimizer),
                            "opt_scheduler": {},
-                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
+                           "gru_l": self.model_cfg['gru_l'],
+                           "gru_h": self.model_cfg['gru_h'],
+                           "decoder": self.model_cfg['decoder'].__name__,
+                           "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],
                            "min_val_loss": float('inf'),
@@ -103,6 +104,17 @@ class BaselineGRU(torch.nn.Module):
                            "target_mats_bins": self.model_cfg['target_mats_bins'],
                            "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
                            "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
+
+        return best_model_info
+
+    def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000, **unused_kwargs):
+        # In order to make original function of nn.Module.train() work, we need to override it
+        super().train(mode=mode)
+        if train_data is None:
+            return self
+
+        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+        best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         for epoch_i in tqdm(range(epochs)):
             self.train()
@@ -125,6 +137,8 @@ class BaselineGRU(torch.nn.Module):
                     if "EdgeAcc" in fn_name:
                         edge_acc = 1-loss
                         batch_edge_acc += edge_acc
+                    else:
+                        edge_acc = torch.zeros(1)
 
                 self.optimizer.zero_grad()
                 batch_loss.backward()
@@ -150,6 +164,8 @@ class BaselineGRU(torch.nn.Module):
                 best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
                 best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
 
+            if epoch_i == 0:
+                logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
                 logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
@@ -181,6 +197,8 @@ class BaselineGRU(torch.nn.Module):
                     if "EdgeAcc" in fn_name:
                         edge_acc = 1-loss
                         batch_edge_acc += edge_acc
+                    else:
+                        edge_acc = torch.zeros(1)
 
                 test_edge_acc += edge_acc / num_batches
                 test_loss += batch_loss / num_batches

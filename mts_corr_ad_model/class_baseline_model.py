@@ -24,6 +24,7 @@ from tqdm import tqdm
 sys.path.append("/workspace/correlation-change-predict/utils")
 from utils import split_and_norm_data
 
+from baseline_model import BaselineGRU
 from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
 
 current_dir = Path(__file__).parent
@@ -40,9 +41,9 @@ logger.addHandler(logger_console)
 logger.setLevel(logging.INFO)
 
 
-class ClassBaselineGRU(torch.nn.Module):
+class ClassBaselineGRU(BaselineGRU):
     def __init__(self, model_cfg: dict, **unused_kwargs):
-        super(ClassBaselineGRU, self).__init__()
+        super(BaselineGRU, self).__init__()
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -86,27 +87,7 @@ class ClassBaselineGRU(torch.nn.Module):
             return self
 
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
-        best_model_info = {"num_training_graphs": len(train_data['edges']),
-                           "filt_mode": self.model_cfg['filt_mode'],
-                           "filt_quan": self.model_cfg['filt_quan'],
-                           "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
-                           "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
-                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": num_batches,
-                           "epochs": epochs,
-                           "batch_size": self.model_cfg['batch_size'],
-                           "seq_len": self.model_cfg['seq_len'],
-                           "optimizer": str(self.optimizer),
-                           "opt_scheduler": {},
-                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
-                           "drop_pos": self.model_cfg["drop_pos"],
-                           "drop_p": self.model_cfg["drop_p"],
-                           "min_val_loss": float('inf'),
-                           "output_type": self.model_cfg['output_type'],
-                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
-                           "target_mats_bins": self.model_cfg['target_mats_bins'],
-                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
-                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
+        best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         for epoch_i in tqdm(range(epochs)):
             self.train()
@@ -199,33 +180,3 @@ class ClassBaselineGRU(torch.nn.Module):
                 test_loss += batch_loss / num_batches
 
         return test_loss, test_edge_acc
-
-    @staticmethod
-    def save_model(unsaved_model: OrderedDict, model_info: dict, model_dir: Path, model_log_dir: Path):
-        e_i = model_info.get("best_val_epoch")
-        t_stamp = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
-        torch.save(unsaved_model, model_dir/f"epoch_{e_i}-{t_stamp}.pt")
-        with open(model_log_dir/f"epoch_{e_i}-{t_stamp}.json", "w") as f:
-            json_str = json.dumps(model_info)
-            f.write(json_str)
-        logger.info(f"model has been saved in:{model_dir}")
-
-    @staticmethod
-    def yield_batch_data(graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
-        graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        _, num_nodes, _ = graph_adj_mats.shape
-        graph_adj_arr = graph_adj_mats.reshape(graph_time_step+1, -1)
-        target_arr = target_mats.reshape(graph_time_step+1, -1)
-        for g_t in range(0, graph_time_step, batch_size):
-            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
-            if cur_batch_size <= 0: break
-            batch_x = torch.empty((cur_batch_size, seq_len, num_nodes**2)).fill_(np.nan)
-            batch_y = torch.empty((cur_batch_size, num_nodes**2)).fill_(np.nan)
-            for data_batch_idx in range(cur_batch_size):
-                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
-                batch_x[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[begin_t:end_t], nan=0))
-                batch_y[data_batch_idx] = torch.tensor(np.nan_to_num(target_arr[end_t], nan=0))
-
-            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
-
-            yield batch_x, batch_y
