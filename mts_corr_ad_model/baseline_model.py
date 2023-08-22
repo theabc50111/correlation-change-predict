@@ -24,6 +24,7 @@ sys.path.append("/workspace/correlation-change-predict/utils")
 from utils import split_and_norm_data
 
 from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
+from mts_corr_ad_model import MTSCorrAD
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -39,9 +40,9 @@ logger.addHandler(logger_console)
 logger.setLevel(logging.INFO)
 
 
-class BaselineGRU(torch.nn.Module):
+class BaselineGRU(MTSCorrAD):
     def __init__(self, model_cfg: dict, **unused_kwargs):
-        super(BaselineGRU, self).__init__()
+        super(BaselineGRU, self).__init__(model_cfg)
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -51,11 +52,8 @@ class BaselineGRU(torch.nn.Module):
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
-
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
+        del self.gru1
+        del self.graph_encoder
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
         gru_output, gru_hn = self.gru(x)
@@ -91,7 +89,7 @@ class BaselineGRU(torch.nn.Module):
                            "opt_lr": self.model_cfg['learning_rate'],
                            "opt_weight_decay": self.model_cfg['weight_decay'],
                            "optimizer": str(self.optimizer),
-                           "opt_scheduler": {},
+                           "opt_scheduler": str(self.scheduler.__class__.__name__),
                            "gru_l": self.model_cfg['gru_l'],
                            "gru_h": self.model_cfg['gru_h'],
                            "decoder": self.model_cfg['decoder'].__name__,
@@ -114,6 +112,7 @@ class BaselineGRU(torch.nn.Module):
             return self
 
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+        self.show_model_struture()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         for epoch_i in tqdm(range(epochs)):

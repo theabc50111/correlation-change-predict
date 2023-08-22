@@ -65,32 +65,16 @@ class MTSCorrAD3(MTSCorrAD):
         GRU -> GraphEncoder -> Decoder
     """
     def __init__(self, model_cfg: dict):
-        super(MTSCorrAD, self).__init__()
+        super(MTSCorrAD3, self).__init__(model_cfg)
         self.model_cfg = model_cfg
-        # create data loader
-        self.num_tr_batches = self.model_cfg["num_batches"]['train']
-        self.num_val_batches = self.model_cfg["num_batches"]['val']
-
         # set model components
-        self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
         num_nodes = self.model_cfg['num_nodes']
         num_edges = num_nodes**2
         num_edge_features = self.model_cfg['num_edge_features']
         graph_enc_emb_size = self.graph_encoder.gra_enc_l * self.graph_encoder.gra_enc_h  # the input size of GRU depend on the number of layers of GINconv
         self.gru1_edges = GRU(num_edges*num_edge_features, num_edges*num_edge_features, self.model_cfg["gru_l"], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0)
         self.decoder = self.model_cfg['decoder'](graph_enc_emb_size, num_nodes, drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        if self.model_cfg["pretrain_encoder"]:
-            self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
-        if self.model_cfg["pretrain_decoder"]:
-            self.decoder.load_state_dict(torch.load(self.model_cfg["pretrain_decoder"]))
-        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
-        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
-
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
+        del self.gru1
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """

@@ -43,7 +43,7 @@ logger.setLevel(logging.INFO)
 
 class ClassBaselineGRU(BaselineGRU):
     def __init__(self, model_cfg: dict, **unused_kwargs):
-        super(BaselineGRU, self).__init__()
+        super(ClassBaselineGRU, self).__init__(model_cfg)
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -57,11 +57,6 @@ class ClassBaselineGRU(BaselineGRU):
         self.softmax = Softmax(dim=0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
-
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
@@ -87,6 +82,7 @@ class ClassBaselineGRU(BaselineGRU):
             return self
 
         num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+        self.show_model_struture()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         for epoch_i in tqdm(range(epochs)):
@@ -140,6 +136,8 @@ class ClassBaselineGRU(BaselineGRU):
                 best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
                 best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
 
+            if epoch_i == 0:
+                logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
                 logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")

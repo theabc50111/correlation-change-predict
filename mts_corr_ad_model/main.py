@@ -137,9 +137,9 @@ if __name__ == "__main__":
     assert ARGS.output_bins is None or ARGS.output_type == "discretize", "output_bins must be input when output_type is discretize"
     assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
-    assert "ClassMTSCorrAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
-    assert "ClassMTSCorrAD3" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD3"
-    assert "ClassBaseline" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
+    assert "CLASSMTSCORRAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
+    assert "CLASSMTSCORRAD3" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD3"
+    assert "CLASSBASELINE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
     assert "class_fc" not in ARGS.drop_pos or ARGS.output_type == "class_probability", "output_type must be class_probability when class_fc in drop_pos"
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
@@ -242,6 +242,8 @@ if __name__ == "__main__":
             mts_corr_ad_cfg["pretrain_encoder"] = ARGS.pretrain_encoder
             mts_corr_ad_cfg["pretrain_decoder"] = ARGS.pretrain_decoder
             baseline_gru_cfg["gru_in_dim"] = (norm_train_dataset['edges'].shape[1])**2
+            baseline_gru_cfg["pretrain_encoder"] = None
+            baseline_gru_cfg["pretrain_decoder"] = None
             gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
             model_dict = {"MTSCORRAD": MTSCorrAD(mts_corr_ad_cfg),
                           "MTSCORRAD2": MTSCorrAD2(mts_corr_ad_cfg),

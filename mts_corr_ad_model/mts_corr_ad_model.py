@@ -188,9 +188,18 @@ class MTSCorrAD(torch.nn.Module):
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
         self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
+
+    def show_model_struture(self):
+        """
+        Show model information
+        """
         observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
         observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
+        if hasattr(self.scheduler, '_milestones'):
+            observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
+        else:
+            observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
+
 
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
@@ -270,6 +279,7 @@ class MTSCorrAD(torch.nn.Module):
         if train_data is None:
             return self
 
+        self.show_model_struture()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         num_nodes = self.model_cfg["num_nodes"]

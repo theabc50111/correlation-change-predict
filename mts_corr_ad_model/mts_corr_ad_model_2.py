@@ -33,7 +33,7 @@ from utils import split_and_norm_data
 
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
-from mts_corr_ad_model import GraphTimeSeriesDataset
+from mts_corr_ad_model import GraphTimeSeriesDataset, MTSCorrAD
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -58,7 +58,7 @@ mpl.rcParams['axes.unicode_minus'] = False
 warnings.simplefilter("ignore")
 
 
-class MTSCorrAD2(torch.nn.Module):
+class MTSCorrAD2(MTSCorrAD):
     """
     Multi-Time Series Correlation Anomaly Detection2 (MTSCorrAD2)
     Structure of MTSCorrAD3:
@@ -68,7 +68,7 @@ class MTSCorrAD2(torch.nn.Module):
     Note: the nodes values of input of GraphEncoder is produced by first GRU
     """
     def __init__(self, model_cfg: dict):
-        super(MTSCorrAD2, self).__init__()
+        super(MTSCorrAD2, self).__init__(model_cfg)
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
@@ -93,12 +93,6 @@ class MTSCorrAD2(torch.nn.Module):
         #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
         self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
-        self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
-
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, *unused_args):
         """
@@ -149,26 +143,9 @@ class MTSCorrAD2(torch.nn.Module):
         if train_data is None:
             return self
 
-        best_model_info = {"num_training_graphs": len(train_data),
-                           "filt_mode": self.model_cfg['filt_mode'],
-                           "filt_quan": self.model_cfg['filt_quan'],
-                           "discrete_bin": self.model_cfg['discrete_bin'],
-                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": self.num_tr_batches,
-                           "epochs": epochs,
-                           "batch_size": self.model_cfg['batch_size'],
-                           "seq_len": self.model_cfg['seq_len'],
-                           "optimizer": str(self.optimizer),
-                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
-                           "loss_fns": str([fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]]),
-                           "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
-                           "drop_pos": self.model_cfg["drop_pos"],
-                           "drop_p": self.model_cfg["drop_p"],
-                           "graph_enc": type(self.graph_encoder).__name__,
-                           "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
-                           "min_val_loss": float('inf')}
+        self.show_model_struture()
+        best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
-
         num_nodes = self.model_cfg['num_nodes']
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], loader_seq_len=self.model_cfg["seq_len"])
         for epoch_i in tqdm(range(epochs)):
