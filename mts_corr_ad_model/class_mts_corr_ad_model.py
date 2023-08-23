@@ -14,6 +14,7 @@ from datetime import datetime
 from itertools import product
 from pathlib import Path
 from pprint import pformat
+from typing import overload
 
 import dynamic_yaml
 import matplotlib as mpl
@@ -113,6 +114,14 @@ class ClassMTSCorrAD(MTSCorrAD):
         outputs = self.softmax(logits)
 
         return outputs
+
+    @overload
+    def train(self, mode: bool = True) -> torch.nn.Module:
+        ...
+
+    @overload
+    def train(self, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False) -> tuple:
+        ...
 
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 5, num_diff_graphs: int = 5, show_model_info: bool = False):
         """
