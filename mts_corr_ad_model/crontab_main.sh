@@ -33,6 +33,7 @@ ARGUMENT_LIST=(
   "gru_l"
   "gru_h"
   "edge_acc_loss_atol"
+  "two_ord_pred_prob_edge_accu_thres"
   "use_bin_edge_acc_loss"
   "output_type"
   "output_bins"
@@ -68,6 +69,7 @@ gra_enc_mlp_l=""
 gru_l=""
 gru_h=""
 edge_acc_loss_atol=""
+two_ord_pred_prob_edge_accu_thres=""
 use_bin_edge_acc_loss=""
 output_type=""
 output_bins=""
@@ -242,6 +244,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
 
+    --two_ord_pred_prob_edge_accu_thres)
+      two_ord_pred_prob_edge_accu_thres="--two_ord_pred_prob_edge_accu_thres $2"
+      shift 2
+      ;;
+
     --use_bin_edge_acc_loss)
       use_bin_edge_acc_loss="--use_bin_edge_acc_loss"
       shift 2
@@ -280,6 +287,6 @@ done
 
 echo "========================== Start training at $(/usr/bin/date) ==========================" >> $log_file
 
-/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_type $corr_window $corr_stride $filt_mode $filt_quan $quan_discrete_bins $custom_discrete_bins $graph_nodes_v_mode $target_mats_path $cuda_device $learning_rate $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gra_enc_mlp_l $gru_l $gru_h $edge_acc_loss_atol $use_bin_edge_acc_loss $output_type $output_bins $save_model >> "$log_file" 2>&1
+/usr/bin/docker container exec ywt-pytorch python /workspace/correlation-change-predict/mts_corr_ad_model/main.py $data_implement $batch_size $tr_epochs $train_models $seq_len $corr_type $corr_window $corr_stride $filt_mode $filt_quan $quan_discrete_bins $custom_discrete_bins $graph_nodes_v_mode $target_mats_path $cuda_device $learning_rate $weight_decay $graph_enc_weight_l2_reg_lambda ${drop_pos[@]} $drop_p $gra_enc $gra_enc_aggr $gra_enc_l $gra_enc_h $gra_enc_mlp_l $gru_l $gru_h $edge_acc_loss_atol $two_ord_pred_prob_edge_accu_thres $use_bin_edge_acc_loss $output_type $output_bins $save_model >> "$log_file" 2>&1
 
 echo "========================== End training at $(/usr/bin/date) ================================" >> $log_file
