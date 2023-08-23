@@ -4,10 +4,10 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement SP500_20082017")
+dataset_list=("--data_implement SP500_20082017_CORR_SER_REG_CORR_MAT_HRCHY_11_CLUSTER")
 
 
-train_items_setting="train_all"  # "train_train" "train_all"
+train_items_setting="train_train"  # "train_train" "train_all"
 filt_gra_mode_list=("")  # ("--filt_gra_mode keep_abs" "--filt_gra_mode keep_positive" "--filt_gra_mode keep_strong")
 filt_gra_quan_list=("") # ("--data_implement 0.25" "--data_implement 0.5" "--data_implement 0.75")
 quan_discrete_bins_list=("--quan_discrete_bins 3")  # ("--quan_discrete_bins 2" "--quan_discrete_bins 3" "--quan_discrete_bins 4" "--quan_discrete_bins 5")
