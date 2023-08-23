@@ -17,7 +17,8 @@ import yaml
 from torch.nn import CrossEntropyLoss, MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from metrics_utils import BinsEdgeAccuracyLoss, EdgeAccuracyLoss
+from metrics_utils import (BinsEdgeAccuracyLoss, EdgeAccuracyLoss,
+                           TwoOrderPredProbEdgeAccuracy)
 from utils import convert_str_bins_list, split_and_norm_data
 
 from baseline_model import BaselineGRU
@@ -119,6 +120,8 @@ if __name__ == "__main__":
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
+    args_parser.add_argument("--two_ord_pred_prob_edge_accu_thres", type=float, nargs='?', default=None,
+                             help="input the threshold of TwoOrderPredProbEdgeAccuracy")
     args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
                              help="input the absolute tolerance of edge acc loss")
     args_parser.add_argument("--use_bin_edge_acc_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
@@ -137,6 +140,8 @@ if __name__ == "__main__":
     assert ARGS.output_bins is None or ARGS.output_type == "discretize", "output_bins must be input when output_type is discretize"
     assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
+    assert ("MTSCORRAD" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD"
+    assert ("MTSCORRAD3" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD3"
     assert "CLASSMTSCORRAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
     assert "CLASSMTSCORRAD3" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD3"
     assert "CLASSBASELINE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
@@ -209,6 +214,8 @@ if __name__ == "__main__":
                        "output_bins": ARGS.output_bins,
                        "target_mats_bins": ARGS.target_mats_path.split("/")[-1] if ARGS.target_mats_path else None,
                        "edge_acc_loss_atol": ARGS.edge_acc_loss_atol,
+                       "two_ord_pred_prob_edge_accu_thres": ARGS.two_ord_pred_prob_edge_accu_thres,
+                       "edge_acc_metric_fn": TwoOrderPredProbEdgeAccuracy(threshold=ARGS.two_ord_pred_prob_edge_accu_thres) if ARGS.two_ord_pred_prob_edge_accu_thres else None,
                        "use_bin_edge_acc_loss": ARGS.use_bin_edge_acc_loss}
 
     loss_fns_dict = {"fns": [MSELoss()],
@@ -221,7 +228,7 @@ if __name__ == "__main__":
         bins_list = convert_str_bins_list(ARGS.target_mats_path.split("/")[-1])
         loss_fns_dict["fns"].append(BinsEdgeAccuracyLoss())
         loss_fns_dict["fn_args"].update({"BinsEdgeAccuracyLoss()": {"bins_list": bins_list}})
-    else:
+    elif ARGS.edge_acc_loss_atol is not None:
         loss_fns_dict["fns"].append(EdgeAccuracyLoss())
         loss_fns_dict["fn_args"].update({"EdgeAccuracyLoss()": {"atol": ARGS.edge_acc_loss_atol}})
 

@@ -76,32 +76,14 @@ class BaselineGRU(MTSCorrAD):
         """
         Initialize best_model_info
         """
-        best_model_info = {"num_training_graphs": len(train_data['edges']),
-                           "filt_mode": self.model_cfg['filt_mode'],
-                           "filt_quan": self.model_cfg['filt_quan'],
-                           "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
-                           "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
-                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1,
-                           "epochs": epochs,
-                           "batch_size": self.model_cfg['batch_size'],
-                           "seq_len": self.model_cfg['seq_len'],
-                           "opt_lr": self.model_cfg['learning_rate'],
-                           "opt_weight_decay": self.model_cfg['weight_decay'],
-                           "optimizer": str(self.optimizer),
-                           "opt_scheduler": str(self.scheduler.__class__.__name__),
-                           "gru_l": self.model_cfg['gru_l'],
-                           "gru_h": self.model_cfg['gru_h'],
-                           "decoder": self.model_cfg['decoder'].__name__,
-                           "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
-                           "drop_pos": self.model_cfg["drop_pos"],
-                           "drop_p": self.model_cfg["drop_p"],
-                           "min_val_loss": float('inf'),
-                           "output_type": self.model_cfg['output_type'],
-                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
-                           "target_mats_bins": self.model_cfg['target_mats_bins'],
-                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
-                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
+        best_model_info = super().init_best_model_info(train_data, loss_fns, epochs)
+        best_model_info["batches_per_epoch"] = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+        del best_model_info["gra_enc_l"]
+        del best_model_info["gra_enc_h"]
+        del best_model_info["gra_enc_mlp_l"]
+        del best_model_info["gra_enc_weight_l2_reg_lambda"]
+        del best_model_info["graph_enc"]
+        del best_model_info["graph_enc_aggr"]
 
         return best_model_info
 

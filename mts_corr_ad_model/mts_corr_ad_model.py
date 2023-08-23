@@ -248,7 +248,7 @@ class MTSCorrAD(torch.nn.Module):
                            "opt_lr": self.model_cfg['learning_rate'],
                            "opt_weight_decay": self.model_cfg['weight_decay'],
                            "optimizer": str(self.optimizer),
-                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)},
+                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)} if hasattr(self.scheduler, '_milestones') else str(self.scheduler.__class__.__name__),
                            "gru_l": self.model_cfg['gru_l'],
                            "gru_h": self.model_cfg['gru_h'],
                            "gra_enc_l": self.model_cfg['gra_enc_l'],
@@ -266,9 +266,41 @@ class MTSCorrAD(torch.nn.Module):
                            "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
                            "target_mats_bins": self.model_cfg['target_mats_bins'],
                            "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
+                           "two_ord_pred_prob_edge_accu_thres": self.model_cfg['two_ord_pred_prob_edge_accu_thres'],
                            "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
 
         return best_model_info
+
+    def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
+                     batch_edge_acc: torch.Tensor, preds: torch.Tensor = None, y_labels: torch.Tensor = None, epoch_metrics: dict = None):
+        """
+        Calculate loss function
+        """
+        has_calc_edge_acc = False
+        for fn in loss_fns["fns"]:
+            fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+            loss_fns["fn_args"][fn_name].update({"input": loss_fn_input, "target": loss_fn_target})
+            partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+            loss = partial_fn()
+            batch_loss += loss/self.model_cfg['batch_size']
+            if epoch_metrics:
+                epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
+            if has_calc_edge_acc:
+                continue
+            if "EdgeAcc" in fn_name:
+                edge_acc = 1-loss
+                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                has_calc_edge_acc = True
+            elif self.model_cfg.get("edge_acc_metric_fn"):
+                edge_acc = self.model_cfg.get("edge_acc_metric_fn")(loss_fn_input, loss_fn_target)
+                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                has_calc_edge_acc = True
+            elif preds is not None and y_labels is not None:
+                edge_acc = torch.mean((preds == y_labels).to(torch.float32))
+                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                has_calc_edge_acc = True
+
+        return batch_loss, batch_edge_acc
 
     @overload
     def train(self, mode: bool = True) -> torch.nn.Module:
@@ -309,16 +341,9 @@ class MTSCorrAD(torch.nn.Module):
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    for fn in loss_fns["fns"]:
-                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
-                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                        loss = partial_fn()
-                        batch_loss += loss/self.model_cfg['batch_size']
-                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-                        if "EdgeAcc" in fn_name:
-                            edge_acc = 1-loss
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_graph_adj, "loss_fn_target": y_graph_adj,
+                                           "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
+                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
@@ -391,15 +416,10 @@ class MTSCorrAD(torch.nn.Module):
                     y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
                     pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    for fn in loss_fns["fns"]:
-                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_graph_adj, "target":  y_graph_adj})
-                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                        loss = partial_fn()
-                        batch_loss += loss/self.model_cfg['batch_size']
-                        if "EdgeAcc" in fn_name:
-                            edge_acc = 1-loss
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_graph_adj, "loss_fn_target": y_graph_adj,
+                                           "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc}
+                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+
                 test_loss += batch_loss/self.num_val_batches
                 test_edge_acc += batch_edge_acc/self.num_val_batches
 

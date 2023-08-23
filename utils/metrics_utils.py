@@ -84,6 +84,9 @@ class DiscriminationTester:
 
 
 class EdgeAccuracyLoss(torch.nn.Module):
+    """ 
+    This loss function is used to compute the edge accuracy of the prediction.
+    """
     def __init__(self):
         super(EdgeAccuracyLoss, self).__init__()
 
@@ -95,6 +98,9 @@ class EdgeAccuracyLoss(torch.nn.Module):
 
 
 class BinsEdgeAccuracyLoss(torch.nn.Module):
+    """
+    This loss function is used to compute the edge accuracy of the discretized prediction.
+    """
     def __init__(self):
         super(BinsEdgeAccuracyLoss, self).__init__()
 
@@ -116,3 +122,38 @@ class BinsEdgeAccuracyLoss(torch.nn.Module):
         edge_acc.requires_grad = True
         loss = 1 - edge_acc
         return loss
+
+
+class TwoOrderPredProbEdgeAccuracyLoss(torch.nn.Module):
+    def __init__(self, threshold: float):
+        super(TwoOrderPredProbEdgeAccuracyLoss, self).__init__()
+        self.threshold = threshold
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        sorted_pred_prob, sorted_indices = torch.sort(input, dim=1, descending=True)
+        sorted_preds = sorted_indices
+        first_order_preds = sorted_preds[::, 0]
+        second_order_preds = sorted_preds[::, 1]
+        first_second_order_pred_prob_diff = torch.diff(sorted_pred_prob)[::, 0].abs()
+        second_order_preds_mask = first_second_order_pred_prob_diff < self.threshold
+        filtered_second_oreder_preds = torch.where(second_order_preds_mask, second_order_preds, torch.nan)
+        assert not any((first_order_preds == target) & (filtered_second_oreder_preds == target)), "There are some edges that are both first and second order predictions at the same time, which is not allowed."
+        num_correct_first_order_preds = (first_order_preds == target).sum()
+        num_correct_second_order_preds = (filtered_second_oreder_preds == target).sum()
+        edge_acc = (num_correct_first_order_preds+num_correct_second_order_preds)/len(target)
+        loss = 1 - edge_acc
+
+        return loss
+
+
+class TwoOrderPredProbEdgeAccuracy(torch.nn.Module):
+    def __init__(self, threshold: float):
+        super(TwoOrderPredProbEdgeAccuracy, self).__init__()
+        self.threshold = threshold
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        two_order_pred_prob_edge_acc_loss_fn = TwoOrderPredProbEdgeAccuracyLoss(threshold=self.threshold)
+        two_order_pred_prob_edge_acc_loss = two_order_pred_prob_edge_acc_loss_fn(input, target)
+        edge_acc = 1 - two_order_pred_prob_edge_acc_loss
+
+        return edge_acc

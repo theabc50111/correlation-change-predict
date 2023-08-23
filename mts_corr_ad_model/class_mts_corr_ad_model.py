@@ -156,19 +156,10 @@ class ClassMTSCorrAD(MTSCorrAD):
                     preds = torch.argmax(pred_prob, dim=1)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     y_labels = (y_graph_adj.view(-1)+1).to(torch.long)
-                    for fn in loss_fns["fns"]:
-                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
-                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                        loss = partial_fn()
-                        batch_loss += loss/self.model_cfg['batch_size']
-                        epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-                        if "EdgeAcc" in fn_name:
-                            edge_acc = 1-loss
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
-                        else:
-                            edge_acc = torch.mean((preds == y_labels).to(torch.float32))
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
+                                           "preds": preds, "y_labels": y_labels, "batch_loss": batch_loss,
+                                           "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
+                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
@@ -243,18 +234,10 @@ class ClassMTSCorrAD(MTSCorrAD):
                     preds = torch.argmax(pred_prob, dim=1)
                     y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
                     y_labels = (y_graph_adj.view(-1)+1).to(torch.long)
-                    for fn in loss_fns["fns"]:
-                        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                        loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target":  y_labels})
-                        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                        loss = partial_fn()
-                        batch_loss += loss/self.model_cfg['batch_size']
-                        if "EdgeAcc" in fn_name:
-                            edge_acc = 1-loss
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
-                        else:
-                            edge_acc = torch.mean((preds == y_labels).to(torch.float32))
-                            batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
+                                           "preds": preds, "y_labels": y_labels, "batch_loss": batch_loss,
+                                           "batch_edge_acc": batch_edge_acc}
+                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
                 test_loss += batch_loss/self.num_val_batches
                 test_edge_acc += batch_edge_acc/self.num_val_batches
