@@ -259,7 +259,7 @@ class MTSCorrAD(torch.nn.Module):
                            "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],
-                           "graph_enc": type(self.graph_encoder).__name__,
+                           "graph_enc": type(self.graph_encoder).__name__ if hasattr(self, 'graph_encoder') else None,
                            "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
                            "min_val_loss": float('inf'),
                            "output_type": self.model_cfg['output_type'],

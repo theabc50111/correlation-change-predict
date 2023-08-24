@@ -83,7 +83,7 @@ class BaselineGRU(MTSCorrAD):
         del best_model_info["gra_enc_mlp_l"]
         del best_model_info["gra_enc_weight_l2_reg_lambda"]
         del best_model_info["graph_enc"]
-        del best_model_info["graph_enc_aggr"]
+        del best_model_info["gra_enc_aggr"]
 
         return best_model_info
 
