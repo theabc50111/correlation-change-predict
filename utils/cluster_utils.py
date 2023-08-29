@@ -1,12 +1,13 @@
 # Function: clustering utilities
-
 import logging
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sklearn
 from matplotlib.pyplot import MultipleLocator
+from scipy.cluster.hierarchy import dendrogram
 from scipy.stats import uniform
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
@@ -28,7 +29,8 @@ def calc_silhouette_label_freq_std(estimator: sklearn.base.ClusterMixin, x: pd.D
 def hrchy_clustering_distance_threshold_rs(x: pd.DataFrame, data_mat_mode: str = "precomputed", verbose: int = 0):
     param_dict = {"n_clusters": [None], "affinity": [data_mat_mode],
                   "linkage": ["single", "complete", "average"],
-                  "distance_threshold": uniform(loc=0.55, scale=0.6)}
+                  "distance_threshold": uniform(loc=0.55, scale=0.6),
+                  "compute_distances": True}
     cv = [(slice(None), slice(None))]
     hrchy_clustering_rs = RandomizedSearchCV(estimator=AgglomerativeClustering(), param_distributions=param_dict,
                                              n_iter=100000, scoring=calc_silhouette_label_freq_std, cv=cv, n_jobs=-1)
@@ -51,7 +53,8 @@ def hrchy_clustering_distance_threshold_rs(x: pd.DataFrame, data_mat_mode: str =
 
 def hrchy_clustering_n_cluster_gs(x: pd.DataFrame, data_mat_mode: str = "precomputed", verbose: int = 0):
     param_dict = {"n_clusters": range(2, 20), "affinity": [data_mat_mode],
-                  "linkage": ["single", "complete", "average"]}
+                  "linkage": ["single", "complete", "average"],
+                  "compute_distances": True}
     cv = [(slice(None), slice(None))]
     hrchy_clustering_gs = GridSearchCV(estimator=AgglomerativeClustering(), param_grid=param_dict,
                                        scoring=calc_silhouette_label_freq_std, cv=cv, n_jobs=-1)
@@ -88,7 +91,7 @@ def obs_hrchy_cluster_instances(x: pd.DataFrame, data_mat_mode: str = "precomput
 
 
 def hrchy_cluster_fixed_n_cluster(x: pd.DataFrame, n: int, data_mat_mode: str = "precomputed", verbose: int = 1):
-    hrchy_cluster = AgglomerativeClustering(n_clusters=n, linkage="complete", affinity=data_mat_mode)
+    hrchy_cluster = AgglomerativeClustering(n_clusters=n, linkage="complete", affinity=data_mat_mode, compute_distances=True)
     hrchy_cluster.fit(x)
 
     if verbose == 1:
@@ -101,7 +104,7 @@ def hrchy_cluster_fixed_n_cluster(x: pd.DataFrame, n: int, data_mat_mode: str = 
     return hrchy_cluster
 
 
-def plot_cluster_labels_distribution(trained_cluster: sklearn.base.ClusterMixin, cluster_name: str, fig_title: str):
+def plot_cluster_labels_distribution(trained_cluster: sklearn.base.ClusterMixin, cluster_name: str, fig_title: str, save_dir: Path = None):
     x_major_locator = MultipleLocator(1)
     ax = plt.gca()
     ax.xaxis.set_major_locator(x_major_locator)
@@ -110,6 +113,37 @@ def plot_cluster_labels_distribution(trained_cluster: sklearn.base.ClusterMixin,
     plt.ylabel("instances in cluster")
     plt.xlabel("cluster label")
     plt.title(f"{cluster_name}\n {fig_title}")
+    if save_dir is not None:
+        plt.savefig(save_dir/f"{cluster_name}_{fig_title}.png")
     plt.show()  # findout elbow point
     plt.close()
     logging.info(f"cluster of each point distribution: {np.unique(trained_cluster.labels_, return_counts=True)}")
+
+
+def plot_dendrogram(model, save_dir, **kwargs):
+    # Create linkage matrix and then plot the dendrogram
+
+    # create the counts of samples under each node
+    counts = np.zeros(model.children_.shape[0])
+    n_samples = len(model.labels_)
+    for i, merge in enumerate(model.children_):
+        current_count = 0
+        for child_idx in merge:
+            if child_idx < n_samples:
+                current_count += 1  # leaf node
+            else:
+                current_count += counts[child_idx - n_samples]
+        counts[i] = current_count
+
+    linkage_matrix = np.column_stack(
+        [model.children_, model.distances_, counts]
+    ).astype(float)
+
+    # Plot the corresponding dendrogram
+    ax = plt.gca()
+    kwargs["ax"] = ax
+    dendrogram(linkage_matrix, **kwargs)
+    if save_dir is not None:
+        plt.savefig(save_dir/"dendrogram.png")
+    plt.show()
+    plt.close()

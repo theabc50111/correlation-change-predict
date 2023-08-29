@@ -182,7 +182,7 @@ if __name__ == "__main__":
     gra_edges_data_mats = np.load(graph_adj_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy")
     gra_nodes_data_mats = np.load(graph_node_mat_dir/f"{ARGS.graph_nodes_v_mode}_s{s_l}_w{w_l}_nodes_mat.npy") if ARGS.graph_nodes_v_mode else np.ones((gra_edges_data_mats.shape[0], 1, gra_edges_data_mats.shape[2]))
     target_mats = np.load(target_mat_dir/f"corr_s{s_l}_w{w_l}_adj_mat.npy") if ARGS.target_mats_path else None
-    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(edges_mats=gra_edges_data_mats, nodes_mats=gra_nodes_data_mats, target_mats=target_mats)
+    norm_train_dataset, norm_val_dataset, norm_test_dataset, scaler = split_and_norm_data(edges_mats=gra_edges_data_mats, nodes_mats=gra_nodes_data_mats, target_mats=target_mats, batch_size= ARGS.batch_size)
     basic_model_cfg = {"filt_mode": ARGS.filt_mode,
                        "filt_quan": ARGS.filt_quan,
                        "quan_discrete_bins": ARGS.quan_discrete_bins,

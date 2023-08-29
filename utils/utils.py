@@ -69,7 +69,7 @@ def calc_corr_ser_property(corr_dataset: pd.DataFrame, corr_property_df_path: Pa
     return corr_property_df
 
 
-def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, target_mats: np.ndarray, show_info: bool = False):
+def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, target_mats: np.ndarray, batch_size: int, show_info: bool = False):
     """
     split dataset to train, validation, test
     normalize these dataset
@@ -78,13 +78,19 @@ def split_and_norm_data(edges_mats: np.ndarray, nodes_mats: np.ndarray, target_m
     num_graphs = len(nodes_mats)
 
     # Split to training, validation, and test sets
-    train_dataset = {"edges": edges_mats[:int(num_graphs * 0.9)], "nodes": nodes_mats[:int(num_graphs * 0.9)]}
-    val_dataset = {"edges": edges_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)], "nodes": nodes_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]}
-    test_dataset = {"edges": edges_mats[int(num_graphs * 0.95):], "nodes": nodes_mats[int(num_graphs * 0.95):]}
+
+    for val_test_pct in np.linspace(0.1, 0.3, 21):
+        if int(num_graphs * val_test_pct) > 2*batch_size:
+            train_pct = 1 - val_test_pct
+            val_pct = train_pct + (val_test_pct / 2)
+            break
+    train_dataset = {"edges": edges_mats[:int(num_graphs * train_pct)], "nodes": nodes_mats[:int(num_graphs * train_pct)]}
+    val_dataset = {"edges": edges_mats[int(num_graphs * train_pct):int(num_graphs * val_pct)], "nodes": nodes_mats[int(num_graphs * train_pct):int(num_graphs * val_pct)]}
+    test_dataset = {"edges": edges_mats[int(num_graphs * val_pct):], "nodes": nodes_mats[int(num_graphs * val_pct):]}
     if target_mats is not None:
-        train_dataset["target"] = target_mats[:int(num_graphs * 0.9)]
-        val_dataset["target"] = target_mats[int(num_graphs * 0.9):int(num_graphs * 0.95)]
-        test_dataset["target"] = target_mats[int(num_graphs * 0.95):]
+        train_dataset["target"] = target_mats[:int(num_graphs * train_pct)]
+        val_dataset["target"] = target_mats[int(num_graphs * train_pct):int(num_graphs * val_pct)]
+        test_dataset["target"] = target_mats[int(num_graphs * val_pct):]
     else:
         train_dataset["target"] = train_dataset["edges"]
         val_dataset["target"] = val_dataset["edges"]
