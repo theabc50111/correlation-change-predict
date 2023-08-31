@@ -72,7 +72,7 @@ elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
     model_timedelta_list = [timedelta(hours=1, minutes=25)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 else:
     num_models = len(args_list)
-    model_timedelta_list = [timedelta(hours=2, minutes=40)]
+    model_timedelta_list = [timedelta(hours=1, minutes=25)]
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list
