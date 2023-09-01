@@ -73,7 +73,7 @@ DATASETS:
         TRAIN_SET: ['ALL', 'BRK', 'CB', 'CINF', 'COG', 'GE', 'MAT', 'MSI', 'RRC', 'VZ']
         OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_10_cluster_label_7th"
     SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_ALL_MIX:
-        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre-extension/pearson/corr_s1_w50/corr_ser_calc_reg/corr_ser_std/sim/no_filtered/corr_mat_hrchy_10_cluster_label_all_mix-pre.csv"
+        FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20082017-adj_close-pre-extension/pearson/corr_s1_w50/corr_ser_calc_regular/corr_ser_std/sim/no_filtered/corr_mat_hrchy_10_cluster_label_all_mix-pre.csv"
         TRAIN_SET: ['BRK', 'HON', 'LEN', 'MSCI', 'NEE', 'NFLX', 'NFX', 'PKG', 'UAA', 'URI']
         OUTPUT_FILE_NAME_BASIS: "sp500_20082017_corr_ser_reg_std_corr_mat_hrchy_10_cluster_label_all_mix"
     SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_HALF_MIX:
