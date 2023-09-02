@@ -31,13 +31,13 @@ then
         if [ "$gpu" = "true" ];
         then
             echo "Run contianer in deamon!!!!!!!!!"
-            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it --rm -d -p $port:8888 \
+            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it  -d -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
         else
             echo "Run contianer in deamon!!!!!!!!!"
-            docker container run -v /etc/localtime:/etc/localtime:ro -it --rm -d -p $port:8888 \
+            docker container run -v /etc/localtime:/etc/localtime:ro -it  -d -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
@@ -45,12 +45,12 @@ then
     else
         if [ "$gpu" = "true"];
         then
-            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it --rm -p $port:8888 \
+            docker container run --gpus all -v /etc/localtime:/etc/localtime:ro -it  -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
         else
-            docker container run -it -v /etc/localtime:/etc/localtime:ro --rm -p $port:8888 \
+            docker container run -it -v /etc/localtime:/etc/localtime:ro  -p $port:8888 \
             --mount type=bind,source=$folder_path,target=/workspace \
             --name $container_name \
             abc50111/pytorch:thesis
