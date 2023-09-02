@@ -1,8 +1,10 @@
 # Function: clustering utilities
 import logging
 from pathlib import Path
+from time import time
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import sklearn
@@ -102,6 +104,27 @@ def hrchy_cluster_fixed_n_cluster(x: pd.DataFrame, n: int, data_mat_mode: str = 
         print("-"*50)
 
     return hrchy_cluster
+
+
+def filter_distance_mat(distance_mat: pd.DataFrame, filter_mask: pd.DataFrame, tmp_clique_dir: Path) -> tuple[pd.DataFrame, list]:
+    if filter_mask is not None:
+        original_distance_mat_diagonal = np.diag(distance_mat.values).copy()
+        distance_mat[filter_mask] = 0
+        G = nx.from_pandas_adjacency(distance_mat)
+        max_clique = []
+        train_start_t = time()
+        for i, clique in enumerate(nx.find_cliques(G)):
+            logging.debug(f"{i}th clique: {clique}")
+            if len(clique) > len(max_clique):
+                max_clique = clique
+            now_t = time()
+            if now_t - train_start_t > 1800:  # 30 minutes
+                logging.warn(f"clique search time out: {now_t - train_start_t} seconds")
+                break
+        distance_mat = distance_mat.loc[max_clique, max_clique]
+        np.fill_diagonal(distance_mat.values, original_distance_mat_diagonal)
+
+    return distance_mat, max_clique
 
 
 def plot_cluster_labels_distribution(trained_cluster: sklearn.base.ClusterMixin, cluster_name: str, fig_title: str, save_dir: Path = None):
