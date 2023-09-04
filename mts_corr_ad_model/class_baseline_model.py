@@ -122,12 +122,19 @@ class ClassBaselineGRU(BaselineGRU):
                 epoch_metrics["decoder_gradient"] += sum([p.grad.sum() for p in self.decoder.parameters() if p.grad is not None])/num_batches
 
             # Validation
-            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns)
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'], val_preds, val_y_labels = self.test(val_data, loss_fns=loss_fns)
 
             # record training history and save best model
+            epoch_metrics["tr_last_batch_preds"] = preds
+            epoch_metrics["tr_last_batch_labels"] = y_labels
+            epoch_metrics["val_preds"] = val_preds
+            epoch_metrics["val_labels"] = val_y_labels
             for k, v in epoch_metrics.items():
                 history_list = best_model_info.setdefault(k+"_history", [])
-                history_list.append(v.item())
+                if v.dim() < 2:
+                    history_list.append(v.item())
+                else:
+                    history_list.append(v.cpu().detach().numpy().tolist())
             if epoch_i == 0:
                 best_model_info["model_structure"] = str(self)
             if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
@@ -139,7 +146,8 @@ class ClassBaselineGRU(BaselineGRU):
             if epoch_i == 0:
                 logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
+                no_show_metrics = ["tr_last_batch_preds", "tr_last_batch_labels", "val_preds", "val_labels"]
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items() if k not in no_show_metrics])
                 logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
             if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3}, data_batch_idx:7 \ninput_graph_adj[7, 0, :5]:\n{x[7, 0, :5]}\npred_graph_adj[7, :5]:\n{preds[7, :5]}\ny_graph_adj[7, :5]:\n{y[7, :5]}\n")
@@ -160,7 +168,6 @@ class ClassBaselineGRU(BaselineGRU):
                 pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
                 preds = torch.argmax(pred_prob, dim=1)
                 y_labels = (y+1).to(torch.long)
-
                 for fn in loss_fns["fns"]:
                     fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                     loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
@@ -173,8 +180,9 @@ class ClassBaselineGRU(BaselineGRU):
                     else:
                         edge_acc = (preds == y_labels).to(torch.float).mean()
                         batch_edge_acc += edge_acc
+                print(f"val_pred.shape: {preds.shape}, val_y.shape: {y_labels.shape}")
 
                 test_edge_acc += edge_acc / num_batches
                 test_loss += batch_loss / num_batches
 
-        return test_loss, test_edge_acc
+        return test_loss, test_edge_acc, preds, y_labels

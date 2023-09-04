@@ -115,10 +115,12 @@ def filter_distance_mat(distance_mat: pd.DataFrame, filter_mask: pd.DataFrame, t
         train_start_t = time()
         for i, clique in enumerate(nx.find_cliques(G)):
             logging.debug(f"{i}th clique: {clique}")
+            with open(tmp_clique_dir/"tmp_cliques.txt", "a") as f:
+                f.write(f"{clique}\n")
             if len(clique) > len(max_clique):
                 max_clique = clique
             now_t = time()
-            if now_t - train_start_t > 1800:  # 30 minutes
+            if now_t - train_start_t > 10800:  # 30 minutes
                 logging.warn(f"clique search time out: {now_t - train_start_t} seconds")
                 break
         distance_mat = distance_mat.loc[max_clique, max_clique]
