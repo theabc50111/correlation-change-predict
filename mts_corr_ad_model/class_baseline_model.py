@@ -180,7 +180,6 @@ class ClassBaselineGRU(BaselineGRU):
                     else:
                         edge_acc = (preds == y_labels).to(torch.float).mean()
                         batch_edge_acc += edge_acc
-                print(f"val_pred.shape: {preds.shape}, val_y.shape: {y_labels.shape}")
 
                 test_edge_acc += edge_acc / num_batches
                 test_loss += batch_loss / num_batches
