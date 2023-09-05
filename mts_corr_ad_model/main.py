@@ -122,6 +122,8 @@ if __name__ == "__main__":
                              help="input the number of gru hidden size")
     args_parser.add_argument("--two_ord_pred_prob_edge_accu_thres", type=float, nargs='?', default=None,
                              help="input the threshold of TwoOrderPredProbEdgeAccuracy")
+    args_parser.add_argument("--use_weighted_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,
+                             help="input --use_weighted_loss to use CrossEntropyLoss weight")
     args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
                              help="input the absolute tolerance of edge acc loss")
     args_parser.add_argument("--use_bin_edge_acc_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
@@ -222,7 +224,10 @@ if __name__ == "__main__":
                      "fn_args": {"MSELoss()": {}}}
     if ARGS.output_type == "class_probability":
         loss_fns_dict["fns"].clear(); loss_fns_dict["fn_args"].clear()
-        loss_fns_dict["fns"].append(CrossEntropyLoss())
+        if ARGS.use_weighted_loss:
+            tr_labels, tr_labels_freq_counts = np.unique(norm_train_dataset['target'], return_counts=True)
+            weight = torch.tensor(np.reciprocal(tr_labels_freq_counts/tr_labels_freq_counts.sum()))
+        loss_fns_dict["fns"].append(CrossEntropyLoss(weight if ARGS.use_weighted_loss else None))
         loss_fns_dict["fn_args"].update({"CrossEntropyLoss()": {}})
     elif ARGS.use_bin_edge_acc_loss is True:
         bins_list = convert_str_bins_list(ARGS.target_mats_path.split("/")[-1])

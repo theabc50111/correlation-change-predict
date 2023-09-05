@@ -256,6 +256,7 @@ class MTSCorrAD(torch.nn.Module):
                            "gra_enc_mlp_l": self.model_cfg['gra_enc_mlp_l'],
                            "decoder": self.model_cfg['decoder'].__name__,
                            "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
+                           "loss_weight": [{fn.__name__ if hasattr(fn, '__name__') else str(fn): str(getattr(fn, "weight", None))} for fn in loss_fns["fns"]],
                            "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
                            "drop_pos": self.model_cfg["drop_pos"],
                            "drop_p": self.model_cfg["drop_p"],

@@ -125,16 +125,19 @@ class ClassBaselineGRU(BaselineGRU):
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'], val_preds, val_y_labels = self.test(val_data, loss_fns=loss_fns)
 
             # record training history and save best model
-            epoch_metrics["tr_last_batch_preds"] = preds
-            epoch_metrics["tr_last_batch_labels"] = y_labels
+            epoch_metrics["tr_preds"] = preds  # only record the last batch
+            epoch_metrics["tr_labels"] = y_labels
             epoch_metrics["val_preds"] = val_preds
             epoch_metrics["val_labels"] = val_y_labels
             for k, v in epoch_metrics.items():
                 history_list = best_model_info.setdefault(k+"_history", [])
-                if v.dim() < 2:
-                    history_list.append(v.item())
+                if isinstance(v, torch.Tensor):
+                    if v.dim() == 0 or (v.dim() == 1 and v.shape[0] == 1):
+                        history_list.append(v.item())
+                    elif v.dim() >= 2 or v.shape[0] > 1:
+                        history_list.append(v.cpu().detach().numpy().tolist())
                 else:
-                    history_list.append(v.cpu().detach().numpy().tolist())
+                    history_list.append(v)
             if epoch_i == 0:
                 best_model_info["model_structure"] = str(self)
             if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
@@ -146,8 +149,7 @@ class ClassBaselineGRU(BaselineGRU):
             if epoch_i == 0:
                 logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                no_show_metrics = ["tr_last_batch_preds", "tr_last_batch_labels", "val_preds", "val_labels"]
-                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items() if k not in no_show_metrics])
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items() if v.dim() < 2])
                 logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
             if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3}, data_batch_idx:7 \ninput_graph_adj[7, 0, :5]:\n{x[7, 0, :5]}\npred_graph_adj[7, :5]:\n{preds[7, :5]}\ny_graph_adj[7, :5]:\n{y[7, :5]}\n")

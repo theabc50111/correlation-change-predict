@@ -187,14 +187,23 @@ class ClassMTSCorrAD(MTSCorrAD):
                 # used in observation model info in console
                 log_model_info_data = data
                 log_model_info_batch_idx = batch_idx
-
             # Validation
-            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
+            epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'], val_preds, val_y_labels = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
 
             # record training history and save best model
+            epoch_metrics["tr_preds"] = preds  # only record the last batch
+            epoch_metrics["tr_labels"] = y_labels
+            epoch_metrics["val_preds"] = val_preds
+            epoch_metrics["val_labels"] = val_y_labels
             for k, v in epoch_metrics.items():
                 history_list = best_model_info.setdefault(k+"_history", [])
-                history_list.append(v.item() if isinstance(v, torch.Tensor) else v)
+                if isinstance(v, torch.Tensor):
+                    if v.dim() == 0 or (v.dim() == 1 and v.shape[0] == 1):
+                        history_list.append(v.item())
+                    elif v.dim() >= 2 or v.shape[0] > 1:
+                        history_list.append(v.cpu().detach().numpy().tolist())
+                else:
+                    history_list.append(v)
             if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
                 best_model = copy.deepcopy(self.state_dict())
                 best_model_info["best_val_epoch"] = epoch_i
@@ -209,7 +218,8 @@ class ClassMTSCorrAD(MTSCorrAD):
                 if show_model_info:
                     logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
-                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
+                no_show_metrics = ["pred_gra_embeds", "y_gra_embeds", "gra_embeds_disparity", "tr_preds", "tr_labels", "val_preds", "val_labels"]
+                epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if k not in no_show_metrics])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npreds:\n{preds}\ny_graph_adj:\n{y_graph_adj}\n")
@@ -242,4 +252,4 @@ class ClassMTSCorrAD(MTSCorrAD):
                 test_loss += batch_loss/self.num_val_batches
                 test_edge_acc += batch_edge_acc/self.num_val_batches
 
-        return test_loss, test_edge_acc
+        return test_loss, test_edge_acc, preds, y_labels
