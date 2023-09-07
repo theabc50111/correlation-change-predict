@@ -1,37 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
-import argparse
 import copy
 import functools
-import json
 import logging
-import sys
-from collections import OrderedDict
-from datetime import datetime
-from math import ceil, sqrt
-from pathlib import Path
-from pprint import pformat
+from math import ceil, isclose
 
-import dynamic_yaml
 import numpy as np
 import torch
-import yaml
-from torch.nn import (GRU, BatchNorm1d, Dropout, Linear, MSELoss, Sequential,
-                      Softmax)
-from torch_geometric.nn.models.autoencoder import InnerProductDecoder
+from torch.nn import GRU, Dropout, Linear, Sequential, Softmax
 from tqdm import tqdm
 
-sys.path.append("/workspace/correlation-change-predict/utils")
-from utils import split_and_norm_data
-
 from baseline_model import BaselineGRU
-from encoder_decoder import MLPDecoder, ModifiedInnerProductDecoder
-
-current_dir = Path(__file__).parent
-data_config_path = current_dir / "../config/data_config.yaml"
-with open(data_config_path) as f:
-    data_cfg_yaml = dynamic_yaml.load(f)
-    data_cfg = yaml.full_load(dynamic_yaml.dump(data_cfg_yaml))
 
 logger = logging.getLogger(__name__)
 logger_console = logging.StreamHandler()
@@ -47,17 +26,19 @@ class ClassBaselineGRU(BaselineGRU):
         self.model_cfg = model_cfg
 
         # set model components
+        self.graph_size = self.model_cfg["num_nodes"]**2
+        self.fc_out_dim = self.graph_size
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
-        self.fc1 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
-        self.fc2 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
-        self.fc3 = Sequential(Linear(self.model_cfg["num_nodes"]**2, self.model_cfg["num_nodes"]**2), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc1 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.softmax = Softmax(dim=0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
-        batch_pred_prob = torch.empty(x.shape[0], 3, self.model_cfg['num_nodes']**2)
+        batch_pred_prob = torch.empty(x.shape[0], 3, self.fc_out_dim)
         gru_output, gru_hn = self.gru(x)
         # Decoder (Graph Adjacency Reconstruction)
         for data_batch_idx in range(x.shape[0]):
@@ -184,3 +165,44 @@ class ClassBaselineGRU(BaselineGRU):
                 test_loss += batch_loss / num_batches
 
         return test_loss, test_edge_acc, preds, y_labels
+
+
+class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
+    def __init__(self, model_cfg: dict, **unused_kwargs):
+        super(ClassBaselineGRUWithoutSelfCorr, self).__init__(model_cfg)
+
+        # set model components
+        self.gru_in_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
+        self.fc_out_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
+        assert isclose(self.gru_in_dim, (self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1)), "self.gru_in_dim is not an integer"
+        self.gru = GRU(input_size=self.gru_in_dim, hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
+        self.fc1 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+
+    def transform_graph_adj_to_only_triu(self, graph_adj_mats: np.ndarray):
+        graph_adj_mats[graph_adj_mats == 0] = -100
+        for i, graph_adj_t in enumerate(graph_adj_mats):
+            graph_adj_mats[i] = np.triu(graph_adj_t, k=1)
+        graph_adj_mats = graph_adj_mats.reshape(-1, self.graph_size)
+        graph_adj_mats = np.apply_along_axis(lambda x: x[x != 0], 1, graph_adj_mats)
+        graph_adj_mats[graph_adj_mats == -100] = 0
+        return graph_adj_mats
+
+    def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
+        graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)
+        target_arr = self.transform_graph_adj_to_only_triu(target_mats)
+        for g_t in range(0, graph_time_step, batch_size):
+            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
+            if cur_batch_size <= 0: break
+            batch_x = torch.empty((cur_batch_size, seq_len, self.gru_in_dim)).fill_(np.nan)
+            batch_y = torch.empty((cur_batch_size, self.fc_out_dim)).fill_(np.nan)
+            for data_batch_idx in range(cur_batch_size):
+                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
+                batch_x[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[begin_t:end_t], nan=0))
+                batch_y[data_batch_idx] = torch.tensor(np.nan_to_num(target_arr[end_t], nan=0))
+
+            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
+
+            yield batch_x, batch_y
