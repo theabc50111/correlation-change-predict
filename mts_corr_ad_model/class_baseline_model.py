@@ -160,7 +160,7 @@ class ClassBaselineGRU(BaselineGRU):
         with torch.no_grad():
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil((len(test_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
-            for batch_idx, batch_data in enumerate(batch_data_generator):
+            for batch_data in batch_data_generator:
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]
