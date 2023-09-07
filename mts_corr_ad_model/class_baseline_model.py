@@ -45,8 +45,6 @@ class ClassBaselineGRU(BaselineGRU):
     def __init__(self, model_cfg: dict, **unused_kwargs):
         super(ClassBaselineGRU, self).__init__(model_cfg)
         self.model_cfg = model_cfg
-        # create data loader
-        self.num_tr_batches = self.model_cfg["num_batches"]['train']
 
         # set model components
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
@@ -57,7 +55,6 @@ class ClassBaselineGRU(BaselineGRU):
         self.softmax = Softmax(dim=0)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
-
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
         batch_pred_prob = torch.empty(x.shape[0], 3, self.model_cfg['num_nodes']**2)
@@ -81,7 +78,6 @@ class ClassBaselineGRU(BaselineGRU):
         if train_data is None:
             return self
 
-        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         self.show_model_struture()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
@@ -91,6 +87,7 @@ class ClassBaselineGRU(BaselineGRU):
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
+            num_batches = ceil((len(train_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
             for batch_data in batch_data_generator:
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)
@@ -162,8 +159,8 @@ class ClassBaselineGRU(BaselineGRU):
         test_edge_acc = 0
         with torch.no_grad():
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
-            num_batches = ceil(len(test_data['edges'])//self.model_cfg['batch_size'])+1
-            for batch_data in batch_data_generator:
+            num_batches = ceil((len(test_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
+            for batch_idx, batch_data in enumerate(batch_data_generator):
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]

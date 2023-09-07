@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ["--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_LAST"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
+data_implement_list = ["--data_implement SP500_20112015_CORR_SER_REG_STD_CORR_MAT_NEGATIVE_FILTERED"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
 batch_size_list = [""]
 train_models_list = ["--train_models CLASSBASELINE"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
@@ -21,7 +21,7 @@ discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_dis
 learning_rate_list = [""]  # ["--learn_rate 0.0001", "--learn_rate 0.0005", "--learn_rate 0.001", "--learn_rate 0.005", "--learn_rate 0.01", "--learn_rate 0.05", "--learn_rate 0.1"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
 graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
-drop_pos_list = ["--drop_pos class_fc", "--drop_pos gru"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
+drop_pos_list = ["--drop_pos class_fc"]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
 drop_p_list = ["--drop_p 0.05", "--drop_p 0.1", "--drop_p 0.15", "--drop_p 0.2", "--drop_p 0.3"]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "--gra_enc_aggr max"]
@@ -74,7 +74,7 @@ elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
     model_timedelta_list = [timedelta(hours=1, minutes=25)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 else:
     num_models = len(args_list)
-    model_timedelta_list = [timedelta(hours=2, minutes=25)]
+    model_timedelta_list = [timedelta(hours=1, minutes=25)]
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list

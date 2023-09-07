@@ -46,6 +46,8 @@ class BaselineGRU(MTSCorrAD):
         self.model_cfg = model_cfg
         # create data loader
         self.num_tr_batches = self.model_cfg["num_batches"]['train']
+        self.num_val_batches = self.model_cfg["num_batches"]['val']
+        self.num_test_batches = self.model_cfg["num_batches"]['test']
 
         # set model components
         self.gru = GRU(input_size=self.model_cfg['gru_in_dim'], hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
@@ -77,7 +79,6 @@ class BaselineGRU(MTSCorrAD):
         Initialize best_model_info
         """
         best_model_info = super().init_best_model_info(train_data, loss_fns, epochs)
-        best_model_info["batches_per_epoch"] = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
         del best_model_info["gra_enc_l"]
         del best_model_info["gra_enc_h"]
         del best_model_info["gra_enc_mlp_l"]
@@ -93,7 +94,7 @@ class BaselineGRU(MTSCorrAD):
         if train_data is None:
             return self
 
-        num_batches = ceil(len(train_data['edges'])//self.model_cfg['batch_size'])+1
+        num_batches = ceil((len(train_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
         self.show_model_struture()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
@@ -161,7 +162,7 @@ class BaselineGRU(MTSCorrAD):
         test_edge_acc = 0
         with torch.no_grad():
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
-            num_batches = ceil(len(test_data['edges'])//self.model_cfg['batch_size'])+1
+            num_batches = ceil((len(test_data['edges'])-self.model_cfg['seq_len'])//self.model_cfg['batch_size'])
             for batch_data in batch_data_generator:
                 batch_loss = torch.zeros(1)
                 batch_edge_acc = torch.zeros(1)

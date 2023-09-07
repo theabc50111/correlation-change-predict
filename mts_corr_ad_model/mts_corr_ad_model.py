@@ -174,8 +174,9 @@ class MTSCorrAD(torch.nn.Module):
         super(MTSCorrAD, self).__init__()
         self.model_cfg = model_cfg
         # create data loader
-        self.num_tr_batches = self.model_cfg["num_batches"]['train']
-        self.num_val_batches = self.model_cfg["num_batches"]['val']
+        self.num_tr_batches = max(1, self.model_cfg["num_batches"]['train']-1)  # the number of batches in training data loader, -1 because the last batch is not full
+        self.num_val_batches = max(1, self.model_cfg["num_batches"]['val']-1)
+        self.num_test_batches = max(1, self.model_cfg["num_batches"]['test']-1)
 
         # set model components
         self.graph_encoder = self.model_cfg['graph_encoder'](**self.model_cfg)
@@ -326,6 +327,7 @@ class MTSCorrAD(torch.nn.Module):
         best_model = []
         num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])
+        num_batches = len(train_loader)
         for epoch_i in tqdm(range(epochs)):
             self.train()
             epoch_metrics = {"tr_loss": torch.zeros(1), "val_loss": torch.zeros(1), "gra_enc_weight_l2_reg": torch.zeros(1), "tr_edge_acc": torch.zeros(1), "val_edge_acc": torch.zeros(1),
@@ -360,12 +362,12 @@ class MTSCorrAD(torch.nn.Module):
                 pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                 y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
-                epoch_metrics["tr_loss"] += batch_loss/self.num_tr_batches
-                epoch_metrics["tr_edge_acc"] += batch_edge_acc/self.num_tr_batches
-                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty/self.num_tr_batches
-                epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["gru_grad"] += sum(p.grad.sum() for layer in self.modules() if isinstance(layer, GRU) for p in layer.parameters() if p.grad is not None)/self.num_tr_batches
-                epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/self.num_tr_batches
+                epoch_metrics["tr_loss"] += batch_loss/num_batches
+                epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
+                epoch_metrics["gra_enc_weight_l2_reg"] += gra_enc_weight_l2_penalty/num_batches
+                epoch_metrics["gra_enc_grad"] += sum(p.grad.sum() for p in self.graph_encoder.parameters() if p.grad is not None)/num_batches
+                epoch_metrics["gru_grad"] += sum(p.grad.sum() for layer in self.modules() if isinstance(layer, GRU) for p in layer.parameters() if p.grad is not None)/num_batches
+                epoch_metrics["gra_dec_grad"] += sum(p.grad.sum() for p in self.decoder.parameters() if p.grad is not None)/num_batches
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
                 epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
@@ -407,6 +409,7 @@ class MTSCorrAD(torch.nn.Module):
         test_edge_acc = 0
         num_nodes = self.model_cfg["num_nodes"]
         test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], target_mats=test_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
+        num_batches = len(test_loader)
         with torch.no_grad():
             for batch_data in test_loader:
                 batch_loss = torch.zeros(1)
@@ -421,8 +424,8 @@ class MTSCorrAD(torch.nn.Module):
                                            "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc}
                     batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
-                test_loss += batch_loss/self.num_val_batches
-                test_edge_acc += batch_edge_acc/self.num_val_batches
+                test_loss += batch_loss/num_batches
+                test_edge_acc += batch_edge_acc/num_batches
 
         return test_loss, test_edge_acc
 
