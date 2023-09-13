@@ -132,11 +132,11 @@ class ClassBaselineGRU(BaselineGRU):
                     history_list.append(v)
             if epoch_i == 0:
                 best_model_info["model_structure"] = str(self)
-            if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
+            if epoch_metrics['val_edge_acc'] > best_model_info["max_val_edge_acc"]:
                 best_model = copy.deepcopy(self.state_dict())
                 best_model_info["best_val_epoch"] = epoch_i
-                best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
-                best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
+                best_model_info["max_val_edge_acc_val_loss"] = epoch_metrics['val_loss'].item()
+                best_model_info["max_val_edge_acc"] = epoch_metrics['val_edge_acc'].item()
 
             if epoch_i == 0:
                 logger.info(f"\nModel Structure: \n{self}")

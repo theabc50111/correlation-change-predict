@@ -245,11 +245,11 @@ class ClassMTSCorrAD(MTSCorrAD):
                         history_list.append(v.cpu().detach().numpy().tolist())
                 else:
                     history_list.append(v)
-            if epoch_metrics['val_loss'] < best_model_info["min_val_loss"]:
+            if epoch_metrics['val_edge_acc'] > best_model_info["max_val_edge_acc"]:
                 best_model = copy.deepcopy(self.state_dict())
                 best_model_info["best_val_epoch"] = epoch_i
-                best_model_info["min_val_loss"] = epoch_metrics['val_loss'].item()
-                best_model_info["min_val_loss_edge_acc"] = epoch_metrics['val_edge_acc'].item()
+                best_model_info["max_val_edge_acc_val_loss"] = epoch_metrics['val_loss'].item()
+                best_model_info["max_val_edge_acc"] = epoch_metrics['val_edge_acc'].item()
 
             # Check if graph_encoder.parameters() have been updated
             assert sum(map(abs, best_model_info['gra_enc_grad_history'])) > 0, f"Sum of gradient of MTSCorrAD.graph_encoder in epoch_{epoch_i}:{sum(map(abs, best_model_info['gra_enc_grad_history']))}"

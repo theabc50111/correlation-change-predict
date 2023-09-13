@@ -124,8 +124,8 @@ class BaselineGRU(MTSCorrAD):
             return self
 
         num_batches = ceil((len(train_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
-        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
+        self.show_model_config()
         best_model = []
         for epoch_i in tqdm(range(epochs)):
             self.train()
