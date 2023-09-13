@@ -165,6 +165,7 @@ class ClassMTSCorrAD(MTSCorrAD):
 
         self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
+        best_model_info.update({"max_val_edge_acc": 0})
         best_model = []
         ###num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])

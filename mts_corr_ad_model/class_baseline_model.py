@@ -70,6 +70,7 @@ class ClassBaselineGRU(BaselineGRU):
             return self
 
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
+        best_model_info.update({"max_val_edge_acc": 0})
         self.show_model_config()
         best_model = []
         for epoch_i in tqdm(range(epochs)):
