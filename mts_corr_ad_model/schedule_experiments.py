@@ -6,7 +6,7 @@ from pprint import pprint
 
 data_implement_list = ["--data_implement SP500_20112015_CORR_SER_REG_STD_CORR_MAT_NEGATIVE_FILTERED"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
 batch_size_list = [""]
-train_models_list = ["--train_models CLASSBASELINEWITHOUTSELFCORR"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
+train_models_list = ["--train_models CLASSBASELINEONEFEATURE"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
 seq_len_list = ["--seq_len 30"]  # ["--seq_len 5", "--seq_len 10"]
 filt_mode_list = [""]  # ["", "--filt_mode keep_strong", "--filt_mode keep_positive", "--filt_mode keep_abs"]
@@ -28,8 +28,9 @@ gra_enc_aggr_list = [""]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "-
 gra_enc_l_list = [""]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
 gra_enc_h_list = [""]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"]
 gra_enc_mlp_l_list = [""]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
-gru_l_list = ["--gru_l 2", "--gru_l 3", "--gru_l 4"]  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
-gru_h_list = ["--gru_h 80", "--gru_h 160", "--gru_h 240"]  # ["--gru_h 40", "--gru_h 80", "--gru_h 100", "--gru_h 320", "--gru_h 640"]
+gru_l_list = []  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
+gru_h_list = []  # ["--gru_h 40", "--gru_h 80", "--gru_h 100", "--gru_h 320", "--gru_h 640"]
+gru_input_feature_idx_list = ["--gru_input_feature_idx 0", "--gru_input_feature_idx 1", "--gru_input_feature_idx 2"]  # ["", "--gru_input_feature_idx 0", "--gru_input_feature_idx 1", "--gru_input_feature_idx 2", "--gru_input_feature_idx 3", "--gru_input_feature_idx 4"]
 use_weighted_loss_list = [""]  # ["", "--use_weighted_loss true"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 two_ord_pred_prob_edge_accu_thres_list = [""]  # ["", "--two_ord_pred_prob_edge_accu_thres 0.1", "--two_ord_pred_prob_edge_accu_thres 0.2"]
@@ -40,10 +41,10 @@ output_bins_list = [""]  # ["--output_bins -1 --output_bins -0.25 --output_bins 
 args_values = list(product(data_implement_list, batch_size_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
                            custom_discrete_bins_list, nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, learning_rate_list, weight_decay_list,
                            graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list, gra_enc_mlp_l_list, gru_l_list, gru_h_list,
-                           use_weighted_loss_list, edge_acc_loss_atol_list, two_ord_pred_prob_edge_accu_thres_list, use_edge_acc_bins_list, output_type_list, output_bins_list))
+                           gru_input_feature_idx_list, use_weighted_loss_list, edge_acc_loss_atol_list, two_ord_pred_prob_edge_accu_thres_list, use_edge_acc_bins_list, output_type_list, output_bins_list))
 args_keys = ["data_implement", "batch_size", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "quan_discrete_bins", "custom_discrete_bins", "nodes_v_mode", "target_mats_path", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
-             "learning_rate", "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "use_weighted_loss", "edge_acc_loss_atol",
-             "two_ord_pred_prob_edge_accu_thres", "use_edge_acc_bins", "output_type", "output_bins"]
+             "learning_rate", "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "gru_input_feature_idx", "use_weighted_loss",
+             "edge_acc_loss_atol", "two_ord_pred_prob_edge_accu_thres", "use_edge_acc_bins", "output_type", "output_bins"]
 args_list = []
 for args_value in args_values:
     args_dict = dict(zip(args_keys, args_value))
@@ -74,7 +75,7 @@ elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
     model_timedelta_list = [timedelta(hours=1, minutes=20), timedelta(hours=1, minutes=20), timedelta(hours=1, minutes=25)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_list
 else:
     num_models = len(args_list)
-    model_timedelta_list = [timedelta(hours=1, minutes=20)]
+    model_timedelta_list = [timedelta(hours=1, minutes=10)]
 
 model_timedelta_list = list(chain.from_iterable(repeat(x, num_models) for x in model_timedelta_list))
 model_timedelta_list = [0] + model_timedelta_list

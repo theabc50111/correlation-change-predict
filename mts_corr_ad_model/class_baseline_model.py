@@ -69,8 +69,8 @@ class ClassBaselineGRU(BaselineGRU):
         if train_data is None:
             return self
 
-        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
+        self.show_model_config()
         best_model = []
         for epoch_i in tqdm(range(epochs)):
             self.train()
@@ -196,10 +196,11 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         super(ClassBaselineGRUWithoutSelfCorr, self).__init__(model_cfg)
 
         # set model components
-        self.gru_in_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
-        self.fc_out_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
-        assert isclose(self.gru_in_dim, (self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1)), "self.gru_in_dim is not an integer"
-        self.gru = GRU(input_size=self.gru_in_dim, hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
+        ###self.gru_in_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
+        ###self.fc_out_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
+        self.fc_out_dim = self.model_cfg["gru_in_dim"]
+        ###assert isclose(self.gru_in_dim, (self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1)), "self.gru_in_dim is not an integer"
+        ###self.gru = GRU(input_size=self.gru_in_dim, hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.fc1 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
@@ -220,7 +221,30 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         for g_t in range(0, graph_time_step, batch_size):
             cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
             if cur_batch_size <= 0: break
-            batch_x = torch.empty((cur_batch_size, seq_len, self.gru_in_dim)).fill_(np.nan)
+            batch_x = torch.empty((cur_batch_size, seq_len, self.model_cfg['gru_in_dim'])).fill_(np.nan)
+            batch_y = torch.empty((cur_batch_size, self.fc_out_dim)).fill_(np.nan)
+            for data_batch_idx in range(cur_batch_size):
+                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
+                batch_x[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[begin_t:end_t], nan=0))
+                batch_y[data_batch_idx] = torch.tensor(np.nan_to_num(target_arr[end_t], nan=0))
+
+            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
+
+            yield batch_x, batch_y
+
+
+class  ClassBaselineGRUOneFeature(ClassBaselineGRUWithoutSelfCorr):
+    """
+    Only use one feature of graph adjacency matrix as input
+    """
+    def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
+        graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
+        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
+        for g_t in range(0, graph_time_step, batch_size):
+            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
+            if cur_batch_size <= 0: break
+            batch_x = torch.empty((cur_batch_size, seq_len, self.model_cfg['gru_in_dim'])).fill_(np.nan)
             batch_y = torch.empty((cur_batch_size, self.fc_out_dim)).fill_(np.nan)
             for data_batch_idx in range(cur_batch_size):
                 begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
