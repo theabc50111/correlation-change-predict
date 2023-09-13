@@ -93,7 +93,7 @@ class ClassMTSCorrAD3(ClassMTSCorrAD):
                                           ("class_fc3_relu", ReLU()),
                                           ("class_fc3_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
                                           ]))
-        self.softmax = Softmax(dim=1)
+        self.softmax = Softmax(dim=0)
         del self.gru1
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
@@ -133,7 +133,7 @@ class ClassMTSCorrAD3(ClassMTSCorrAD):
         fc1_output = self.fc1(flatten_pred_graph_adj)
         fc2_output = self.fc2(flatten_pred_graph_adj)
         fc3_output = self.fc3(flatten_pred_graph_adj)
-        logits = torch.cat([fc1_output, fc2_output, fc3_output], dim=0).t()
+        logits = torch.cat([fc1_output, fc2_output, fc3_output], dim=0)
         outputs = self.softmax(logits)
 
         return outputs

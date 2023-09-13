@@ -191,7 +191,7 @@ class MTSCorrAD(torch.nn.Module):
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
         self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
 
-    def show_model_struture(self):
+    def show_model_config(self):
         """
         Show model information
         """
@@ -202,8 +202,8 @@ class MTSCorrAD(torch.nn.Module):
         else:
             observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
 
-
         logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
+        logger.info("="*80)
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """
@@ -273,36 +273,93 @@ class MTSCorrAD(torch.nn.Module):
 
         return best_model_info
 
-    def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
-                     batch_edge_acc: torch.Tensor, preds: torch.Tensor = None, y_labels: torch.Tensor = None, epoch_metrics: dict = None):
+    def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, num_batches: int,
+                     preds: torch.Tensor = None, y_labels: torch.Tensor = None, epoch_metrics: dict = None):
+    ###def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
+    ###                 batch_edge_acc: torch.Tensor, preds: torch.Tensor = None, y_labels: torch.Tensor = None,
+    ###                 epoch_metrics: dict = None):
         """
         Calculate loss function
         """
         has_calc_edge_acc = False
+        batch_loss = torch.zeros(1)
+        batch_edge_acc = torch.zeros(1)
         for fn in loss_fns["fns"]:
             fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
             loss_fns["fn_args"][fn_name].update({"input": loss_fn_input, "target": loss_fn_target})
             partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
             loss = partial_fn()
-            batch_loss += loss/self.model_cfg['batch_size']
-            if epoch_metrics:
-                epoch_metrics[fn_name] += loss/(self.num_tr_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
+            batch_loss += loss
+            if epoch_metrics is not None:
+                epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
             if has_calc_edge_acc:
                 continue
             if "EdgeAcc" in fn_name:
                 edge_acc = 1-loss
-                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
-                has_calc_edge_acc = True
             elif self.model_cfg.get("edge_acc_metric_fn"):
                 edge_acc = self.model_cfg.get("edge_acc_metric_fn")(loss_fn_input, loss_fn_target)
-                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
-                has_calc_edge_acc = True
             elif preds is not None and y_labels is not None:
-                edge_acc = torch.mean((preds == y_labels).to(torch.float32))
-                batch_edge_acc += edge_acc/self.model_cfg['batch_size']
-                has_calc_edge_acc = True
+                edge_acc = (preds == y_labels).to(torch.float).mean()
+            else:
+                edge_acc = torch.zeros(1)
+            has_calc_edge_acc = True
+            batch_edge_acc += edge_acc
 
         return batch_loss, batch_edge_acc
+    ###def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
+    ###                 batch_edge_acc: torch.Tensor, num_batches: int, preds: torch.Tensor = None, y_labels: torch.Tensor = None,
+    ###                 epoch_metrics: dict = None):
+    ###    """
+    ###    Calculate loss function
+    ###    """
+    ###    has_calc_edge_acc = False
+    ###    for fn in loss_fns["fns"]:
+    ###        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+    ###        loss_fns["fn_args"][fn_name].update({"input": loss_fn_input, "target": loss_fn_target})
+    ###        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+    ###        loss = partial_fn()
+    ###        batch_loss += loss/(num_batches*self.model_cfg['batch_size'])
+    ###        if epoch_metrics:
+    ###            epoch_metrics[fn_name] += loss/(num_batches*self.model_cfg['batch_size'])  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
+    ###        if has_calc_edge_acc:
+    ###            continue
+    ###        if "EdgeAcc" in fn_name:
+    ###            edge_acc = (1-loss)/num_batches
+    ###        elif self.model_cfg.get("edge_acc_metric_fn"):
+    ###            edge_acc = (self.model_cfg.get("edge_acc_metric_fn")(loss_fn_input, loss_fn_target))/num_batches
+    ###        elif preds is not None and y_labels is not None:
+    ###            edge_acc = torch.mean((preds == y_labels).to(torch.float32))/num_batches
+    ###        else:
+    ###            edge_acc = torch.zeros(1)
+    ###        has_calc_edge_acc = True
+    ###        batch_edge_acc += edge_acc/self.model_cfg['batch_size']
+
+    ###    return batch_loss, batch_edge_acc
+    def infer_batch_data(self, batch_data: list, is_return_graph_embeds: bool = False):
+        """
+        Calculate batch data
+        """
+        num_nodes = self.model_cfg["num_nodes"]
+        for data_batch_idx in range(self.model_cfg['batch_size']):
+            data = batch_data[data_batch_idx]
+            x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+            y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
+            pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"]).unsqueeze(0)
+            y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense().unsqueeze(0)
+            batch_pred_graph_adj = pred_graph_adj if data_batch_idx == 0 else torch.cat((batch_pred_graph_adj, pred_graph_adj), dim=0)
+            batch_y_graph_adj = y_graph_adj if data_batch_idx == 0 else torch.cat((batch_y_graph_adj, y_graph_adj), dim=0)
+
+        # compute graph embeds
+        pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+        y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
+
+        # used in observation model info in console
+        log_model_info_data = data
+
+        if is_return_graph_embeds:
+            return batch_pred_graph_adj, batch_y_graph_adj, log_model_info_data, pred_graph_embeds, y_graph_embeds
+        else:
+            return batch_pred_graph_adj, batch_y_graph_adj, log_model_info_data
 
     @overload
     def train(self, mode: bool = True) -> torch.nn.Module:
@@ -322,10 +379,10 @@ class MTSCorrAD(torch.nn.Module):
         if train_data is None:
             return self
 
-        self.show_model_struture()
+        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
-        num_nodes = self.model_cfg["num_nodes"]
+        ###num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])
         num_batches = len(train_loader)
         for epoch_i in tqdm(range(epochs)):
@@ -336,17 +393,22 @@ class MTSCorrAD(torch.nn.Module):
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             for batch_idx, batch_data in enumerate(train_loader):
-                batch_loss = torch.zeros(1)
-                batch_edge_acc = torch.zeros(1)
-                for data_batch_idx in range(self.model_cfg['batch_size']):
-                    data = batch_data[data_batch_idx]
-                    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-                    y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
-                    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_graph_adj, "loss_fn_target": y_graph_adj,
-                                           "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
-                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+                ###batch_loss = torch.zeros(1)
+                ###batch_edge_acc = torch.zeros(1)
+                batch_pred_graph_adj, batch_y_graph_adj, log_model_info_data, pred_graph_embeds, y_graph_embeds = self.infer_batch_data(batch_data, is_return_graph_embeds=True)
+                ###for data_batch_idx in range(self.model_cfg['batch_size']):
+                ###    data = batch_data[data_batch_idx]
+                ###    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+                ###    y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
+                ###    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"]).unsqueeze(0)
+                ###    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense().unsqueeze(0)
+                ###    batch_pred_graph_adj = pred_graph_adj if data_batch_idx == 0 else torch.cat((batch_pred_graph_adj, pred_graph_adj), dim=0)
+                ###    batch_y_graph_adj = y_graph_adj if data_batch_idx == 0 else torch.cat((batch_y_graph_adj, y_graph_adj), dim=0)
+                ###calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": batch_pred_graph_adj, "loss_fn_target": batch_y_graph_adj,
+                ###                       "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
+                calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": batch_pred_graph_adj, "loss_fn_target": batch_y_graph_adj,
+                                       "num_batches": num_batches, "epoch_metrics": epoch_metrics}
+                batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
                 if self.model_cfg['graph_enc_weight_l2_reg_lambda']:
                     gra_enc_weight_l2_penalty = self.model_cfg['graph_enc_weight_l2_reg_lambda']*sum(p.pow(2).mean() for p in self.graph_encoder.parameters())
@@ -358,9 +420,9 @@ class MTSCorrAD(torch.nn.Module):
                 self.optimizer.step()
                 self.scheduler.step()
 
-                # compute graph embeds
-                pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
-                y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
+                #### compute graph embeds
+                ###pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
+                ###y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
@@ -371,9 +433,6 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
                 epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
-                # used in observation model info in console
-                log_model_info_data = data
-                log_model_info_batch_idx = batch_idx
 
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'] = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
@@ -394,12 +453,14 @@ class MTSCorrAD(torch.nn.Module):
             if epoch_i == 0:
                 best_model_info["model_structure"] = str(self) + "\n" + "="*100 + "\n" + str(summary(self, log_model_info_data.x, log_model_info_data.edge_index, log_model_info_data.batch, log_model_info_data.edge_attr, self.model_cfg["output_type"], max_depth=20))
                 if show_model_info:
-                    logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{log_model_info_batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
+                    logger.info(f"\nNumber of graphs:{log_model_info_data.num_graphs} in No.{batch_idx} batch, the model structure:\n{best_model_info['model_structure']}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.9f}" for k, v in epoch_metrics.items() if "embeds" not in k])
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
+                obs_data_batch_idx = self.model_cfg['batch_size']-1
+                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{obs_data_batch_idx} \ninput_graph_adj[:5]:\n{log_model_info_data.edge_attr[:5]}\npred_graph_adj:\n{batch_pred_graph_adj[obs_data_batch_idx]}\ny_graph_adj:\n{batch_y_graph_adj[obs_data_batch_idx]}\n")
+                ###logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npred_graph_adj:\n{pred_graph_adj}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
 
@@ -407,22 +468,25 @@ class MTSCorrAD(torch.nn.Module):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
-        num_nodes = self.model_cfg["num_nodes"]
+        ###num_nodes = self.model_cfg["num_nodes"]
         test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], target_mats=test_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
         num_batches = len(test_loader)
         with torch.no_grad():
             for batch_data in test_loader:
-                batch_loss = torch.zeros(1)
-                batch_edge_acc = torch.zeros(1)
-                for data_batch_idx in range(self.model_cfg['batch_size']):
-                    data = batch_data[data_batch_idx]
-                    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-                    y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"])
-                    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_graph_adj, "loss_fn_target": y_graph_adj,
-                                           "batch_loss": batch_loss, "batch_edge_acc": batch_edge_acc}
-                    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+                ###batch_loss = torch.zeros(1)
+                ###batch_edge_acc = torch.zeros(1)
+                batch_pred_graph_adj, batch_y_graph_adj, _ = self.infer_batch_data(batch_data)
+                ###for data_batch_idx in range(self.model_cfg['batch_size']):
+                ###    data = batch_data[data_batch_idx]
+                ###    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
+                ###    y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
+                ###    pred_graph_adj = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"]).unsqueeze(0)
+                ###    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense().unsqueeze(0)
+                ###    batch_pred_graph_adj = pred_graph_adj if data_batch_idx == 0 else torch.cat((batch_pred_graph_adj, pred_graph_adj), dim=0)
+                ###    batch_y_graph_adj = y_graph_adj if data_batch_idx == 0 else torch.cat((batch_y_graph_adj, y_graph_adj), dim=0)
+                calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": batch_pred_graph_adj, "loss_fn_target": batch_y_graph_adj,
+                                       "num_batches": num_batches}
+                batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
 
                 test_loss += batch_loss/num_batches
                 test_edge_acc += batch_edge_acc/num_batches

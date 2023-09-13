@@ -91,10 +91,11 @@ class EdgeAccuracyLoss(torch.nn.Module):
         super(EdgeAccuracyLoss, self).__init__()
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, atol: float = 0.05) -> torch.Tensor:
-        edge_acc = torch.isclose(input, target, atol=atol, rtol=0).to(torch.float64).mean()
-        edge_acc.requires_grad = True
-        loss = 1 - edge_acc
-        return loss
+        raise NotImplementedError("This function is not implemented yet.")
+        ###edge_acc = torch.isclose(input, target, atol=atol, rtol=0).to(torch.float64).mean()
+        ###edge_acc.requires_grad = True
+        ###loss = 1 - edge_acc
+        ###return loss
 
 
 class BinsEdgeAccuracyLoss(torch.nn.Module):
@@ -105,23 +106,24 @@ class BinsEdgeAccuracyLoss(torch.nn.Module):
         super(BinsEdgeAccuracyLoss, self).__init__()
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, bins_list: list) -> torch.Tensor:
-        bins = torch.tensor(bins_list).reshape(-1, 1)
-        num_bins = len(bins)-1
-        bins = torch.concat((bins[:-1], bins[1:]), dim=1)
-        edge_correct = 0
-        discretize_values = np.linspace(-1, 1, num_bins)
-        for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
-            bin_center = (lower + upper) / 2
-            atol = (upper - lower) / 2
-            mask_input = torch.where((input > lower) & (input <= upper), input, -12345)
-            convert_target = torch.where(target == discretize_value, bin_center, 12345)
-            edge_correct += torch.isclose(mask_input, convert_target, atol=atol, rtol=0).sum()
-        lowest_bin_mask_input = torch.where(input == bins.min(), input, -12345)  # For the case of lowest bin
-        edge_correct += torch.isclose(lowest_bin_mask_input, target, atol=0, rtol=0).sum()  # For the case of lowest bin
-        edge_acc = edge_correct / torch.numel(input)
-        edge_acc.requires_grad = True
-        loss = 1 - edge_acc
-        return loss
+        raise NotImplementedError("This function is not implemented yet.")
+        ###bins = torch.tensor(bins_list).reshape(-1, 1)
+        ###num_bins = len(bins)-1
+        ###bins = torch.concat((bins[:-1], bins[1:]), dim=1)
+        ###edge_correct = 0
+        ###discretize_values = np.linspace(-1, 1, num_bins)
+        ###for lower, upper, discretize_value in zip(bins[:, 0], bins[:, 1], discretize_values):
+        ###    bin_center = (lower + upper) / 2
+        ###    atol = (upper - lower) / 2
+        ###    mask_input = torch.where((input > lower) & (input <= upper), input, -12345)
+        ###    convert_target = torch.where(target == discretize_value, bin_center, 12345)
+        ###    edge_correct += torch.isclose(mask_input, convert_target, atol=atol, rtol=0).sum()
+        ###lowest_bin_mask_input = torch.where(input == bins.min(), input, -12345)  # For the case of lowest bin
+        ###edge_correct += torch.isclose(lowest_bin_mask_input, target, atol=0, rtol=0).sum()  # For the case of lowest bin
+        ###edge_acc = edge_correct / torch.numel(input)
+        ###edge_acc.requires_grad = True
+        ###loss = 1 - edge_acc
+        ###return loss
 
 
 class TwoOrderPredProbEdgeAccuracyLoss(torch.nn.Module):
@@ -134,13 +136,13 @@ class TwoOrderPredProbEdgeAccuracyLoss(torch.nn.Module):
         sorted_preds = sorted_indices
         first_order_preds = sorted_preds[::, 0]
         second_order_preds = sorted_preds[::, 1]
-        first_second_order_pred_prob_diff = torch.diff(sorted_pred_prob)[::, 0].abs()
+        first_second_order_pred_prob_diff = torch.diff(sorted_pred_prob, axis=1)[::, 0].abs()
         second_order_preds_mask = first_second_order_pred_prob_diff < self.threshold
         filtered_second_oreder_preds = torch.where(second_order_preds_mask, second_order_preds, torch.nan)
-        assert not any((first_order_preds == target) & (filtered_second_oreder_preds == target)), "There are some edges that are both first and second order predictions at the same time, which is not allowed."
+        assert not bool(((first_order_preds == target) & (filtered_second_oreder_preds == target)).sum()), "There are some edges that are both first and second order predictions at the same time, which is not allowed."
         num_correct_first_order_preds = (first_order_preds == target).sum()
         num_correct_second_order_preds = (filtered_second_oreder_preds == target).sum()
-        edge_acc = (num_correct_first_order_preds+num_correct_second_order_preds)/len(target)
+        edge_acc = (num_correct_first_order_preds+num_correct_second_order_preds)/target.numel()
         loss = 1 - edge_acc
 
         return loss

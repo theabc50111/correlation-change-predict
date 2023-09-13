@@ -30,6 +30,7 @@ from utils import split_and_norm_data
 
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
+from mts_corr_ad_model import MTSCorrAD
 
 current_dir = Path(__file__).parent
 data_config_path = current_dir / "../config/data_config.yaml"
@@ -51,9 +52,9 @@ utils_logger.setLevel(logging.INFO)
 warnings.simplefilter("ignore")
 
 
-class GAE(torch.nn.Module):
+class GAE(MTSCorrAD):
     def __init__(self, model_cfg):
-        super(GAE, self).__init__()
+        super(MTSCorrAD, self).__init__()
 
         self.model_cfg = model_cfg
         # create data loader
@@ -67,12 +68,12 @@ class GAE(torch.nn.Module):
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
         schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
         self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
         self.graph_enc_num_layers = sum(1 for _ in self.graph_encoder.parameters())
+        ###observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
+        ###observe_model_cfg['optimizer'] = str(self.optimizer)
+        ###observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
 
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
+        ###logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr):
         """
@@ -96,6 +97,7 @@ class GAE(torch.nn.Module):
         if train_data is None:
             return self
 
+        self.show_model_config()
         best_model_info = {"num_training_graphs": len(train_data),
                            "filt_mode": self.model_cfg['filt_mode'],
                            "filt_quan": self.model_cfg['filt_quan'],

@@ -29,6 +29,7 @@ from class_mts_corr_ad_model_3 import ClassMTSCorrAD3
 from encoder_decoder import (GineEncoder, GinEncoder, MLPDecoder,
                              ModifiedInnerProductDecoder)
 from graph_auto_encoder import GAE
+from main import ModelType
 from mts_corr_ad_model import MTSCorrAD
 from mts_corr_ad_model_2 import MTSCorrAD2
 from mts_corr_ad_model_3 import MTSCorrAD3
@@ -56,60 +57,6 @@ mts_corr_ad_model_logger.setLevel(logging.INFO)
 baseline_model_logger.setLevel(logging.INFO)
 gae_model_logger.setLevel(logging.INFO)
 warnings.simplefilter("ignore")
-
-
-class ModelType(Enum):
-    MTSCORRAD = auto()
-    MTSCORRAD2 = auto()
-    MTSCORRAD3 = auto()
-    CLASSMTSCORRAD = auto()
-    CLASSMTSCORRAD3 = auto()
-    BASELINE = auto()
-    CLASSBASELINE = auto()
-    CLASSBASELINEWITHOUTSELFCORR = auto()
-    GAE = auto()
-
-    def set_train_model(self, basic_model_cfg, args):
-        mts_corr_ad_cfg = basic_model_cfg.copy()
-        baseline_gru_cfg = basic_model_cfg.copy()
-        gae_cfg = basic_model_cfg.copy()
-        mts_corr_ad_cfg["pretrain_encoder"] = args.pretrain_encoder
-        mts_corr_ad_cfg["pretrain_decoder"] = args.pretrain_decoder
-        baseline_gru_cfg["gru_in_dim"] = basic_model_cfg["num_nodes"]**2
-        baseline_gru_cfg["pretrain_encoder"] = None
-        baseline_gru_cfg["pretrain_decoder"] = None
-        gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
-        model_dict = {"MTSCORRAD": MTSCorrAD(mts_corr_ad_cfg),
-                      "MTSCORRAD2": MTSCorrAD2(mts_corr_ad_cfg),
-                      "MTSCORRAD3": MTSCorrAD3(mts_corr_ad_cfg),
-                      "CLASSMTSCORRAD": ClassMTSCorrAD(mts_corr_ad_cfg),
-                      "CLASSMTSCORRAD3": ClassMTSCorrAD3(mts_corr_ad_cfg),
-                      "BASELINE": BaselineGRU(baseline_gru_cfg),
-                      "CLASSBASELINE": ClassBaselineGRU(baseline_gru_cfg),
-                      "CLASSBASELINEWITHOUTSELFCORR": ClassBaselineGRUWithoutSelfCorr(baseline_gru_cfg),
-                      "GAE": GAE(gae_cfg)}
-        model = model_dict[self.name]
-        assert ModelType.__members__.keys() == model_dict.keys(), "ModelType members and model_dict must be the same keys"
-
-        return model
-
-    def set_save_model_dir(self, current_dir, output_file_name, corr_type, s_l, w_l):
-        save_model_dir_base_dict = {"MTSCORRAD": "mts_corr_ad_model",
-                                    "MTSCORRAD2": "mts_corr_ad_model_2",
-                                    "MTSCORRAD3": "mts_corr_ad_model_3",
-                                    "CLASSMTSCORRAD": "class_mts_corr_ad_model",
-                                    "CLASSMTSCORRAD3": "class_mts_corr_ad_model_3",
-                                    "BASELINE": "baseline_gru",
-                                    "CLASSBASELINE": "class_baseline_gru",
-                                    "CLASSBASELINEWITHOUTSELFCORR": "class_baseline_gru_without_self_corr",
-                                    "GAE": "gae_model"}
-        assert ModelType.__members__.keys() == save_model_dir_base_dict.keys(), "ModelType members and save_model_dir_base_dict must be the same keys"
-        model_dir = current_dir/f'save_models/{save_model_dir_base_dict[self.name]}/{output_file_name}/{corr_type}/corr_s{s_l}_w{w_l}'
-        model_log_dir = current_dir/f'save_models/{save_model_dir_base_dict[self.name]}/{output_file_name}/{corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
-        model_dir.mkdir(parents=True, exist_ok=True)
-        model_log_dir.mkdir(parents=True, exist_ok=True)
-
-        return model_dir, model_log_dir
 
 
 if __name__ == "__main__":
@@ -143,7 +90,7 @@ if __name__ == "__main__":
                              help="input the relative path of target matrices, the base directory of path is data_cfg[DIR][PIPELINE_DATA_DIR])/data_cfg[DATASETS][data_implement][OUTPUT_FILE_NAME_BASIS] + train_items_setting")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
-    args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
+    args_parser.add_argument("--observe_model", type=str, nargs='?', default="MTSCorrAD",
                              choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
@@ -190,6 +137,10 @@ if __name__ == "__main__":
                              help="input the bins of output")
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
+    args_parser.add_argument("--model_save_date", type=str, nargs='?', default=None,
+                             help="input the date of saving model")
+    args_parser.add_argument("--para_file_name", type=str, nargs='?', default=None,
+                             help="input the file name of saving model parameters")
     ARGS = args_parser.parse_args()
     assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
@@ -197,17 +148,17 @@ if __name__ == "__main__":
     assert ARGS.output_bins is None or ARGS.output_type == "discretize", "output_bins must be input when output_type is discretize"
     assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
-    assert ("MTSCORRAD" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD"
-    assert ("MTSCORRAD3" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD3"
-    assert "CLASSMTSCORRAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
-    assert "CLASSMTSCORRAD3" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD3"
-    assert "CLASSBASELINE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
-    assert "CLASSBASELINEWITHOUTSELFCORR" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaselineWithoutSelfCorr"
-    assert ARGS.two_ord_pred_prob_edge_accu_thres is None or ARGS.output_type != "class_probability", "two_ord_pred_prob_edge_accu_thres must be input when output_type is class_probability"
+    assert ("MTSCORRAD" not in ARGS.observe_model) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when observe_model is MTSCorrAD"
+    assert ("MTSCORRAD3" not in ARGS.observe_model) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when observe_model is MTSCorrAD3"
+    assert "CLASSMTSCORRAD" not in ARGS.observe_model or ARGS.output_type == "class_probability", "output_type must be class_probability when observe_model is ClassMTSCorrAD"
+    assert "CLASSMTSCORRAD3" not in ARGS.observe_model or ARGS.output_type == "class_probability", "output_type must be class_probability when observe_model is ClassMTSCorrAD3"
+    assert "CLASSBASELINE" not in ARGS.observe_model or ARGS.output_type == "class_probability", "output_type must be class_probability when observe_model is ClassBaseline"
+    assert "CLASSBASELINEWITHOUTSELFCORR" not in ARGS.observe_model or ARGS.output_type == "class_probability", "output_type must be class_probability when observe_model is ClassBaselineWithoutSelfCorr"
+    assert ARGS.two_ord_pred_prob_edge_accu_thres is not None or ARGS.output_type != "class_probability", "two_ord_pred_prob_edge_accu_thres must be input when output_type is class_probability"
     assert "class_fc" not in ARGS.drop_pos or ARGS.output_type == "class_probability", "output_type must be class_probability when class_fc in drop_pos"
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
-    logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
+    logger.info(pformat(f"ARGS:\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
     # data implement setting
@@ -308,29 +259,25 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    for model_type in ModelType:
-        is_training, train_count = True, 0
-        while (model_type.name in ARGS.train_models) and (is_training is True) and (train_count < 100):
-            try:
-                train_count += 1
-                model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-                model = model_type.set_train_model(basic_model_cfg, ARGS)
-                best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
-            except AssertionError as e:
-                logger.error(f"\n{e}")
-            except Exception as e:
-                error_class = e.__class__.__name__  # 取得錯誤類型
-                detail = e.args[0]  # 取得詳細內容
-                cl, exc, tb = sys.exc_info()  # 取得Call Stack
-                last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
-                file_name = last_call_stack[0]  # 取得發生的檔案名稱
-                line_num = last_call_stack[1]  # 取得發生的行號
-                func_name = last_call_stack[2]  # 取得發生的函數名稱
-                err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
-                logger.error(f"===\n{err_msg}")
-                logger.error(f"===\n{traceback.extract_tb(tb)}")
-            else:
-                is_training = False
-                if save_model_info:
-                    model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-                    model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
+    obs_data = norm_val_dataset
+    model = ModelType[ARGS.observe_model].set_train_model(basic_model_cfg, ARGS)
+    model_dir, model_log_dir = ModelType[ARGS.observe_model].set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
+    model_para_path = model_dir.parents[2].joinpath('archive', ARGS.model_save_date, *model_dir.parts[-3:], ARGS.para_file_name)
+    assert model_para_path.exists(), f"{model_para_path} not exists"
+    model.load_state_dict(torch.load(model_para_path, map_location=device))
+    model.eval()
+    loss, edge_acc, preds, y_labels = model.test(norm_val_dataset, loss_fns=loss_fns_dict)
+    logger.info(f"loss_fns:{loss_fns_dict['fns']}")
+    logger.info([(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict["fn_args"].items() for arg in loss_args if arg not in ["input", "target"]])
+    logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
+
+    #### Start observe the process of inference
+    ###batch_data_generator = model.yield_batch_data(graph_adj_mats=obs_data['edges'], target_mats=obs_data['target'], batch_size=model.model_cfg['batch_size'], seq_len=model.model_cfg['seq_len'])
+    ###num_batches = ceil((len(obs_data['edges'])-model.model_cfg['seq_len'])/model.model_cfg['batch_size'])
+    ###for batch_data in batch_data_generator:
+    ###    batch_loss = torch.zeros(1)
+    ###    batch_edge_acc = torch.zeros(1)
+    ###    x, y = batch_data[0], batch_data[1]
+    ###    pred_prob = model.forward(x, output_type=model.model_cfg['output_type'])
+    ###    preds = torch.argmax(pred_prob, dim=1)
+    ###    y_labels = (y+1).to(torch.long)

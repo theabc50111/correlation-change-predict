@@ -100,7 +100,6 @@ DATASETS:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20112015-adj_close-pre-extension/pearson/corr_s1_w50/corr_ser_calc_regular/corr_ser_std/sim/large_corr_ser_mean_filtered/corr_mat_hrchy_6_cluster_label_last-pre.csv"
         TRAIN_SET: ['ADP', 'APH', 'MDT', 'PAYX']
         OUTPUT_FILE_NAME_BASIS: "sp500_20112015_corr_ser_reg_std_corr_mat_large_filtered_hrchy_10_cluster_label_last_v2"
-
     SP500_20112015_CORR_SER_REG_STD_CORR_MAT_NEGATIVE_FILTERED:
         FILE_PATH: "{DIRS.DATASET_DIR}/sp500_hold_20112015-adj_close-pre-extension/pearson/corr_s1_w50/corr_ser_calc_regular/corr_ser_std/sim//negative_corr_ser_mean_filtered/no_cluster-pre.csv"
         TRAIN_SET: ['NEM', 'ETR', 'INCY']

@@ -53,13 +53,23 @@ class ClassBaselineGRU(BaselineGRU):
 
         return batch_pred_prob
 
+    def infer_batch_data(self, batch_data: list):
+        """
+        Infer batch data and return predicted labels and real labels
+        """
+        x, y = batch_data[0], batch_data[1]
+        pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
+        preds = torch.argmax(pred_prob, dim=1)
+        y_labels = (y+1).to(torch.long)
+        return pred_prob, preds, y_labels
+
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000, **unused_kwargs):
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
         if train_data is None:
             return self
 
-        self.show_model_struture()
+        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         for epoch_i in tqdm(range(epochs)):
@@ -69,32 +79,36 @@ class ClassBaselineGRU(BaselineGRU):
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil((len(train_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
-            for batch_data in batch_data_generator:
-                batch_loss = torch.zeros(1)
-                batch_edge_acc = torch.zeros(1)
-                x, y = batch_data[0], batch_data[1]
-                pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
-                preds = torch.argmax(pred_prob, dim=1)
-                y_labels = (y+1).to(torch.long)
-                for fn in loss_fns["fns"]:
-                    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
-                    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                    loss = partial_fn()
-                    batch_loss += loss
-                    epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-                    if "EdgeAcc" in fn_name:
-                        edge_acc = 1-loss
-                        batch_edge_acc += edge_acc
-                    else:
-                        edge_acc = (preds == y_labels).to(torch.float).mean()
-                        batch_edge_acc += edge_acc
+            for batch_idx, batch_data in enumerate(batch_data_generator):
+                ###batch_loss = torch.zeros(1)
+                ###batch_edge_acc = torch.zeros(1)
+                ###x, y = batch_data[0], batch_data[1]
+                ###pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
+                ###preds = torch.argmax(pred_prob, dim=1)
+                ###y_labels = (y+1).to(torch.long)
+                pred_prob, preds, y_labels = self.infer_batch_data(batch_data)
+                calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
+                                       "preds": preds, "y_labels": y_labels, "num_batches": num_batches, "epoch_metrics": epoch_metrics}
+                batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+                ###for fn in loss_fns["fns"]:
+                ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                ###    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
+                ###    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                ###    loss = partial_fn()
+                ###    batch_loss += loss
+                ###    epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
+                ###    if "EdgeAcc" in fn_name:
+                ###        edge_acc = 1-loss
+                ###        batch_edge_acc += edge_acc
+                ###    else:
+                ###        edge_acc = (preds == y_labels).to(torch.float).mean()
+                ###        batch_edge_acc += edge_acc
 
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-                epoch_metrics["tr_edge_acc"] += edge_acc/num_batches
+                epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
                 epoch_metrics["gru_gradient"] += sum([p.grad.sum() for p in self.gru.parameters() if p.grad is not None])/num_batches
                 epoch_metrics["decoder_gradient"] += sum([p.grad.sum() for p in self.decoder.parameters() if p.grad is not None])/num_batches
@@ -128,9 +142,11 @@ class ClassBaselineGRU(BaselineGRU):
                 logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items() if v.dim() < 2])
-                logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
-            if epoch_i % 500 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-                logger.info(f"\nIn Epoch {epoch_i:>3}, data_batch_idx:7 \ninput_graph_adj[7, 0, :5]:\n{x[7, 0, :5]}\npred_graph_adj[7, :5]:\n{preds[7, :5]}\ny_graph_adj[7, :5]:\n{y[7, :5]}\n")
+                ###logger.info(f"Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
+                logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
+            if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
+                x, y = batch_data[0], batch_data[1]
+                logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:7 \ninput_graph_adj[7, 0, :5]:\n{x[7, 0, :5]}\npred_graph_adj[7, :5]:\n{preds[7, :5]}\ny_graph_adj[7, :5]:\n{y[7, :5]}\n")
 
         return best_model, best_model_info
 
@@ -142,27 +158,35 @@ class ClassBaselineGRU(BaselineGRU):
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil((len(test_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
             for batch_data in batch_data_generator:
-                batch_loss = torch.zeros(1)
-                batch_edge_acc = torch.zeros(1)
-                x, y = batch_data[0], batch_data[1]
-                pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
-                preds = torch.argmax(pred_prob, dim=1)
-                y_labels = (y+1).to(torch.long)
-                for fn in loss_fns["fns"]:
-                    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
-                    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                    loss = partial_fn()
-                    batch_loss += loss
-                    if "EdgeAcc" in fn_name:
-                        edge_acc = 1-loss
-                        batch_edge_acc += edge_acc
-                    else:
-                        edge_acc = (preds == y_labels).to(torch.float).mean()
-                        batch_edge_acc += edge_acc
+                ###batch_loss = torch.zeros(1)
+                ###batch_edge_acc = torch.zeros(1)
+                ###x, y = batch_data[0], batch_data[1]
+                ###pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
+                ###preds = torch.argmax(pred_prob, dim=1)
+                ###y_labels = (y+1).to(torch.long)
+                ###calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
+                ###                       "preds": preds, "y_labels": y_labels, "batch_loss": batch_loss,
+                ###                       "batch_edge_acc": batch_edge_acc, "num_batches": num_batches}
+                ###batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+                pred_prob, preds, y_labels = self.infer_batch_data(batch_data)
+                calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
+                                       "preds": preds, "y_labels": y_labels, "num_batches": num_batches}
+                batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
+                ###for fn in loss_fns["fns"]:
+                ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
+                ###    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
+                ###    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
+                ###    loss = partial_fn()
+                ###    batch_loss += loss
+                ###    if "EdgeAcc" in fn_name:
+                ###        edge_acc = 1-loss
+                ###        batch_edge_acc += edge_acc
+                ###    else:
+                ###        edge_acc = (preds == y_labels).to(torch.float).mean()
+                ###        batch_edge_acc += edge_acc
 
-                test_edge_acc += edge_acc / num_batches
-                test_loss += batch_loss / num_batches
+                test_edge_acc += batch_edge_acc
+                test_loss += batch_loss
 
         return test_loss, test_edge_acc, preds, y_labels
 

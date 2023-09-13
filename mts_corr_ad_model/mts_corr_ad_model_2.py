@@ -143,7 +143,7 @@ class MTSCorrAD2(MTSCorrAD):
         if train_data is None:
             return self
 
-        self.show_model_struture()
+        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
         num_nodes = self.model_cfg['num_nodes']
