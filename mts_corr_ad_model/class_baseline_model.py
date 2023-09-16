@@ -91,7 +91,6 @@ class ClassBaselineGRU(BaselineGRU):
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
                                        "preds": preds, "y_labels": y_labels, "num_batches": num_batches, "epoch_metrics": epoch_metrics}
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-                print(f"batch_idx:{batch_idx} | batch_loss:{batch_loss} | batch_edge_acc:{batch_edge_acc}")
                 ###for fn in loss_fns["fns"]:
                 ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                 ###    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
@@ -118,7 +117,6 @@ class ClassBaselineGRU(BaselineGRU):
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'], val_preds, val_y_labels = self.test(val_data, loss_fns=loss_fns)
 
-            print(f"epoch_metrics['tr_edge_acc']:{epoch_metrics['tr_edge_acc']} | epoch_metrics['val_edge_acc']:{epoch_metrics['val_edge_acc']}")
             # record training history and save best model
             epoch_metrics["tr_preds"] = preds  # only record the last batch
             epoch_metrics["tr_labels"] = y_labels
@@ -176,7 +174,6 @@ class ClassBaselineGRU(BaselineGRU):
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
                                        "preds": preds, "y_labels": y_labels, "num_batches": num_batches}
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-                print(f"val_batch_loss:{batch_loss} | val_batch_edge_acc:{batch_edge_acc}")
                 ###for fn in loss_fns["fns"]:
                 ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
                 ###    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
@@ -192,7 +189,6 @@ class ClassBaselineGRU(BaselineGRU):
 
                 test_edge_acc += batch_edge_acc/num_batches
                 test_loss += batch_loss/num_batches
-                print(f"test_edge_acc:{test_edge_acc} | test_loss:{test_loss}")
 
         return test_loss, test_edge_acc, preds, y_labels
 
