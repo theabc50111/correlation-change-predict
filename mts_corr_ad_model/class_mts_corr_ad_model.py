@@ -88,7 +88,9 @@ class ClassMTSCorrAD(MTSCorrAD):
                                           ("class_fc3_drop", Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
                                           ]))
         self.softmax = Softmax(dim=0)
-        ###self.softmax = Softmax(dim=1)
+        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
+        schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
+        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """
@@ -163,9 +165,9 @@ class ClassMTSCorrAD(MTSCorrAD):
         if train_data is None:
             return self
 
-        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model_info.update({"max_val_edge_acc": 0})
+        self.show_model_config()
         best_model = []
         ###num_nodes = self.model_cfg["num_nodes"]
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])

@@ -198,14 +198,12 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         super(ClassBaselineGRUWithoutSelfCorr, self).__init__(model_cfg)
 
         # set model components
-        ###self.gru_in_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
-        ###self.fc_out_dim = int((self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1))
         self.fc_out_dim = self.model_cfg["gru_in_dim"]
-        ###assert isclose(self.gru_in_dim, (self.model_cfg["num_nodes"]-1)/2*(1+self.model_cfg["num_nodes"]-1)), "self.gru_in_dim is not an integer"
-        ###self.gru = GRU(input_size=self.gru_in_dim, hidden_size=self.model_cfg['gru_h'], num_layers=self.model_cfg['gru_l'], dropout=self.model_cfg["drop_p"] if "gru" in self.model_cfg["drop_pos"] else 0, batch_first=True)
         self.fc1 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
     def transform_graph_adj_to_only_triu(self, graph_adj_mats: np.ndarray):
         graph_adj_mats[graph_adj_mats == 0] = -100
@@ -235,7 +233,7 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
             yield batch_x, batch_y
 
 
-class  ClassBaselineGRUOneFeature(ClassBaselineGRUWithoutSelfCorr):
+class ClassBaselineGRUOneFeature(ClassBaselineGRUWithoutSelfCorr):
     """
     Only use one feature of graph adjacency matrix as input
     """

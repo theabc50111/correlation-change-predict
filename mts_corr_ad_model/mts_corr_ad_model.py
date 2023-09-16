@@ -299,7 +299,6 @@ class MTSCorrAD(torch.nn.Module):
             elif "EdgeAcc" in fn_name:
                 edge_acc = 1-loss
             elif preds is not None and y_labels is not None:
-                print(f"preds: {preds.shape}; y_labels: {y_labels.shape}")
                 edge_acc = (preds == y_labels).to(torch.float).mean()
             else:
                 edge_acc = torch.zeros(1)
