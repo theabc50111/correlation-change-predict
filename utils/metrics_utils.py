@@ -1,5 +1,6 @@
 import inspect
 import logging
+from math import sqrt
 
 import numpy as np
 import torch
@@ -127,11 +128,14 @@ class BinsEdgeAccuracyLoss(torch.nn.Module):
 
 
 class TwoOrderPredProbEdgeAccuracyLoss(torch.nn.Module):
-    def __init__(self, threshold: float):
+    def __init__(self, threshold: float, num_classes: int):
         super(TwoOrderPredProbEdgeAccuracyLoss, self).__init__()
         self.threshold = threshold
+        self.num_classes = num_classes
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        batch_size, num_classes, graph_size = input.shape
+        assert num_classes == self.num_classes, "The number of classes in the input tensor is not equal to the number of classes in the model."
         sorted_pred_prob, sorted_indices = torch.sort(input, dim=1, descending=True)
         sorted_preds = sorted_indices
         first_order_preds = sorted_preds[::, 0]
@@ -149,13 +153,55 @@ class TwoOrderPredProbEdgeAccuracyLoss(torch.nn.Module):
 
 
 class TwoOrderPredProbEdgeAccuracy(torch.nn.Module):
-    def __init__(self, threshold: float):
+    def __init__(self, threshold: float, num_classes: int):
         super(TwoOrderPredProbEdgeAccuracy, self).__init__()
         self.threshold = threshold
+        self.num_classes = num_classes
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        two_order_pred_prob_edge_acc_loss_fn = TwoOrderPredProbEdgeAccuracyLoss(threshold=self.threshold)
+        batch_size, num_classes, graph_size = input.shape
+        assert num_classes == self.num_classes, "The number of classes in the input tensor is not equal to the number of classes in the model."
+        two_order_pred_prob_edge_acc_loss_fn = TwoOrderPredProbEdgeAccuracyLoss(threshold=self.threshold, num_classes=input.shape[1])
         two_order_pred_prob_edge_acc_loss = two_order_pred_prob_edge_acc_loss_fn(input, target)
         edge_acc = 1 - two_order_pred_prob_edge_acc_loss
+
+        return edge_acc
+
+class UpperTriangleEdgeAccuracyLoss(torch.nn.Module):
+    def __init__(self, num_classes: int):
+        super(UpperTriangleEdgeAccuracyLoss, self).__init__()
+        self.num_classes = num_classes
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        batch_size, num_classes, graph_size = input.shape
+        assert num_classes == self.num_classes, "The number of classes in the input tensor is not equal to the number of classes in the model."
+        assert sqrt(graph_size).is_integer(), "The graph size must be a perfect square number."
+        num_nodes = int(sqrt(graph_size))
+        reshaped_input = input.reshape(-1, num_nodes, num_nodes)
+        reshaped_target = target.reshape(-1, num_nodes, num_nodes)
+        triu_idx = torch.triu_indices(num_nodes, num_nodes, offset=1)
+        for i, pred_prob_along_class in enumerate(reshaped_input):
+            pred_prob_triu = pred_prob_along_class[triu_idx[0], triu_idx[1]] if i == 0 else torch.vstack((pred_prob_triu, pred_prob_along_class[triu_idx[0], triu_idx[1]]))
+        for i, target_along_graph in enumerate(reshaped_target):
+            triu_target = target_along_graph[triu_idx[0], triu_idx[1]] if i == 0 else torch.vstack((triu_target, target_along_graph[triu_idx[0], triu_idx[1]]))
+        triu_input = pred_prob_triu.reshape(batch_size, num_classes, -1)
+        triu_preds = torch.argmax(triu_input, dim=1)
+        edge_acc = (triu_preds == triu_target).to(torch.float64).mean()
+        loss = 1 - edge_acc
+
+        return loss
+
+class UpperTriangleEdgeAccuracy(torch.nn.Module):
+    def __init__(self, num_classes: int):
+        super(UpperTriangleEdgeAccuracy, self).__init__()
+        self.num_classes = num_classes
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        batch_size, num_classes, graph_size = input.shape
+        assert num_classes == self.num_classes, "The number of classes in the input tensor is not equal to the number of classes in the model."
+        assert sqrt(graph_size).is_integer(), "The graph size must be a perfect square number."
+        upper_triangle_edge_acc_loss_fn = UpperTriangleEdgeAccuracyLoss(num_classes=input.shape[1])
+        upper_triangle_edge_acc_loss = upper_triangle_edge_acc_loss_fn(input, target)
+        edge_acc = 1 - upper_triangle_edge_acc_loss
 
         return edge_acc

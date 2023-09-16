@@ -260,11 +260,11 @@ if __name__ == "__main__":
     logger.info("="*80)
 
     obs_data = norm_val_dataset
-    model = ModelType[ARGS.observe_model].set_train_model(basic_model_cfg, ARGS)
+    model = ModelType[ARGS.observe_model].set_model(basic_model_cfg, ARGS)
     model_dir, model_log_dir = ModelType[ARGS.observe_model].set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-    model_para_path = model_dir.parents[2].joinpath('archive', ARGS.model_save_date, *model_dir.parts[-3:], ARGS.para_file_name)
-    assert model_para_path.exists(), f"{model_para_path} not exists"
-    model.load_state_dict(torch.load(model_para_path, map_location=device))
+    model_param_path = model_dir.parents[2].joinpath('archive', ARGS.model_save_date, *model_dir.parts[-3:], ARGS.para_file_name)
+    assert model_param_path.exists(), f"{model_param_path} not exists"
+    model.load_state_dict(torch.load(model_param_path, map_location=device))
     model.eval()
     loss, edge_acc, preds, y_labels = model.test(norm_val_dataset, loss_fns=loss_fns_dict)
     logger.info(f"loss_fns:{loss_fns_dict['fns']}")

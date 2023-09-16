@@ -294,11 +294,12 @@ class MTSCorrAD(torch.nn.Module):
                 epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
             if has_calc_edge_acc:
                 continue
-            if "EdgeAcc" in fn_name:
-                edge_acc = 1-loss
-            elif self.model_cfg.get("edge_acc_metric_fn"):
+            if self.model_cfg.get("edge_acc_metric_fn"):
                 edge_acc = self.model_cfg.get("edge_acc_metric_fn")(loss_fn_input, loss_fn_target)
+            elif "EdgeAcc" in fn_name:
+                edge_acc = 1-loss
             elif preds is not None and y_labels is not None:
+                print(f"preds: {preds.shape}; y_labels: {y_labels.shape}")
                 edge_acc = (preds == y_labels).to(torch.float).mean()
             else:
                 edge_acc = torch.zeros(1)

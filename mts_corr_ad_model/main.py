@@ -18,7 +18,8 @@ from torch.nn import CrossEntropyLoss, MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
 from metrics_utils import (BinsEdgeAccuracyLoss, EdgeAccuracyLoss,
-                           TwoOrderPredProbEdgeAccuracy)
+                           TwoOrderPredProbEdgeAccuracy,
+                           UpperTriangleEdgeAccuracy)
 from utils import convert_str_bins_list, split_and_norm_data
 
 from baseline_model import BaselineGRU
@@ -70,7 +71,7 @@ class ModelType(Enum):
     CLASSBASELINEONEFEATURE = auto()
     GAE = auto()
 
-    def set_train_model(self, basic_model_cfg, args):
+    def set_model(self, basic_model_cfg, args):
         mts_corr_ad_cfg = basic_model_cfg.copy()
         baseline_gru_cfg = basic_model_cfg.copy()
         gae_cfg = basic_model_cfg.copy()
@@ -152,7 +153,7 @@ if __name__ == "__main__":
                              help="input the relative path of target matrices, the base directory of path is data_cfg[DIR][PIPELINE_DATA_DIR])/data_cfg[DATASETS][data_implement][OUTPUT_FILE_NAME_BASIS] + train_items_setting")
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
-    args_parser.add_argument("--train_models", type=str, nargs='+', default=["MTSCorrAD"],
+    args_parser.add_argument("--train_models", type=str, nargs='+', default=[],
                              choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
@@ -188,12 +189,16 @@ if __name__ == "__main__":
                              help="input the order of input features of gru")
     args_parser.add_argument("--two_ord_pred_prob_edge_accu_thres", type=float, nargs='?', default=None,
                              help="input the threshold of TwoOrderPredProbEdgeAccuracy")
+    args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
+                             help="input the absolute tolerance of EdgeAccuracyLoss")
     args_parser.add_argument("--use_weighted_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,
                              help="input --use_weighted_loss to use CrossEntropyLoss weight")
-    args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
-                             help="input the absolute tolerance of edge acc loss")
     args_parser.add_argument("--use_bin_edge_acc_loss", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --use_bin_edge_acc_loss to use BinsEdgeaccuracyLoss")
+    args_parser.add_argument("--use_two_ord_pred_prob_edge_acc_metric", type=bool, default=False, action=argparse.BooleanOptionalAction,
+                             help="input --use_two_ord_pred_prob_edge_acc_metric to use TwoOrderPredProbEdgeAccuracy")
+    args_parser.add_argument("--use_upper_tri_edge_acc_metric", type=bool, default=False, action=argparse.BooleanOptionalAction,
+                             help="input --use_upper_tri_edge_acc_metric to use UpperTriangleEdgeAccuracy")
     args_parser.add_argument("--output_type", type=str, nargs='?', default=None,
                              choices=["discretize", "class_probability"],
                              help="input the type of output, the choices are [discretize]")
@@ -201,7 +206,15 @@ if __name__ == "__main__":
                              help="input the bins of output")
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
+    args_parser.add_argument("--inference_models", type=str, nargs='+', default=[],
+                             choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "GAE"],
+                             help="input to decide which models to train, the choices are [MTSCorrAD, MTSCORRAD2, BASELINE, GAE]")
+    args_parser.add_argument("--inference_model_path", type=str, nargs='?', default=None,
+                             help="input the path of inference model weight")
+    args_parser.add_argument("--inference_data_split", type=str, nargs='?', default="val",
+                             help="input the data split of inference data, the choices are [train, val, test]")
     ARGS = args_parser.parse_args()
+    assert bool(ARGS.train_models) != bool(ARGS.inference_models), "train_models and inference_models must be input one of them"
     assert bool(ARGS.drop_pos) == bool(ARGS.drop_p), "drop_pos and drop_p must be both input or not input"
     assert bool(ARGS.filt_mode) == bool(ARGS.filt_quan), "filt_mode and filt_quan must be both input or not input"
     assert (bool(ARGS.filt_mode) != bool(ARGS.quan_discrete_bins)) or (ARGS.filt_mode is None and ARGS.quan_discrete_bins is None), "filt_mode and quan_discrete_bins must be both not input or one input"
@@ -215,11 +228,13 @@ if __name__ == "__main__":
     assert "CLASSBASELINE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
     assert "CLASSBASELINEWITHOUTSELFCORR" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaselineWithoutSelfCorr"
     assert "CLASSBASELINEONEFEATURE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaselineOneFeatureGRUWithoutSelfCorr"
-    assert ARGS.two_ord_pred_prob_edge_accu_thres is None or ARGS.output_type != "class_probability", "two_ord_pred_prob_edge_accu_thres must be input when output_type is class_probability"
+    assert ARGS.two_ord_pred_prob_edge_accu_thres is not None or ARGS.output_type == "class_probability", "output_type must be class_probability when two_ord_pred_prob_edge_accu_thres is input"
     assert "class_fc" not in ARGS.drop_pos or ARGS.output_type == "class_probability", "output_type must be class_probability when class_fc in drop_pos"
     assert "CLASSBASELINEONEFEATURE" not in ARGS.train_models or ARGS.gru_input_feature_idx is not None, "gru_input_feature_idx must be input when train_models is ClassBaselineOneFeatureGRUWithoutSelfCorr"
-    assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss and output_type can not be both input"
+    assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss can't be input when output_type is class_probability"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
+    assert not ARGS.use_two_ord_pred_prob_edge_acc_metric or ARGS.two_ord_pred_prob_edge_accu_thres is not None, "two_ord_pred_prob_edge_accu_thres must be input when use_two_ord_pred_prob_edge_acc_metric is input"
+    assert not (ARGS.use_upper_tri_edge_acc_metric and ARGS.use_two_ord_pred_prob_edge_acc_metric), "use_upper_tri_edge_acc_metric and use_two_ord_pred_prob_edge_acc_metric can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -287,7 +302,6 @@ if __name__ == "__main__":
                        "target_mats_bins": ARGS.target_mats_path.split("/")[-1] if ARGS.target_mats_path else None,
                        "edge_acc_loss_atol": ARGS.edge_acc_loss_atol,
                        "two_ord_pred_prob_edge_accu_thres": ARGS.two_ord_pred_prob_edge_accu_thres,
-                       "edge_acc_metric_fn": TwoOrderPredProbEdgeAccuracy(threshold=ARGS.two_ord_pred_prob_edge_accu_thres) if ARGS.two_ord_pred_prob_edge_accu_thres else None,
                        "use_bin_edge_acc_loss": ARGS.use_bin_edge_acc_loss}
 
     loss_fns_dict = {"fns": [MSELoss()],
@@ -307,6 +321,14 @@ if __name__ == "__main__":
         loss_fns_dict["fns"].append(EdgeAccuracyLoss())
         loss_fns_dict["fn_args"].update({"EdgeAccuracyLoss()": {"atol": ARGS.edge_acc_loss_atol}})
 
+    # setting of metric function of edge_accuracy of model
+    if ARGS.use_two_ord_pred_prob_edge_acc_metric:
+        num_classes = ARGS.target_mats_path.split("/")[-1].replace("bins_", "").count("_")
+        basic_model_cfg["edge_acc_metric_fn"] = TwoOrderPredProbEdgeAccuracy(threshold=ARGS.two_ord_pred_prob_edge_accu_thres, num_classes=num_classes)
+    elif ARGS.use_upper_tri_edge_acc_metric:
+        num_classes = ARGS.target_mats_path.split("/")[-1].replace("bins_", "").count("_")
+        basic_model_cfg["edge_acc_metric_fn"] = UpperTriangleEdgeAccuracy(num_classes=num_classes)
+
     # show info
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
@@ -325,9 +347,10 @@ if __name__ == "__main__":
         is_training, train_count = True, 0
         while (model_type.name in ARGS.train_models) and (is_training is True) and (train_count < 100):
             try:
+                logger.info(f"===== train model:{model_type.name} =====")
                 train_count += 1
                 model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-                model = model_type.set_train_model(basic_model_cfg, ARGS)
+                model = model_type.set_model(basic_model_cfg, ARGS)
                 best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
             except AssertionError as e:
                 logger.error(f"\n{e}")
@@ -347,3 +370,22 @@ if __name__ == "__main__":
                 if save_model_info:
                     model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
                     model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
+        if model_type.name in ARGS.inference_models:
+            if ARGS.inference_data_split == "train":
+                inference_data = norm_train_dataset
+            elif ARGS.inference_data_split == "val":
+                inference_data = norm_val_dataset
+            elif ARGS.inference_data_split == "test":
+                inference_data = norm_test_dataset
+            model = model_type.set_model(basic_model_cfg, ARGS)
+            model_dir, _ = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
+            model_param_path = model_dir.parents[2].joinpath(ARGS.inference_model_path)
+            assert model_param_path.exists(), f"{model_param_path} not exists"
+            model.load_state_dict(torch.load(model_param_path, map_location=device))
+            model.eval()
+            loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
+            logger.info(f"===== inference model:{model_type.name} on {ARGS.inference_data_split} data =====")
+            logger.info(f"loss_fns:{loss_fns_dict['fns']}")
+            logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn']}")
+            logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
+            logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
