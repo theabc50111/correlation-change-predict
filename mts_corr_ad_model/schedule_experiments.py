@@ -25,8 +25,8 @@ drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gr
 drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "--gra_enc_aggr max"]
-gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
-gra_enc_h_list = ["--gra_enc_h 32"]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"]
+gra_enc_l_list = ["--gra_enc_l 2", "--gra_enc_l 3"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = ["--gra_enc_h 128", "--gra_enc_h 256"]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"]
 gra_enc_mlp_l_list = [""]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
 gru_l_list = [""]  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
 gru_h_list = [""]  # ["--gru_h 40", "--gru_h 80", "--gru_h 100", "--gru_h 320", "--gru_h 640"]
@@ -66,7 +66,7 @@ if set(map(lambda x: x['gra_enc_l'], args_list)) != {""}:
     gra_enc_l_values_set.discard("")
     gra_enc_l_pop_value = gra_enc_l_values_set.pop()
     num_models = sum(1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == gra_enc_l_pop_value)  # the main reasons for model operation time: discr_loss, gra_enc_l
-    model_timedelta_list = [timedelta(hours=5, minutes=30)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+    model_timedelta_list = [timedelta(hours=5, minutes=5), timedelta(hours=6, minutes=20)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
     gru_l_values_set = set(map(lambda x: x['gru_l'], args_list))
     gru_l_values_set.discard("")
