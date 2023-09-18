@@ -386,6 +386,6 @@ if __name__ == "__main__":
             loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
             logger.info(f"===== inference model:{model_type.name} on {ARGS.inference_data_split} data =====")
             logger.info(f"loss_fns:{loss_fns_dict['fns']}")
-            logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn']}")
+            logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
             logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
             logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
