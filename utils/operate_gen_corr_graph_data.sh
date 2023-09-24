@@ -4,7 +4,7 @@
 # Define the list of items
 
 
-dataset_list=("--data_implement SP500_20112015_CORR_SER_REG_STD_CORR_MAT_NEGATIVE_FILTERED")
+dataset_list=("--data_implement SP500_20112015_RANDOM_30")
 
 
 train_items_setting="train_train"  # "train_train" "train_all"
