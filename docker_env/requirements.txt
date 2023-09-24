@@ -18,5 +18,3 @@ isort
 tabulate
 ruptures
 networkx
---extra-index-url 
-cugraph-cu11
