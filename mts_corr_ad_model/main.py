@@ -370,6 +370,8 @@ if __name__ == "__main__":
                 if save_model_info:
                     model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
                     model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
+    if len(ARGS.inference_models) > 0:
+        assert filter(lambda x: x in ModelType, 
         if model_type.name in ARGS.inference_models:
             if ARGS.inference_data_split == "train":
                 inference_data = norm_train_dataset
