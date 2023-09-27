@@ -209,7 +209,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--inference_models", type=str, nargs='+', default=[],
                              choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, MTSCORRAD2, BASELINE, GAE]")
-    args_parser.add_argument("--inference_model_path", type=str, nargs='?', default=None,
+    args_parser.add_argument("--inference_model_paths", type=str, nargs='+', default=[],
                              help="input the path of inference model weight")
     args_parser.add_argument("--inference_data_split", type=str, nargs='?', default="val",
                              help="input the data split of inference data, the choices are [train, val, test]")
@@ -343,45 +343,48 @@ if __name__ == "__main__":
     logger.info(f'Test set       = {len(norm_test_dataset["edges"])} graphs')
     logger.info("="*80)
 
-    for model_type in ModelType:
-        is_training, train_count = True, 0
-        while (model_type.name in ARGS.train_models) and (is_training is True) and (train_count < 100):
-            try:
-                logger.info(f"===== train model:{model_type.name} =====")
-                train_count += 1
-                model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-                model = model_type.set_model(basic_model_cfg, ARGS)
-                best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
-            except AssertionError as e:
-                logger.error(f"\n{e}")
-            except Exception as e:
-                error_class = e.__class__.__name__  # 取得錯誤類型
-                detail = e.args[0]  # 取得詳細內容
-                cl, exc, tb = sys.exc_info()  # 取得Call Stack
-                last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
-                file_name = last_call_stack[0]  # 取得發生的檔案名稱
-                line_num = last_call_stack[1]  # 取得發生的行號
-                func_name = last_call_stack[2]  # 取得發生的函數名稱
-                err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
-                logger.error(f"===\n{err_msg}")
-                logger.error(f"===\n{traceback.extract_tb(tb)}")
-            else:
-                is_training = False
-                if save_model_info:
+    if len(ARGS.train_models) > 0:
+        assert list(filter(lambda x: x in ModelType.__members__.keys(), ARGS.train_models)), f"train_models must be input one of {ModelType.__members__.keys()}"
+        for model_type in ModelType:
+            is_training, train_count = True, 0
+            while (model_type.name in ARGS.train_models) and (is_training is True) and (train_count < 100):
+                try:
+                    logger.info(f"===== train model:{model_type.name} =====")
+                    train_count += 1
                     model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-                    model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
-    if len(ARGS.inference_models) > 0:
-        assert filter(lambda x: x in ModelType, 
-        if model_type.name in ARGS.inference_models:
-            if ARGS.inference_data_split == "train":
-                inference_data = norm_train_dataset
-            elif ARGS.inference_data_split == "val":
-                inference_data = norm_val_dataset
-            elif ARGS.inference_data_split == "test":
-                inference_data = norm_test_dataset
+                    model = model_type.set_model(basic_model_cfg, ARGS)
+                    best_model, best_model_info = model.train(train_data=norm_train_dataset, val_data=norm_val_dataset, loss_fns=loss_fns_dict, epochs=ARGS.tr_epochs, show_model_info=True)
+                except AssertionError as e:
+                    logger.error(f"\n{e}")
+                except Exception as e:
+                    error_class = e.__class__.__name__  # 取得錯誤類型
+                    detail = e.args[0]  # 取得詳細內容
+                    cl, exc, tb = sys.exc_info()  # 取得Call Stack
+                    last_call_stack = traceback.extract_tb(tb)[-1]  # 取得Call Stack的最後一筆資料
+                    file_name = last_call_stack[0]  # 取得發生的檔案名稱
+                    line_num = last_call_stack[1]  # 取得發生的行號
+                    func_name = last_call_stack[2]  # 取得發生的函數名稱
+                    err_msg = "File \"{}\", line {}, in {}: [{}] {}".format(file_name, line_num, func_name, error_class, detail)
+                    logger.error(f"===\n{err_msg}")
+                    logger.error(f"===\n{traceback.extract_tb(tb)}")
+                else:
+                    is_training = False
+                    if save_model_info:
+                        model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
+                        model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
+    elif len(ARGS.inference_models) > 0:
+        assert list(filter(lambda x: x in ModelType.__members__.keys(), ARGS.inference_models)), f"inference_models must be input one of {ModelType.__members__.keys()}"
+        if ARGS.inference_data_split == "train":
+            inference_data = norm_train_dataset
+        elif ARGS.inference_data_split == "val":
+            inference_data = norm_val_dataset
+        elif ARGS.inference_data_split == "test":
+            inference_data = norm_test_dataset
+        if len(ARGS.inference_models) == 1:
+            model_type = ModelType[ARGS.inference_models[0]]
             model = model_type.set_model(basic_model_cfg, ARGS)
             model_dir, _ = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
-            model_param_path = model_dir.parents[2].joinpath(ARGS.inference_model_path)
+            model_param_path = model_dir.parents[2].joinpath(ARGS.inference_model_paths[0])
             assert model_param_path.exists(), f"{model_param_path} not exists"
             model.load_state_dict(torch.load(model_param_path, map_location=device))
             model.eval()
@@ -391,3 +394,36 @@ if __name__ == "__main__":
             logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
             logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
             logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
+        elif len(ARGS.inference_models) > 1:
+            logger.info(f"===== inference model with ensemble =====")
+            for model_type, infer_model_path in zip(ARGS.inference_models, ARGS.inference_model_paths):
+                model = ModelType[model_type].set_model(basic_model_cfg, ARGS)
+                print(model)
+                print("-"*80)
+                model_dir, _ = ModelType[model_type].set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
+                model_param_path = model_dir.parents[2].joinpath(infer_model_path)
+                assert model_param_path.exists(), f"{model_param_path} not exists"
+                model.load_state_dict(torch.load(model_param_path, map_location=device))
+                model.eval()
+                if "MTSCORRAD" in model_type:
+                    test_loader = model.create_pyg_data_loaders(graph_adj_mats=inference_data["edges"],  graph_nodes_mats=inference_data["nodes"], target_mats=inference_data["target"], loader_seq_len=model.model_cfg["seq_len"], show_log=False)
+                elif "BASELINE" in model_type:
+                    test_loader = model.yield_batch_data(graph_adj_mats=inference_data['edges'], target_mats=inference_data['target'], batch_size=model.model_cfg['batch_size'], seq_len=model.model_cfg['seq_len'])
+                with torch.no_grad():
+                    all_pred_prob_each_model = []
+                    for batch_idx, batch_data in enumerate(test_loader):
+                        infer_res = model.infer_batch_data(batch_data)
+                        batch_pred_prob, batch_preds, batch_y_labels = infer_res[0], infer_res[1], infer_res[2]
+                        all_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_pred_prob, batch_pred_prob), dim=0)
+                    all_pred_prob_each_model.append(all_pred_prob)
+                #None
+                ##loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
+                ###logger.info(f"===== inference model:{model_type} on {ARGS.inference_data_split} data =====")
+                ###logger.info(f"loss_fns:{loss_fns_dict['fns']}")
+                ###logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
+                ###logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
+                ###logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
+                ###if model_type == ARGS.inference_models[0]:
+                ###    preds_ensemble = preds
+                ###else:
+                ###    preds_ensemble += preds
