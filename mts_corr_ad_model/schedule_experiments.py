@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from itertools import chain, product, repeat
 from pprint import pprint
 
-data_implement_list = ["--data_implement SP500_20112015_CORR_SER_REG_STD_CORR_MAT_LARGE_FILTERED_HRCHY_10_CLUSTER_LABEL_LAST_V2"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
+data_implement_list = ["--data_implement SP500_20082017_CORR_SER_REG_STD_CORR_MAT_HRCHY_10_CLUSTER_LABEL_7TH"]  # "--data_implement LINEAR_REG_ONE_CLUSTER_DIM_30_BKPS_0_NOISE_STD_30"
 batch_size_list = [""]
 train_models_list = ["--train_models CLASSMTSCORRAD"]  # ["", "--train_models MTSCORRAD", "--train_models MTSCORRAD --train_models BASELINE", "--train_models MTSORRAD --train_models BASELINE --train_models GAE"]
 corr_type_list = ["--corr_type pearson"]  # ["--corr_type pearson", "--corr_type cross_corr"]
@@ -25,13 +25,13 @@ drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gr
 drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
 gra_enc_list = [""]  # ["", "--gra_enc gin", "--gra_enc gine"]
 gra_enc_aggr_list = [""]  # ["", "--gra_enc_aggr mean", "--gra_enc_aggr add", "--gra_enc_aggr max"]
-gra_enc_l_list = ["--gra_enc_l 2"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
-gra_enc_h_list = ["--gra_enc_h 64"]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"]
-gra_enc_mlp_l_list = [""]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
+gra_enc_l_list = ["--gra_enc_l 3"]  # ["--gra_enc_l 1", "--gra_enc_l 2", "--gra_enc_l 3", "--gra_enc_l 4", "--gra_enc_l 5"]
+gra_enc_h_list = ["--gra_enc_h 32", "--gra_enc_h 64"]  # ["--gra_enc_h 32", "--gra_enc_h 64", "--gra_enc_h 128", "--gra_enc_h 256", "--gra_enc_h 512"]
+gra_enc_mlp_l_list = ["--gra_enc_mlp_l 2", "--gra_enc_mlp_l 4"]  # ["--gra_enc_mlp_l 1", "--gra_enc_mlp_l 2", "--gra_enc_mlp_l 3"]
 gru_l_list = [""]  # ["--gru_l 1", "--gru_l 2", "--gru_l 3", "--gru_l 4", "--gru_l 5"]
 gru_h_list = [""]  # ["--gru_h 40", "--gru_h 80", "--gru_h 100", "--gru_h 320", "--gru_h 640"]
 gru_input_feature_idx_list = [""]  # ["", "--gru_input_feature_idx 0", "--gru_input_feature_idx 1", "--gru_input_feature_idx 2", "--gru_input_feature_idx 3", "--gru_input_feature_idx 4"]
-use_weighted_loss_list = ["--use_weighted_loss true"]  # ["", "--use_weighted_loss true"]
+use_weighted_loss_list = [""]  # ["", "--use_weighted_loss true"]
 edge_acc_loss_atol_list = [""]  # ["", "--edge_acc_loss_atol 0.05", "--edge_acc_loss_atol 0.1", "--edge_acc_loss_atol 0.33"]
 two_ord_pred_prob_edge_accu_thres_list = [""]  # ["", "--two_ord_pred_prob_edge_accu_thres 0.1", "--two_ord_pred_prob_edge_accu_thres 0.2"]
 use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
