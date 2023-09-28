@@ -332,7 +332,7 @@ if __name__ == "__main__":
     # show info
     logger.info(f"===== file_name basis:{output_file_name} =====")
     logger.info(f"===== pytorch running on:{device} =====")
-    logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}")
+    logger.info(f"gra_edges_data_mats.shape:{gra_edges_data_mats.shape}, gra_nodes_data_mats.shape:{gra_nodes_data_mats.shape}, target_mats.shape:{target_mats.shape if target_mats is not None else None}")
     logger.info(f"gra_edges_data_mats.max:{np.nanmax(gra_edges_data_mats)}, gra_edges_data_mats.min:{np.nanmin(gra_edges_data_mats)}")
     logger.info(f"gra_nodes_data_mats.max:{np.nanmax(gra_nodes_data_mats)}, gra_nodes_data_mats.min:{np.nanmin(gra_nodes_data_mats)}")
     logger.info(f"norm_train_nodes_data_mats.max:{np.nanmax(norm_train_dataset['nodes'])}, norm_train_nodes_data_mats.min:{np.nanmin(norm_train_dataset['nodes'])}")
@@ -396,26 +396,32 @@ if __name__ == "__main__":
             logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
         elif len(ARGS.inference_models) > 1:
             logger.info(f"===== inference model with ensemble =====")
+            all_pred_prob_each_model = []
             for model_type, infer_model_path in zip(ARGS.inference_models, ARGS.inference_model_paths):
                 model = ModelType[model_type].set_model(basic_model_cfg, ARGS)
-                print(model)
-                print("-"*80)
                 model_dir, _ = ModelType[model_type].set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
                 model_param_path = model_dir.parents[2].joinpath(infer_model_path)
                 assert model_param_path.exists(), f"{model_param_path} not exists"
                 model.load_state_dict(torch.load(model_param_path, map_location=device))
                 model.eval()
                 if "MTSCORRAD" in model_type:
-                    test_loader = model.create_pyg_data_loaders(graph_adj_mats=inference_data["edges"],  graph_nodes_mats=inference_data["nodes"], target_mats=inference_data["target"], loader_seq_len=model.model_cfg["seq_len"], show_log=False)
+                    if ARGS.inference_data_split in ["val", "test"]:
+                        model.model_cfg["batch_size"] = inference_data["edges"].shape[0]-1-ARGS.seq_len
+                    test_loader = model.create_pyg_data_loaders(graph_adj_mats=inference_data["edges"],  graph_nodes_mats=inference_data["nodes"], target_mats=inference_data["target"], loader_seq_len=model.model_cfg["seq_len"], show_log=True)
                 elif "BASELINE" in model_type:
                     test_loader = model.yield_batch_data(graph_adj_mats=inference_data['edges'], target_mats=inference_data['target'], batch_size=model.model_cfg['batch_size'], seq_len=model.model_cfg['seq_len'])
                 with torch.no_grad():
-                    all_pred_prob_each_model = []
                     for batch_idx, batch_data in enumerate(test_loader):
                         infer_res = model.infer_batch_data(batch_data)
                         batch_pred_prob, batch_preds, batch_y_labels = infer_res[0], infer_res[1], infer_res[2]
-                        all_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_pred_prob, batch_pred_prob), dim=0)
-                    all_pred_prob_each_model.append(all_pred_prob)
+                        all_batch_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_batch_pred_prob, batch_pred_prob), dim=0)
+                        all_batch_labels = batch_y_labels if batch_idx == 0 else torch.cat((all_batch_labels, batch_y_labels), dim=0)
+                        ###print(f"all_batch_labels:\n{all_batch_labels}")
+                        ###print("---------------------")
+                    all_pred_prob_each_model.append(all_batch_pred_prob)
+            ensemble_pred_prob = torch.mean(torch.stack(all_pred_prob_each_model), dim=0)
+            ensemble_preds = torch.argmax(ensemble_pred_prob, dim=1)
+            ###print(f"ensemble_preds.shape:{ensemble_preds.shape}, all_batch_labels.shape:{all_batch_labels.shape}")
                 #None
                 ##loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
                 ###logger.info(f"===== inference model:{model_type} on {ARGS.inference_data_split} data =====")

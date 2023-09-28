@@ -89,9 +89,8 @@ class ClassMTSCorrAD(MTSCorrAD):
                                           ]))
         self.softmax = Softmax(dim=0)
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        ###self.optimizer = torch.optim.SGD(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
-        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
+        ###schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
+        ###self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
 #
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """
@@ -181,27 +180,6 @@ class ClassMTSCorrAD(MTSCorrAD):
             epoch_metrics.update({str(fn): torch.zeros(1) for fn in loss_fns["fns"]})
             # Train on batches
             for batch_idx, batch_data in enumerate(train_loader):
-                ###batch_loss = torch.zeros(1)
-                ###batch_edge_acc = torch.zeros(1)
-                ###for data_batch_idx in range(self.model_cfg['batch_size']):
-                ###    data = batch_data[data_batch_idx]
-                ###    x, x_edge_index, x_seq_batch_node_id, x_edge_attr = data.x, data.edge_index, data.batch, data.edge_attr
-                ###    y, y_edge_index, y_seq_batch_node_id, y_edge_attr = data.y[-1].x, data.y[-1].edge_index, torch.zeros(data.y[-1].x.shape[0], dtype=torch.int64), data.y[-1].edge_attr  # only take y of x with last time-step on training
-                ###    pred_prob = self(x, x_edge_index, x_seq_batch_node_id, x_edge_attr, self.model_cfg["output_type"]).unsqueeze(0)
-                ###    preds = torch.argmax(pred_prob, dim=1)
-                ###    y_graph_adj = torch.sparse_coo_tensor(y_edge_index, y_edge_attr[:, 0], (num_nodes, num_nodes)).to_dense()
-                ###    y_labels = (y_graph_adj.view(-1)+1).to(torch.long).unsqueeze(0)
-                ###    batch_pred_prob = pred_prob if data_batch_idx == 0 else torch.cat([batch_pred_prob, pred_prob], dim=0)
-                ###    batch_preds = preds if data_batch_idx == 0 else torch.cat([batch_preds, preds], dim=0)
-                ###    batch_y_labels = y_labels if data_batch_idx == 0 else torch.cat([batch_y_labels, y_labels], dim=0)
-
-                ###    calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
-                ###                           "preds": preds, "y_labels": y_labels, "batch_loss": batch_loss,
-                ###                           "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
-                ###    batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-                ###calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": batch_pred_prob, "loss_fn_target": batch_y_labels,
-                ###                       "preds": batch_preds, "y_labels": batch_y_labels, "batch_loss": batch_loss,
-                ###                       "batch_edge_acc": batch_edge_acc, "epoch_metrics": epoch_metrics}
                 batch_pred_prob, batch_preds, batch_y_labels, pred_graph_embeds, y_graph_embeds, log_model_info_data = self.infer_batch_data(batch_data, is_return_graph_embeds=True)
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": batch_pred_prob, "loss_fn_target": batch_y_labels,
                                        "preds": batch_preds, "y_labels": batch_y_labels, "num_batches": num_batches, "epoch_metrics": epoch_metrics}
@@ -215,11 +193,9 @@ class ClassMTSCorrAD(MTSCorrAD):
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                if hasattr(self, "scheduler"):
+                    self.scheduler.step()
 
-                ### compute graph embeds
-                ##pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
-                ##y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
@@ -230,8 +206,6 @@ class ClassMTSCorrAD(MTSCorrAD):
                 epoch_metrics["lr"] = torch.tensor(self.optimizer.param_groups[0]['lr'])
                 epoch_metrics["pred_gra_embeds"].append(pred_graph_embeds.tolist())
                 epoch_metrics["y_gra_embeds"].append(y_graph_embeds.tolist())
-                #### used in observation model info in console
-                ###log_model_info_data = data
             # Validation
             epoch_metrics['val_loss'], epoch_metrics['val_edge_acc'], batch_val_preds, batch_val_y_labels = self.test(val_data, loss_fns=loss_fns, show_loader_log=True if epoch_i == 0 else False)
 
@@ -269,8 +243,6 @@ class ClassMTSCorrAD(MTSCorrAD):
             if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 obs_data_batch_idx = self.model_cfg['batch_size']-1
                 logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{obs_data_batch_idx} \ninput_graph_adj[:5]:\n{log_model_info_data.edge_attr[:5]}\npreds:\n{batch_preds[obs_data_batch_idx]}\ny_labels:\n{batch_y_labels[obs_data_batch_idx]}\n")
-            ###if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
-            ###    logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:{data_batch_idx} \ninput_graph_adj[:5]:\n{x_edge_attr[:5]}\npreds:\n{preds}\ny_graph_adj:\n{y_graph_adj}\n")
 
         return best_model, best_model_info
 
@@ -278,6 +250,9 @@ class ClassMTSCorrAD(MTSCorrAD):
         self.eval()
         test_loss = 0
         test_edge_acc = 0
+        graph_time_len = test_data['edges'].shape[0] - 1  # the graph of last "t" can't be used as train data
+        tr_batch_size = self.model_cfg['batch_size']
+        self.model_cfg['batch_size'] = graph_time_len-self.model_cfg['seq_len']
         test_loader = self.create_pyg_data_loaders(graph_adj_mats=test_data["edges"],  graph_nodes_mats=test_data["nodes"], target_mats=test_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=show_loader_log)
         num_batches = len(test_loader)
         with torch.no_grad():
@@ -288,5 +263,6 @@ class ClassMTSCorrAD(MTSCorrAD):
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
                 test_loss += batch_loss/num_batches
                 test_edge_acc += batch_edge_acc/num_batches
+        self.model_cfg['batch_size'] = tr_batch_size
 
         return test_loss, test_edge_acc, batch_preds, batch_y_labels
