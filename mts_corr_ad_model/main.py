@@ -5,6 +5,7 @@ import logging
 import sys
 import traceback
 import warnings
+from datetime import datetime
 from enum import Enum, auto
 from math import ceil
 from pathlib import Path
@@ -20,7 +21,7 @@ sys.path.append("/workspace/correlation-change-predict/utils")
 from metrics_utils import (BinsEdgeAccuracyLoss, EdgeAccuracyLoss,
                            TwoOrderPredProbEdgeAccuracy,
                            UpperTriangleEdgeAccuracy)
-from utils import convert_str_bins_list, split_and_norm_data
+from utils import convert_str_bins_list, plot_heatmap, split_and_norm_data
 
 from baseline_model import BaselineGRU
 from class_baseline_model import (ClassBaselineGRU, ClassBaselineGRUOneFeature,
@@ -128,7 +129,7 @@ if __name__ == "__main__":
                              help="input the data implement name, watch options by operate: logger.info(data_cfg['DATASETS'].keys())")
     args_parser.add_argument("--batch_size", type=int, nargs='?', default=64,
                              help="input the number of batch size")
-    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=1500,
+    args_parser.add_argument("--tr_epochs", type=int, nargs='?', default=3000,
                              help="input the number of training epochs")
     args_parser.add_argument("--seq_len", type=int, nargs='?', default=10,
                              help="input the number of sequence length")
@@ -373,6 +374,8 @@ if __name__ == "__main__":
                         model_dir, model_log_dir = model_type.set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
                         model.save_model(best_model, best_model_info, model_dir=model_dir, model_log_dir=model_log_dir)
     elif len(ARGS.inference_models) > 0:
+        logger.info(f"===== inference model:[{ARGS.inference_models}] on {ARGS.inference_data_split} data =====")
+        logger.info(f"===== if inference_models is more than one, the inference result is ensemble result =====")
         assert list(filter(lambda x: x in ModelType.__members__.keys(), ARGS.inference_models)), f"inference_models must be input one of {ModelType.__members__.keys()}"
         if ARGS.inference_data_split == "train":
             inference_data = norm_train_dataset
@@ -380,6 +383,8 @@ if __name__ == "__main__":
             inference_data = norm_val_dataset
         elif ARGS.inference_data_split == "test":
             inference_data = norm_test_dataset
+        loss = None
+        edge_acc = None
         if len(ARGS.inference_models) == 1:
             model_type = ModelType[ARGS.inference_models[0]]
             model = model_type.set_model(basic_model_cfg, ARGS)
@@ -389,13 +394,7 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(model_param_path, map_location=device))
             model.eval()
             loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
-            logger.info(f"===== inference model:{model_type.name} on {ARGS.inference_data_split} data =====")
-            logger.info(f"loss_fns:{loss_fns_dict['fns']}")
-            logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
-            logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
-            logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
         elif len(ARGS.inference_models) > 1:
-            logger.info(f"===== inference model with ensemble =====")
             all_pred_prob_each_model = []
             for model_type, infer_model_path in zip(ARGS.inference_models, ARGS.inference_model_paths):
                 model = ModelType[model_type].set_model(basic_model_cfg, ARGS)
@@ -415,21 +414,24 @@ if __name__ == "__main__":
                         infer_res = model.infer_batch_data(batch_data)
                         batch_pred_prob, batch_preds, batch_y_labels = infer_res[0], infer_res[1], infer_res[2]
                         all_batch_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_batch_pred_prob, batch_pred_prob), dim=0)
-                        all_batch_labels = batch_y_labels if batch_idx == 0 else torch.cat((all_batch_labels, batch_y_labels), dim=0)
-                        ###print(f"all_batch_labels:\n{all_batch_labels}")
-                        ###print("---------------------")
+                        y_labels = batch_y_labels if batch_idx == 0 else torch.cat((y_labels, batch_y_labels), dim=0)
                     all_pred_prob_each_model.append(all_batch_pred_prob)
             ensemble_pred_prob = torch.mean(torch.stack(all_pred_prob_each_model), dim=0)
-            ensemble_preds = torch.argmax(ensemble_pred_prob, dim=1)
-            ###print(f"ensemble_preds.shape:{ensemble_preds.shape}, all_batch_labels.shape:{all_batch_labels.shape}")
-                #None
-                ##loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
-                ###logger.info(f"===== inference model:{model_type} on {ARGS.inference_data_split} data =====")
-                ###logger.info(f"loss_fns:{loss_fns_dict['fns']}")
-                ###logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
-                ###logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
-                ###logger.info(f"loss:{loss}, edge_acc:{edge_acc}")
-                ###if model_type == ARGS.inference_models[0]:
-                ###    preds_ensemble = preds
-                ###else:
-                ###    preds_ensemble += preds
+            preds = torch.argmax(ensemble_pred_prob, dim=1)
+            if "edge_acc_metric_fn" in basic_model_cfg.keys():
+                edge_acc = basic_model_cfg["edge_acc_metric_fn"](preds, y_labels)
+            else:
+                edge_acc = preds.eq(y_labels).to(torch.float).mean()
+
+        loss = loss.item() if isinstance(loss, torch.Tensor) else loss
+        edge_acc = edge_acc.item() if isinstance(edge_acc, torch.Tensor) else edge_acc
+        t_stamp = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
+        conf_mat_save_fig_dir = current_dir/'exploration_model_result/model_result_figs'
+        conf_mat_save_fig_name = 'confusion_matrix_'+'-'.join(ARGS.inference_models)+f'_{ARGS.inference_data_split}_{t_stamp}.png'
+        conf_mat_save_fig_path = conf_mat_save_fig_dir/conf_mat_save_fig_name
+        conf_mat_save_fig_dir.mkdir(parents=True, exist_ok=True)
+        plot_heatmap(preds.cpu(), y_labels.cpu(), can_show_conf_mat=True, save_fig_path=conf_mat_save_fig_path)
+        logger.info(f"loss_fns:{loss_fns_dict['fns']}")
+        logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
+        logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
+        logger.info(f"loss:{loss}, edge_acc:{edge_acc}")

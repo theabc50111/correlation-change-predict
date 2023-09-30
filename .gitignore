@@ -9,6 +9,7 @@ dataset/
 dataset.csv
 *train_logs/
 save_models/
+model_result_figs/
 pipeline_dataset/
 *__pycache__/
 *.log

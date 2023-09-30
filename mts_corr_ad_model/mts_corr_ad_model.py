@@ -276,9 +276,6 @@ class MTSCorrAD(torch.nn.Module):
 
     def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, num_batches: int,
                      preds: torch.Tensor = None, y_labels: torch.Tensor = None, epoch_metrics: dict = None):
-    ###def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
-    ###                 batch_edge_acc: torch.Tensor, preds: torch.Tensor = None, y_labels: torch.Tensor = None,
-    ###                 epoch_metrics: dict = None):
         """
         Calculate loss function
         """

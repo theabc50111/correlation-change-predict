@@ -205,13 +205,17 @@ def set_plot_log_data(log_path: Path):
 
     return return_dict
 
-def plot_val_heatmap(best_epoch_val_preds: np.ndarray, best_epoch_val_labels: np.ndarray):
-    total_val_data_confusion_matrix = pd.DataFrame(confusion_matrix(best_epoch_val_labels.reshape(-1), best_epoch_val_preds.reshape(-1), labels=[0, 1, 2]), columns=range(-1, 2), index=range(-1, 2))
+def plot_heatmap(preds: np.ndarray, labels: np.ndarray, save_fig_path: Path = None, can_show_conf_mat: bool = False):
+
+    total_data_confusion_matrix = pd.DataFrame(confusion_matrix(labels.reshape(-1), preds.reshape(-1), labels=[0, 1, 2]), columns=range(-1, 2), index=range(-1, 2))
     plt.figure(figsize = (10, 10))
     plt.rcParams.update({'font.size': 44})
     ax = plt.gca()
-    heatmap(total_val_data_confusion_matrix, annot=True, ax=ax, fmt='g')
+    heatmap(total_data_confusion_matrix, annot=True, ax=ax, fmt='g')
     ax.set(xlabel="Prediction", ylabel="Ground Truth", title="val")
+    if can_show_conf_mat:
+        logger.info(f"confusion_matrix:\n{total_data_confusion_matrix}")
+    if save_fig_path:
+        plt.savefig(save_fig_path)
     plt.show()
     plt.close()
-
