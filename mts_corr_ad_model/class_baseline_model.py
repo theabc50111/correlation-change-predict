@@ -34,8 +34,7 @@ class ClassBaselineGRU(BaselineGRU):
         self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.softmax = Softmax(dim=0)
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
+        self.init_optimizer()
 
     def forward(self, x, output_type, *unused_args, **unused_kwargs):
         batch_pred_prob = torch.empty(x.shape[0], 3, self.fc_out_dim)
@@ -81,34 +80,15 @@ class ClassBaselineGRU(BaselineGRU):
             train_loader = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil((len(train_data['edges'])-self.model_cfg['seq_len'])/self.model_cfg['batch_size'])
             for batch_idx, batch_data in enumerate(train_loader):
-                ###batch_loss = torch.zeros(1)
-                ###batch_edge_acc = torch.zeros(1)
-                ###x, y = batch_data[0], batch_data[1]
-                ###pred_prob = self.forward(x, output_type=self.model_cfg['output_type'])
-                ###preds = torch.argmax(pred_prob, dim=1)
-                ###y_labels = (y+1).to(torch.long)
                 pred_prob, preds, y_labels = self.infer_batch_data(batch_data)
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred_prob, "loss_fn_target": y_labels,
                                        "preds": preds, "y_labels": y_labels, "num_batches": num_batches, "epoch_metrics": epoch_metrics}
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-                ###for fn in loss_fns["fns"]:
-                ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                ###    loss_fns["fn_args"][fn_name].update({"input": pred_prob, "target": y_labels})
-                ###    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                ###    loss = partial_fn()
-                ###    batch_loss += loss
-                ###    epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-                ###    if "EdgeAcc" in fn_name:
-                ###        edge_acc = 1-loss
-                ###        batch_edge_acc += edge_acc
-                ###    else:
-                ###        edge_acc = (preds == y_labels).to(torch.float).mean()
-                ###        batch_edge_acc += edge_acc
-
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                if hasattr(self, "scheduler"):
+                    self.scheduler.step()
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
                 epoch_metrics["gru_gradient"] += sum([p.grad.sum() for p in self.gru.parameters() if p.grad is not None])/num_batches
@@ -178,8 +158,7 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         self.fc1 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc2 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
         self.fc3 = Sequential(Linear(self.graph_size, self.fc_out_dim), Dropout(self.model_cfg["drop_p"] if "class_fc" in self.model_cfg["drop_pos"] else 0))
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
+        self.init_optimizer()
 
     def transform_graph_adj_to_only_triu(self, graph_adj_mats: np.ndarray):
         graph_adj_mats[graph_adj_mats == 0] = -100

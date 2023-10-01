@@ -54,6 +54,9 @@ class BaselineGRU(MTSCorrAD):
         self.decoder = self.model_cfg['decoder'](self.model_cfg['gru_h'], self.model_cfg["num_nodes"], drop_p=self.model_cfg["drop_p"] if "decoder" in self.model_cfg["drop_pos"] else 0)
         del self.gru1
         del self.graph_encoder
+        self.init_optimizer()
+
+    def init_optimizer(self):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.num_tr_batches*50, gamma=0.5)
 
@@ -156,7 +159,8 @@ class BaselineGRU(MTSCorrAD):
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                if hasattr(self, "scheduler"):
+                    self.scheduler.step()
                 epoch_metrics["tr_edge_acc"] += batch_edge_acc/num_batches
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
                 epoch_metrics["gru_gradient"] += sum([p.grad.sum() for p in self.gru.parameters() if p.grad is not None])/num_batches

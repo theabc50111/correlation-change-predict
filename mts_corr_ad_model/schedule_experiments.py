@@ -20,6 +20,7 @@ discr_loss_r_list = [""]  # ["", "--discr_loss_r 0.1", "--discr_loss_r 0.01", "-
 discr_pred_disp_r_list = [""]  # ["", "--discr_pred_disp_r 1", "--discr_pred_disp_r 2", "--discr_pred_disp_r 5"]
 learning_rate_list = [""]  # ["--learn_rate 0.0001", "--learn_rate 0.0005", "--learn_rate 0.001", "--learn_rate 0.005", "--learn_rate 0.01", "--learn_rate 0.05", "--learn_rate 0.1"]
 weight_decay_list = [""]  # ["--weight_decay 0.0001", "--weight_decay 0.0005", "--weight_decay 0.001", "--weight_decay 0.005", "--weight_decay 0.01", "--weight_decay 0.05", "--weight_decay 0.1"]
+use_optim_scheduler_list = [""]  # ["", "--use_optim_scheduler true"]
 graph_enc_weight_l2_reg_lambda_list = [""]  # ["", "--graph_enc_weight_l2_reg_lambda 0.01", "--graph_enc_weight_l2_reg_lambda 0.001"]
 drop_pos_list = [""]  # ["", "--drop_pos gru", "--drop_pos decoder --drop_pos gru", "--drop_pos gru --drop_pos decoder --drop_pos graph_encoder"]
 drop_p_list = [""]  # ["--drop_p 0.33", "--drop_p 0.5", "--drop_p 0.66"]
@@ -38,12 +39,12 @@ use_edge_acc_bins_list = [""]  # ["", "--use_bin_edge_acc_loss true"]
 output_type_list = ["--output_type class_probability"]  # ["--output_type discretize", "--output_type class_probability"]
 output_bins_list = [""]  # ["--output_bins -1 --output_bins -0.25 --output_bins --output_bins 0.25 --output_bins 1", "--output_bins -1 --output_bins -0.5 --output_bins 0 --output_bins 0.5 --output_bins 1", "--output_bins -1 --output_bins 0 --output_bins 1"]
 
-args_values = list(product(data_implement_list, batch_size_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list,
-                           custom_discrete_bins_list, nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, learning_rate_list, weight_decay_list,
+args_values = list(product(data_implement_list, batch_size_list, train_models_list, corr_type_list, seq_len_list, filt_mode_list, filt_quan_list, quan_discrete_bins_list, custom_discrete_bins_list,
+                           nodes_v_mode_list, target_mats_path_list, discr_loss_list, discr_loss_r_list, discr_pred_disp_r_list, learning_rate_list, weight_decay_list, use_optim_scheduler_list,
                            graph_enc_weight_l2_reg_lambda_list, drop_pos_list, drop_p_list, gra_enc_list, gra_enc_aggr_list, gra_enc_l_list, gra_enc_h_list, gra_enc_mlp_l_list, gru_l_list, gru_h_list,
                            gru_input_feature_idx_list, use_weighted_loss_list, edge_acc_loss_atol_list, two_ord_pred_prob_edge_accu_thres_list, use_edge_acc_bins_list, output_type_list, output_bins_list))
 args_keys = ["data_implement", "batch_size", "train_models", "corr_type", "seq_len", "filt_mode", "filt_quan", "quan_discrete_bins", "custom_discrete_bins", "nodes_v_mode", "target_mats_path", "discr_loss", "discr_loss_r", "discr_pred_disp_r",
-             "learning_rate", "weight_decay", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "gru_input_feature_idx", "use_weighted_loss",
+             "learning_rate", "weight_decay", "use_optim_scheduler", "graph_enc_weight_l2_reg_lambda", "drop_pos", "drop_p", "gra_enc", "gra_enc_aggr", "gra_enc_l", "gra_enc_h", "gra_enc_mlp_l", "gru_l", "gru_h", "gru_input_feature_idx", "use_weighted_loss",
              "edge_acc_loss_atol", "two_ord_pred_prob_edge_accu_thres", "use_edge_acc_bins", "output_type", "output_bins"]
 args_list = []
 for args_value in args_values:

@@ -89,10 +89,7 @@ class MTSCorrAD2(MTSCorrAD):
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
         if self.model_cfg["pretrain_decoder"]:
             self.decoder.load_state_dict(torch.load(self.model_cfg["pretrain_decoder"]))
-        self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        #self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=list(range(0, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)
-        schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
-        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
+        self.init_optimizer()
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, *unused_args):
         """
@@ -183,7 +180,8 @@ class MTSCorrAD2(MTSCorrAD):
                     gra_enc_weight_l2_penalty = 0
                 batch_loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                if hasattr(self, 'scheduler'):
+                    self.scheduler.step()
                 # compute graph embeds
                 pred_graph_embeds = self.get_pred_embeddings(x, x_edge_index, x_seq_batch_node_id, x_edge_attr)
                 y_graph_embeds = self.graph_encoder.get_embeddings(y, y_edge_index, y_seq_batch_node_id, y_edge_attr)

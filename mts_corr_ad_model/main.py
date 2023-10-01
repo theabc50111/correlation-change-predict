@@ -165,6 +165,8 @@ if __name__ == "__main__":
                              help="input the learning rate of training")
     args_parser.add_argument("--weight_decay", type=float, nargs='?', default=0,
                              help="input the weight decay of training")
+    args_parser.add_argument("--use_optim_scheduler", type=bool, default=False, action=argparse.BooleanOptionalAction,
+                             help="input --use_optim_scheduler to use optimizer scheduler")
     args_parser.add_argument("--graph_enc_weight_l2_reg_lambda", type=float, nargs='?', default=0,
                              help="input the weight of graph encoder weight l2 norm loss")
     args_parser.add_argument("--drop_pos", type=str, nargs='*', default=[],
@@ -284,6 +286,7 @@ if __name__ == "__main__":
                        "seq_len": ARGS.seq_len,
                        "learning_rate": ARGS.learning_rate,
                        "weight_decay": ARGS.weight_decay,
+                       "can_use_optim_scheduler": ARGS.use_optim_scheduler,
                        "graph_enc_weight_l2_reg_lambda": ARGS.graph_enc_weight_l2_reg_lambda,
                        "drop_pos": ARGS.drop_pos,
                        "drop_p": ARGS.drop_p,

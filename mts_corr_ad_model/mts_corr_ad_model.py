@@ -190,23 +190,63 @@ class MTSCorrAD(torch.nn.Module):
             self.graph_encoder.load_state_dict(torch.load(self.model_cfg["pretrain_encoder"]))
         if self.model_cfg["pretrain_decoder"]:
             self.decoder.load_state_dict(torch.load(self.model_cfg["pretrain_decoder"]))
+        self.init_optimizer()
+
+    def init_optimizer(self):
+        """
+        Initialize optimizer
+        """
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=self.model_cfg['learning_rate'], weight_decay=self.model_cfg['weight_decay'])
-        schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
-        self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
+        if self.model_cfg['can_use_optim_scheduler']:
+            schedulers = [ConstantLR(self.optimizer, factor=0.1, total_iters=self.num_tr_batches*6), MultiStepLR(self.optimizer, milestones=list(range(self.num_tr_batches*5, self.num_tr_batches*600, self.num_tr_batches*50))+list(range(self.num_tr_batches*600, self.num_tr_batches*self.model_cfg['tr_epochs'], self.num_tr_batches*100)), gamma=0.9)]
+            self.scheduler = SequentialLR(self.optimizer, schedulers=schedulers, milestones=[self.num_tr_batches*6])
 
-    def show_model_config(self):
+    def init_best_model_info(self, train_data: dict, loss_fns: dict, epochs: int):
         """
-        Show model information
+        Initialize best_model_info
         """
-        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
-        observe_model_cfg['optimizer'] = str(self.optimizer)
-        if hasattr(self.scheduler, '_milestones'):
-            observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
+        best_model_info = {"num_training_graphs": len(train_data['edges']),
+                           "filt_mode": self.model_cfg['filt_mode'],
+                           "filt_quan": self.model_cfg['filt_quan'],
+                           "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
+                           "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
+                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
+                           "batches_per_epoch": self.num_tr_batches,
+                           "epochs": epochs,
+                           "batch_size": self.model_cfg['batch_size'],
+                           "seq_len": self.model_cfg['seq_len'],
+                           "opt_lr": self.model_cfg['learning_rate'],
+                           "opt_weight_decay": self.model_cfg['weight_decay'],
+                           "optimizer": str(self.optimizer),
+                           "gru_l": self.model_cfg['gru_l'],
+                           "gru_h": self.model_cfg['gru_h'],
+                           "gra_enc_l": self.model_cfg['gra_enc_l'],
+                           "gra_enc_h": self.model_cfg['gra_enc_h'],
+                           "gra_enc_mlp_l": self.model_cfg['gra_enc_mlp_l'],
+                           "decoder": self.model_cfg['decoder'].__name__,
+                           "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
+                           "loss_weight": [{fn.__name__ if hasattr(fn, '__name__') else str(fn): str(getattr(fn, "weight", None))} for fn in loss_fns["fns"]],
+                           "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
+                           "drop_pos": self.model_cfg["drop_pos"],
+                           "drop_p": self.model_cfg["drop_p"],
+                           "graph_enc": type(self.graph_encoder).__name__ if hasattr(self, 'graph_encoder') else None,
+                           "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
+                           "min_val_loss": float('inf'),
+                           "output_type": self.model_cfg['output_type'],
+                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
+                           "target_mats_bins": self.model_cfg['target_mats_bins'],
+                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
+                           "two_ord_pred_prob_edge_accu_thres": self.model_cfg['two_ord_pred_prob_edge_accu_thres'],
+                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
+        if hasattr(self, 'scheduler'):
+            if hasattr(self.scheduler, '_milestones'):
+                best_model_info["opt_scheduler"] = {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)}
+            else:
+                best_model_info["opt_scheduler"] = str(self.scheduler.__class__.__name__)
         else:
-            observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
+            best_model_info["opt_scheduler"] = None
 
-        logger.info(f"\nModel Configuration of {self.__class__}: \n{observe_model_cfg}")
-        logger.info("="*80)
+        return best_model_info
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
         """
@@ -234,47 +274,6 @@ class MTSCorrAD(torch.nn.Module):
             pred_graph_adj = torch.where(pred_graph_adj < bins.min(), bins.min(), pred_graph_adj)
 
         return pred_graph_adj
-
-    def init_best_model_info(self, train_data: dict, loss_fns: dict, epochs: int):
-        """
-        Initialize best_model_info
-        """
-        best_model_info = {"num_training_graphs": len(train_data['edges']),
-                           "filt_mode": self.model_cfg['filt_mode'],
-                           "filt_quan": self.model_cfg['filt_quan'],
-                           "quan_discrete_bins": self.model_cfg['quan_discrete_bins'],
-                           "custom_discrete_bins": self.model_cfg['custom_discrete_bins'],
-                           "graph_nodes_v_mode": self.model_cfg['graph_nodes_v_mode'],
-                           "batches_per_epoch": self.num_tr_batches,
-                           "epochs": epochs,
-                           "batch_size": self.model_cfg['batch_size'],
-                           "seq_len": self.model_cfg['seq_len'],
-                           "opt_lr": self.model_cfg['learning_rate'],
-                           "opt_weight_decay": self.model_cfg['weight_decay'],
-                           "optimizer": str(self.optimizer),
-                           "opt_scheduler": {"gamma": self.scheduler._schedulers[1].gamma, "milestoines": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones)} if hasattr(self.scheduler, '_milestones') else str(self.scheduler.__class__.__name__),
-                           "gru_l": self.model_cfg['gru_l'],
-                           "gru_h": self.model_cfg['gru_h'],
-                           "gra_enc_l": self.model_cfg['gra_enc_l'],
-                           "gra_enc_h": self.model_cfg['gra_enc_h'],
-                           "gra_enc_mlp_l": self.model_cfg['gra_enc_mlp_l'],
-                           "decoder": self.model_cfg['decoder'].__name__,
-                           "loss_fns": [fn.__name__ if hasattr(fn, '__name__') else str(fn) for fn in loss_fns["fns"]],
-                           "loss_weight": [{fn.__name__ if hasattr(fn, '__name__') else str(fn): str(getattr(fn, "weight", None))} for fn in loss_fns["fns"]],
-                           "gra_enc_weight_l2_reg_lambda": self.model_cfg['graph_enc_weight_l2_reg_lambda'],
-                           "drop_pos": self.model_cfg["drop_pos"],
-                           "drop_p": self.model_cfg["drop_p"],
-                           "graph_enc": type(self.graph_encoder).__name__ if hasattr(self, 'graph_encoder') else None,
-                           "gra_enc_aggr": self.model_cfg['gra_enc_aggr'],
-                           "min_val_loss": float('inf'),
-                           "output_type": self.model_cfg['output_type'],
-                           "output_bins": '_'.join((str(f) for f in self.model_cfg['output_bins'])).replace('.', '') if self.model_cfg['output_bins'] else None,
-                           "target_mats_bins": self.model_cfg['target_mats_bins'],
-                           "edge_acc_loss_atol": self.model_cfg['edge_acc_loss_atol'],
-                           "two_ord_pred_prob_edge_accu_thres": self.model_cfg['two_ord_pred_prob_edge_accu_thres'],
-                           "use_bin_edge_acc_loss": self.model_cfg['use_bin_edge_acc_loss']}
-
-        return best_model_info
 
     def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, num_batches: int,
                      preds: torch.Tensor = None, y_labels: torch.Tensor = None, epoch_metrics: dict = None):
@@ -333,6 +332,21 @@ class MTSCorrAD(torch.nn.Module):
         else:
             return batch_pred_graph_adj, batch_y_graph_adj, log_model_info_data
 
+    def show_model_config(self):
+        """
+        Show model information
+        """
+        observe_model_cfg = {item[0]: item[1] for item in self.model_cfg.items() if item[0] != 'dataset'}
+        observe_model_cfg['optimizer'] = str(self.optimizer)
+        if hasattr(self, 'scheduler'):
+            if hasattr(self.scheduler, '_milestones'):
+                observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__), "milestones": self.scheduler._milestones+list(self.scheduler._schedulers[1].milestones), "gamma": self.scheduler._schedulers[1].gamma}
+            else:
+                observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
+
+        logger.info(f"\nModel Configuration of {self.__class__}: \n{observe_model_cfg}")
+        logger.info("="*80)
+
     @overload
     def train(self, mode: bool = True) -> torch.nn.Module:
         ...
@@ -351,8 +365,8 @@ class MTSCorrAD(torch.nn.Module):
         if train_data is None:
             return self
 
-        self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
+        self.show_model_config()
         best_model = []
         train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=True)
         num_batches = len(train_loader)
@@ -377,7 +391,8 @@ class MTSCorrAD(torch.nn.Module):
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+                if hasattr(self, 'scheduler'):
+                    self.scheduler.step()
 
                 # record metrics for each batch
                 epoch_metrics["tr_loss"] += batch_loss/num_batches
