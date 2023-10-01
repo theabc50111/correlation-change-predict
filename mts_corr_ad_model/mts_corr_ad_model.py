@@ -104,9 +104,11 @@ class GraphTimeSeriesDataset(Dataset):
                     batch_data_list.append(data)
                 seq_data_list.append(batch_data_list)
             data_list.extend(seq_data_list)
+        assert len(data_list)%self.seq_len == 0, f"len(data_list): {len(data_list)} % seq_len: {self.seq_len} != 0, the length of data_list should be a multiple of seq_len"
         self.data_list = data_list
 
         if show_log:
+            logger.info("----------- GraphTimeSeriesDataset Info -----------")
             logger.info(f"Time length of graphs: {graph_time_len}")
             logger.info(f"The length of Dataset is: {len(data_list)}")
             logger.info(f"data.num_node_features: {data.num_node_features}; data.num_edges: {data.num_edges}; data.num_edge_features: {data.num_edge_features}; data.is_undirected: {data.is_undirected()}")
@@ -203,7 +205,7 @@ class MTSCorrAD(torch.nn.Module):
         else:
             observe_model_cfg['scheduler'] = {"scheduler_name": str(self.scheduler.__class__.__name__)}
 
-        logger.info(f"\nModel Configuration: \n{observe_model_cfg}")
+        logger.info(f"\nModel Configuration of {self.__class__}: \n{observe_model_cfg}")
         logger.info("="*80)
 
     def forward(self, x, edge_index, seq_batch_node_id, edge_attr, output_type, *unused_args):
@@ -352,8 +354,7 @@ class MTSCorrAD(torch.nn.Module):
         self.show_model_config()
         best_model_info = self.init_best_model_info(train_data, loss_fns, epochs)
         best_model = []
-        ###num_nodes = self.model_cfg["num_nodes"]
-        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"])
+        train_loader = self.create_pyg_data_loaders(graph_adj_mats=train_data['edges'],  graph_nodes_mats=train_data["nodes"], target_mats=train_data["target"], loader_seq_len=self.model_cfg["seq_len"], show_log=True)
         num_batches = len(train_loader)
         for epoch_i in tqdm(range(epochs)):
             self.train()
@@ -476,8 +477,9 @@ class MTSCorrAD(torch.nn.Module):
         data_loader = DataLoader(dataset, batch_size=loader_seq_len, shuffle=False)
 
         if show_log:
+            logger.info("----------------- Create Pytorch Geometric DataLoaders -----------------")
             logger.info(f'Number of batches in this data_loader: {len(data_loader)}')
-            logger.info("="*30)
+            logger.info("="*80)
 
         if show_debug_info:
             logger.debug('Peeking info of subgraph:')
