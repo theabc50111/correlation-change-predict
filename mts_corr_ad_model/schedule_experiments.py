@@ -67,7 +67,7 @@ if set(map(lambda x: x['gra_enc_l'], args_list)) != {""}:
     gra_enc_l_values_set.discard("")
     gra_enc_l_pop_value = gra_enc_l_values_set.pop()
     num_models = sum(1 for x in args_list if x["discr_loss"] == "" and x["gra_enc_l"] == gra_enc_l_pop_value)  # the main reasons for model operation time: discr_loss, gra_enc_l
-    model_timedelta_list = [timedelta(hours=10, minutes=20)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
+    model_timedelta_list = [timedelta(hours=22, minutes=10)]  # The order of elements of model_timedelta_list should comply with the order of elements of args_lisbwwt
 elif set(map(lambda x: x['gru_l'], args_list)) != {""}:
     gru_l_values_set = set(map(lambda x: x['gru_l'], args_list))
     gru_l_values_set.discard("")
