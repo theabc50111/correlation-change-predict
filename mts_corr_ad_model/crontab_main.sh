@@ -190,7 +190,7 @@ while [[ $# -gt 0 ]]; do
       ;;
 
     --use_optim_scheduler)
-      use_optim_scheduler="--use_optim_scheduler $2"
+      use_optim_scheduler="--use_optim_scheduler"
       shift 2
       ;;
 
