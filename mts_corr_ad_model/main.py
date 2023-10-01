@@ -5,8 +5,8 @@ import logging
 import sys
 import traceback
 import warnings
-from datetime import datetime
 from enum import Enum, auto
+from itertools import zip_longest
 from math import ceil
 from pathlib import Path
 from pprint import pformat
@@ -397,9 +397,13 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(model_param_path, map_location=device))
             model.eval()
             loss, edge_acc, preds, y_labels = model.test(inference_data, loss_fns=loss_fns_dict)
+            conf_mat_save_fig_dir = current_dir/f"exploration_model_result/model_result_figs/{ARGS.inference_models[0]}/{model_param_path.stem}"
+            conf_mat_save_fig_name = f'confusion_matrix-{ARGS.inference_data_split}.png'
         elif len(ARGS.inference_models) > 1:
-            all_pred_prob_each_model = []
-            for model_type, infer_model_path in zip(ARGS.inference_models, ARGS.inference_model_paths):
+            assert sorted(ARGS.inference_models) == ARGS.inference_models, f"inference_models must be input in order, but the input order is {ARGS.inference_models}"
+            ensemble_pred_prob = 0
+            ensemble_weights = [10, 12]
+            for model_type, infer_model_path, weight in zip_longest(ARGS.inference_models, ARGS.inference_model_paths, ensemble_weights, fillvalue=None):
                 model = ModelType[model_type].set_model(basic_model_cfg, ARGS)
                 model_dir, _ = ModelType[model_type].set_save_model_dir(current_dir, output_file_name, ARGS.corr_type, s_l, w_l)
                 model_param_path = model_dir.parents[2].joinpath(infer_model_path)
@@ -412,28 +416,26 @@ if __name__ == "__main__":
                     test_loader = model.create_pyg_data_loaders(graph_adj_mats=inference_data["edges"],  graph_nodes_mats=inference_data["nodes"], target_mats=inference_data["target"], loader_seq_len=model.model_cfg["seq_len"], show_log=True)
                 elif "BASELINE" in model_type:
                     test_loader = model.yield_batch_data(graph_adj_mats=inference_data['edges'], target_mats=inference_data['target'], batch_size=model.model_cfg['batch_size'], seq_len=model.model_cfg['seq_len'])
-                with torch.no_grad():
-                    for batch_idx, batch_data in enumerate(test_loader):
-                        infer_res = model.infer_batch_data(batch_data)
-                        batch_pred_prob, batch_preds, batch_y_labels = infer_res[0], infer_res[1], infer_res[2]
-                        all_batch_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_batch_pred_prob, batch_pred_prob), dim=0)
-                        y_labels = batch_y_labels if batch_idx == 0 else torch.cat((y_labels, batch_y_labels), dim=0)
-                    all_pred_prob_each_model.append(all_batch_pred_prob)
-            ensemble_pred_prob = torch.mean(torch.stack(all_pred_prob_each_model), dim=0)
+                for batch_idx, batch_data in enumerate(test_loader):
+                    infer_res = model.infer_batch_data(batch_data)
+                    batch_pred_prob, batch_preds, batch_y_labels = infer_res[0], infer_res[1], infer_res[2]
+                    all_batch_pred_prob = batch_pred_prob if batch_idx == 0 else torch.cat((all_batch_pred_prob, batch_pred_prob), dim=0)
+                    y_labels = batch_y_labels if batch_idx == 0 else torch.cat((y_labels, batch_y_labels), dim=0)
+                ensemble_pred_prob += all_batch_pred_prob*weight
             preds = torch.argmax(ensemble_pred_prob, dim=1)
             if "edge_acc_metric_fn" in basic_model_cfg.keys():
                 edge_acc = basic_model_cfg["edge_acc_metric_fn"](preds, y_labels)
             else:
                 edge_acc = preds.eq(y_labels).to(torch.float).mean()
+            model_param_paths = [Path(model_path).stem for model_path in ARGS.inference_model_paths]
+            conf_mat_save_fig_dir = current_dir/f"exploration_model_result/model_result_figs/ensemble_{'_'.join(ARGS.inference_models)}"/'-'.join(model_param_paths)
+            conf_mat_save_fig_name = 'confusion_matrix-ensemble_rate_'+'_'.join([str(w) for w in ensemble_weights])+f'-{ARGS.inference_data_split}.png'
 
-        loss = loss.item() if isinstance(loss, torch.Tensor) else loss
-        edge_acc = edge_acc.item() if isinstance(edge_acc, torch.Tensor) else edge_acc
-        t_stamp = datetime.strftime(datetime.now(), "%Y%m%d%H%M%S")
-        conf_mat_save_fig_dir = current_dir/'exploration_model_result/model_result_figs'
-        conf_mat_save_fig_name = 'confusion_matrix_'+'-'.join(ARGS.inference_models)+f'_{ARGS.inference_data_split}_{t_stamp}.png'
         conf_mat_save_fig_path = conf_mat_save_fig_dir/conf_mat_save_fig_name
         conf_mat_save_fig_dir.mkdir(parents=True, exist_ok=True)
         plot_heatmap(preds.cpu(), y_labels.cpu(), can_show_conf_mat=True, save_fig_path=conf_mat_save_fig_path)
+        loss = loss.item() if isinstance(loss, torch.Tensor) else loss
+        edge_acc = edge_acc.item() if isinstance(edge_acc, torch.Tensor) else edge_acc
         logger.info(f"loss_fns:{loss_fns_dict['fns']}")
         logger.info(f"metric_fn:{basic_model_cfg['edge_acc_metric_fn'] if 'edge_acc_metric_fn' in basic_model_cfg.keys() else None}")
         logger.info(f"Special args of loss_fns: {[(loss_fn, loss_args) for loss_fn, loss_args in loss_fns_dict['fn_args'].items() for arg in loss_args if arg not in ['input', 'target']]}")
