@@ -91,35 +91,6 @@ class BaselineGRU(MTSCorrAD):
 
         return best_model_info
 
-    ###def calc_loss_fn(self, loss_fns: dict, loss_fn_input: torch.Tensor, loss_fn_target: torch.Tensor, batch_loss: torch.Tensor,
-    ###                 batch_edge_acc: torch.Tensor, num_batches: int, preds: torch.Tensor = None, y_labels: torch.Tensor = None,
-    ###                 epoch_metrics: dict = None):
-    ###    """
-    ###    Calculate loss function
-    ###    """
-    ###    has_calc_edge_acc = False
-    ###    for fn in loss_fns["fns"]:
-    ###        fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-    ###        loss_fns["fn_args"][fn_name].update({"input": loss_fn_input, "target": loss_fn_target})
-    ###        partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-    ###        loss = partial_fn()
-    ###        batch_loss += loss/num_batches
-    ###        if epoch_metrics is not None:
-    ###            epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-    ###        if has_calc_edge_acc: continue
-    ###        if "EdgeAcc" in fn_name:
-    ###            edge_acc = (1-loss)/num_batches
-    ###        elif self.model_cfg.get("edge_acc_metric_fn"):
-    ###            edge_acc = self.model_cfg.get("edge_acc_metric_fn")(loss_fn_input, loss_fn_target)
-    ###        elif preds is not None and y_labels is not None:
-    ###            edge_acc = ((preds == y_labels).to(torch.float).mean())/num_batches
-    ###        else:
-    ###            edge_acc = torch.zeros(1)
-    ###        has_calc_edge_acc = True
-    ###        batch_edge_acc += edge_acc
-
-    ###    return batch_loss, batch_edge_acc
-
     def train(self, mode: bool = True, train_data: np.ndarray = None, val_data: np.ndarray = None, loss_fns: dict = None, epochs: int = 1000, **unused_kwargs):
         # In order to make original function of nn.Module.train() work, we need to override it
         super().train(mode=mode)
@@ -137,25 +108,10 @@ class BaselineGRU(MTSCorrAD):
             # Train on batches
             batch_data_generator = self.yield_batch_data(graph_adj_mats=train_data['edges'], target_mats=train_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             for batch_idx, batch_data in enumerate(batch_data_generator):
-                ###batch_loss = torch.zeros(1)
-                ###batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred, "loss_fn_target": y, "num_batches": num_batches, "epoch_metrics": epoch_metrics}
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-                ###for fn in loss_fns["fns"]:
-                ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                ###    loss_fns["fn_args"][fn_name].update({"input": pred, "target":  y})
-                ###    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                ###    loss = partial_fn()
-                ###    batch_loss += loss
-                ###    epoch_metrics[fn_name] += loss/num_batches  # we don't reset epoch[fn_name] to 0 in each batch, so we need to divide by total number of batches
-                ###    if "EdgeAcc" in fn_name:
-                ###        edge_acc = 1-loss
-                ###        batch_edge_acc += edge_acc
-                ###    else:
-                ###        edge_acc = torch.zeros(1)
-
                 self.optimizer.zero_grad()
                 batch_loss.backward()
                 self.optimizer.step()
@@ -185,7 +141,6 @@ class BaselineGRU(MTSCorrAD):
                 logger.info(f"\nModel Structure: \n{self}")
             if epoch_i % 10 == 0:  # show metrics every 10 epochs
                 epoch_metric_log_msgs = " | ".join([f"{k}: {v.item():.8f}" for k, v in epoch_metrics.items()])
-                ###logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs}")
                 logger.info(f"In Epoch {epoch_i:>3} | {epoch_metric_log_msgs} | lr: {self.optimizer.param_groups[0]['lr']:.9f}")
             if epoch_i % 100 == 0:  # show oredictive and real adjacency matrix every 500 epochs
                 logger.info(f"\nIn Epoch {epoch_i:>3}, batch_idx:{batch_idx}, data_batch_idx:7 \ninput_graph_adj[7, 0, :5]:\n{x[7, 0, :5]}\npred_graph_adj[7, :5]:\n{pred[7, :5]}\ny_graph_adj[7, :5]:\n{y[7, :5]}\n")
@@ -200,25 +155,10 @@ class BaselineGRU(MTSCorrAD):
             batch_data_generator = self.yield_batch_data(graph_adj_mats=test_data['edges'], target_mats=test_data['target'], batch_size=self.model_cfg['batch_size'], seq_len=self.model_cfg['seq_len'])
             num_batches = ceil((len(test_data['edges'])-self.model_cfg['seq_len'])//self.model_cfg['batch_size'])
             for batch_data in batch_data_generator:
-                ###batch_loss = torch.zeros(1)
-                ###batch_edge_acc = torch.zeros(1)
                 x, y = batch_data[0], batch_data[1]
                 pred = self.forward(x, output_type=self.model_cfg['output_type'])
                 calc_loss_fn_kwargs = {"loss_fns": loss_fns, "loss_fn_input": pred, "loss_fn_target": y, "num_batches": num_batches}
                 batch_loss, batch_edge_acc = self.calc_loss_fn(**calc_loss_fn_kwargs)
-
-                ###for fn in loss_fns["fns"]:
-                ###    fn_name = fn.__name__ if hasattr(fn, '__name__') else str(fn)
-                ###    loss_fns["fn_args"][fn_name].update({"input": pred, "target":  y})
-                ###    partial_fn = functools.partial(fn, **loss_fns["fn_args"][fn_name])
-                ###    loss = partial_fn()
-                ###    batch_loss += loss
-                ###    if "EdgeAcc" in fn_name:
-                ###        edge_acc = 1-loss
-                ###        batch_edge_acc += edge_acc
-                ###    else:
-                ###        edge_acc = torch.zeros(1)
-
                 test_edge_acc += batch_edge_acc/num_batches
                 test_loss += batch_loss/num_batches
 
