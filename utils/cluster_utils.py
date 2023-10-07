@@ -106,10 +106,10 @@ def hrchy_cluster_fixed_n_cluster(x: pd.DataFrame, n: int, data_mat_mode: str = 
     return hrchy_cluster
 
 
-def filter_distance_mat(distance_mat: pd.DataFrame, filter_mask: pd.DataFrame, tmp_clique_dir: Path) -> tuple[pd.DataFrame, list]:
-    if filter_mask is not None:
+def filter_distance_mat(distance_mat: pd.DataFrame, opposite_filter_mask: pd.DataFrame, tmp_clique_dir: Path) -> tuple[pd.DataFrame, list]:
+    if opposite_filter_mask is not None:
         original_distance_mat_diagonal = np.diag(distance_mat.values).copy()
-        distance_mat[filter_mask] = 0
+        distance_mat[opposite_filter_mask] = 0
         G = nx.from_pandas_adjacency(distance_mat)
         max_clique = []
         train_start_t = time()
@@ -125,8 +125,9 @@ def filter_distance_mat(distance_mat: pd.DataFrame, filter_mask: pd.DataFrame, t
                 break
         distance_mat = distance_mat.loc[max_clique, max_clique]
         np.fill_diagonal(distance_mat.values, original_distance_mat_diagonal)
-
-    return distance_mat, max_clique
+        return distance_mat, max_clique
+    else:
+        return distance_mat, []
 
 
 def plot_cluster_labels_distribution(trained_cluster: sklearn.base.ClusterMixin, cluster_name: str, fig_title: str, save_dir: Path = None):
