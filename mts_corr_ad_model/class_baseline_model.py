@@ -201,6 +201,7 @@ class ClassBaselineGRUOneFeature(ClassBaselineGRUWithoutSelfCorr):
         return best_model_info
 
     def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
+        assert self.model_cfg["input_feature_idx"] is not None, "input_feature_idx must be set"
         graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
         graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
         target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
