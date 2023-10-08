@@ -7,7 +7,7 @@ import traceback
 import warnings
 from enum import Enum, auto
 from itertools import zip_longest
-from math import ceil
+from math import ceil, sqrt
 from pathlib import Path
 from pprint import pformat
 
@@ -431,9 +431,18 @@ if __name__ == "__main__":
             conf_mat_save_fig_dir = current_dir/f"exploration_model_result/model_result_figs/ensemble_{'_'.join(ARGS.inference_models)}"/'-'.join(model_param_paths)
             conf_mat_save_fig_name = 'confusion_matrix-ensemble_rate_'+'_'.join([str(w) for w in ensemble_weights])+f'-{ARGS.inference_data_split}.png'
 
+        assert preds.shape == y_labels.shape, f"preds.shape:{preds.shape} != y_labels.shape:{y_labels.shape}"
+        preds, y_labels = preds.cpu().numpy(), y_labels.cpu().numpy()
         conf_mat_save_fig_path = conf_mat_save_fig_dir/conf_mat_save_fig_name
         conf_mat_save_fig_dir.mkdir(parents=True, exist_ok=True)
-        plot_heatmap(preds.cpu(), y_labels.cpu(), can_show_conf_mat=True, save_fig_path=conf_mat_save_fig_path)
+        if ARGS.use_upper_tri_edge_acc_metric:
+            assert sqrt(y_labels.shape[1]).is_integer(), f"y_labels.shape[1]:{y_labels.shape[1]} is not square number"
+            num_edges = int(sqrt(y_labels.shape[1]))
+            idx_upper_tri = np.triu_indices(num_edges, k=1)
+            preds, y_labels = preds.reshape(-1, num_edges, num_edges), y_labels.reshape(-1, num_edges, num_edges)
+            preds = preds[:, idx_upper_tri[0], idx_upper_tri[1]]
+            y_labels = y_labels[:, idx_upper_tri[0], idx_upper_tri[1]]
+        plot_heatmap(preds, y_labels, can_show_conf_mat=True, save_fig_path=conf_mat_save_fig_path)
         loss = loss.item() if isinstance(loss, torch.Tensor) else loss
         edge_acc = edge_acc.item() if isinstance(edge_acc, torch.Tensor) else edge_acc
         logger.info(f"loss_fns:{loss_fns_dict['fns']}")
