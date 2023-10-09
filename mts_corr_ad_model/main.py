@@ -18,8 +18,8 @@ import yaml
 from torch.nn import CrossEntropyLoss, MSELoss
 
 sys.path.append("/workspace/correlation-change-predict/utils")
-from metrics_utils import (BinsEdgeAccuracyLoss, EdgeAccuracyLoss,
-                           TwoOrderPredProbEdgeAccuracy,
+from metrics_utils import (BinsEdgeAccuracyLoss, CustomIndicesEdgeAccuracy,
+                           EdgeAccuracyLoss, TwoOrderPredProbEdgeAccuracy,
                            UpperTriangleEdgeAccuracy)
 from utils import convert_str_bins_list, plot_heatmap, split_and_norm_data
 
@@ -202,6 +202,8 @@ if __name__ == "__main__":
                              help="input --use_two_ord_pred_prob_edge_acc_metric to use TwoOrderPredProbEdgeAccuracy")
     args_parser.add_argument("--use_upper_tri_edge_acc_metric", type=bool, default=False, action=argparse.BooleanOptionalAction,
                              help="input --use_upper_tri_edge_acc_metric to use UpperTriangleEdgeAccuracy")
+    args_parser.add_argument("--custom_indices_edge_acc_metric_indices", type=int, nargs='*', default=[],
+                             help="input the indices of CustomIndicesEdgeAccuracy")
     args_parser.add_argument("--output_type", type=str, nargs='?', default=None,
                              choices=["discretize", "class_probability"],
                              help="input the type of output, the choices are [discretize]")
@@ -237,7 +239,8 @@ if __name__ == "__main__":
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss can't be input when output_type is class_probability"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
     assert not ARGS.use_two_ord_pred_prob_edge_acc_metric or ARGS.two_ord_pred_prob_edge_accu_thres is not None, "two_ord_pred_prob_edge_accu_thres must be input when use_two_ord_pred_prob_edge_acc_metric is input"
-    assert not (ARGS.use_upper_tri_edge_acc_metric and ARGS.use_two_ord_pred_prob_edge_acc_metric), "use_upper_tri_edge_acc_metric and use_two_ord_pred_prob_edge_acc_metric can not be both input"
+    ###assert not (ARGS.use_upper_tri_edge_acc_metric and ARGS.use_two_ord_pred_prob_edge_acc_metric), "use_upper_tri_edge_acc_metric and use_two_ord_pred_prob_edge_acc_metric can not be both input"
+    assert ARGS.use_upper_tri_edge_acc_metric + ARGS.use_two_ord_pred_prob_edge_acc_metric + bool(ARGS.custom_indices_edge_acc_metric_indices) <= 1, "use_upper_tri_edge_acc_metric, use_two_ord_pred_prob_edge_acc_metric and custom_indices_edge_acc_metric_indices can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
     # Data implement & output setting & testset setting
@@ -332,6 +335,9 @@ if __name__ == "__main__":
     elif ARGS.use_upper_tri_edge_acc_metric:
         num_classes = ARGS.target_mats_path.split("/")[-1].replace("bins_", "").count("_")
         basic_model_cfg["edge_acc_metric_fn"] = UpperTriangleEdgeAccuracy(num_classes=num_classes)
+    elif ARGS.custom_indices_edge_acc_metric_indices:
+        num_classes = ARGS.target_mats_path.split("/")[-1].replace("bins_", "").count("_")
+        basic_model_cfg["edge_acc_metric_fn"] = CustomIndicesEdgeAccuracy(selected_indices=ARGS.custom_indices_edge_acc_metric_indices, num_classes=num_classes)
 
     # show info
     logger.info(f"===== file_name basis:{output_file_name} =====")
