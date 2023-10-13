@@ -189,7 +189,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
     args_parser.add_argument("--gru_input_feature_idx", type=int, nargs='?', default=None,
-                             help="input the order of input features of gru")
+                             help="input the order of input features of gru, the order is from 0 to combination(num_nodes, 2)-1")
     args_parser.add_argument("--two_ord_pred_prob_edge_accu_thres", type=float, nargs='?', default=None,
                              help="input the threshold of TwoOrderPredProbEdgeAccuracy")
     args_parser.add_argument("--edge_acc_loss_atol", type=float, nargs='?', default=None,
