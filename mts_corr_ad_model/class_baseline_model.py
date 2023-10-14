@@ -197,14 +197,50 @@ class ClassBaselineGRUOneFeature(ClassBaselineGRUWithoutSelfCorr):
         Initialize best_model_info for ClassBaselineGRUOneFeature
         """
         best_model_info = super().init_best_model_info(train_data, loss_fns, epochs)
-        best_model_info.update({"input_feature_idx": self.model_cfg["input_feature_idx"]})
+        best_model_info.update({"input_feature_idx": self.model_cfg["input_feature_idx"][0]})
         return best_model_info
 
     def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
         assert self.model_cfg["input_feature_idx"] is not None, "input_feature_idx must be set"
+        assert len(self.model_cfg["input_feature_idx"]) == 1, "input_feature_idx must be a list with only one element"
+        selected_feature_idx = self.model_cfg["input_feature_idx"][0]
         graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
-        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, self.model_cfg["input_feature_idx"]].reshape(-1, 1)
+        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, selected_feature_idx].reshape(-1, 1)
+        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, selected_feature_idx].reshape(-1, 1)
+        for g_t in range(0, graph_time_step, batch_size):
+            cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
+            if cur_batch_size <= 0: break
+            batch_x = torch.empty((cur_batch_size, seq_len, self.model_cfg['gru_in_dim'])).fill_(np.nan)
+            batch_y = torch.empty((cur_batch_size, self.fc_out_dim)).fill_(np.nan)
+            for data_batch_idx in range(cur_batch_size):
+                begin_t, end_t = g_t+data_batch_idx, g_t+data_batch_idx+seq_len
+                batch_x[data_batch_idx] = torch.tensor(np.nan_to_num(graph_adj_arr[begin_t:end_t], nan=0))
+                batch_y[data_batch_idx] = torch.tensor(np.nan_to_num(target_arr[end_t], nan=0))
+
+            assert not torch.isnan(batch_x).any() or not torch.isnan(batch_y).any(), "batch_x or batch_y contains nan"
+
+            yield batch_x, batch_y
+
+
+class ClassBaselineGRUCustomFeatures(ClassBaselineGRUWithoutSelfCorr):
+    """
+    Only use selected features of graph adjacency matrix as input
+    """
+    def init_best_model_info(self, train_data: np.ndarray, loss_fns: dict, epochs: int):
+        """
+        Initialize best_model_info for ClassBaselineGRUCustomFeatures
+        """
+        best_model_info = super().init_best_model_info(train_data, loss_fns, epochs)
+        best_model_info.update({"input_feature_idx": sorted(self.model_cfg["input_feature_idx"])})
+        return best_model_info
+
+    def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
+        assert self.model_cfg["input_feature_idx"] is not None, "input_feature_idx must be set"
+        assert len(self.model_cfg["input_feature_idx"]) > 1, "input_feature_idx must be a list with more than one element"
+        selected_feature_idx = self.model_cfg["input_feature_idx"]
+        graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
+        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, selected_feature_idx].reshape(-1, 1)
+        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, selected_feature_idx].reshape(-1, 1)
         for g_t in range(0, graph_time_step, batch_size):
             cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
             if cur_batch_size <= 0: break

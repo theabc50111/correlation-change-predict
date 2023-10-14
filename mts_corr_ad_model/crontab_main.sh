@@ -251,7 +251,8 @@ while [[ $# -gt 0 ]]; do
       ;;
 
     --gru_input_feature_idx)
-      gru_input_feature_idx="--gru_input_feature_idx $2"
+      gru_input_feature_idx_args+=("$2")
+      gru_input_feature_idx="--gru_input_feature_idx ${gru_input_feature_idx_args[@]}"
       shift 2
       ;;
 

@@ -24,7 +24,9 @@ from metrics_utils import (BinsEdgeAccuracyLoss, CustomIndicesEdgeAccuracy,
 from utils import convert_str_bins_list, plot_heatmap, split_and_norm_data
 
 from baseline_model import BaselineGRU
-from class_baseline_model import (ClassBaselineGRU, ClassBaselineGRUOneFeature,
+from class_baseline_model import (ClassBaselineGRU,
+                                  ClassBaselineGRUCustomFeatures,
+                                  ClassBaselineGRUOneFeature,
                                   ClassBaselineGRUWithoutSelfCorr)
 from class_mts_corr_ad_model import ClassMTSCorrAD
 from class_mts_corr_ad_model_3 import ClassMTSCorrAD3
@@ -70,6 +72,7 @@ class ModelType(Enum):
     CLASSBASELINE = auto()
     CLASSBASELINEWITHOUTSELFCORR = auto()
     CLASSBASELINEONEFEATURE = auto()
+    CLASSBASELINECUSTOMFEATURE = auto()
     GAE = auto()
 
     def set_model(self, basic_model_cfg, args):
@@ -86,6 +89,9 @@ class ModelType(Enum):
         baseline_gru_one_feature_cfg = baseline_gru_cfg.copy()
         baseline_gru_one_feature_cfg["gru_in_dim"] = 1
         baseline_gru_one_feature_cfg["input_feature_idx"] = args.gru_input_feature_idx
+        baseline_gru_custom_feature_cfg = baseline_gru_cfg.copy()
+        baseline_gru_custom_feature_cfg["gru_in_dim"] = len(args.gru_input_feature_idx)
+        baseline_gru_custom_feature_cfg["input_feature_idx"] = args.gru_input_feature_idx
         gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
         assert ((basic_model_cfg["num_nodes"]-1)/2*(1+basic_model_cfg["num_nodes"]-1)).is_integer(), "baseline_gru_without_self_corr_cfg[gru_in_dim] is not an integer"
         model_dict = {"MTSCORRAD": MTSCorrAD(mts_corr_ad_cfg),
@@ -97,9 +103,10 @@ class ModelType(Enum):
                       "CLASSBASELINE": ClassBaselineGRU(baseline_gru_cfg),
                       "CLASSBASELINEWITHOUTSELFCORR": ClassBaselineGRUWithoutSelfCorr(baseline_gru_without_self_corr_cfg),
                       "CLASSBASELINEONEFEATURE": ClassBaselineGRUOneFeature(baseline_gru_one_feature_cfg),
+                      "CLASSBASELINECUSTOMFEATURE": ClassBaselineGRUCustomFeatures(baseline_gru_custom_feature_cfg),
                       "GAE": GAE(gae_cfg)}
         model = model_dict[self.name]
-        assert ModelType.__members__.keys() == model_dict.keys(), "ModelType members and model_dict must be the same keys"
+        assert ModelType.__members__.keys() == model_dict.keys(), f"ModelType members and model_dict must be the same keys, ModelType.__members__.keys(): {ModelType.__members__.keys()}, model_dict.keys(): {model_dict.keys()}"
 
         return model
 
@@ -113,8 +120,9 @@ class ModelType(Enum):
                                     "CLASSBASELINE": "class_baseline_gru",
                                     "CLASSBASELINEWITHOUTSELFCORR": "class_baseline_gru_without_self_corr",
                                     "CLASSBASELINEONEFEATURE": "class_baseline_gru_one_feature",
+                                    "CLASSBASELINECUSTOMFEATURE": "class_baseline_gru_custom_feature",
                                     "GAE": "gae_model"}
-        assert ModelType.__members__.keys() == save_model_dir_base_dict.keys(), "ModelType members and save_model_dir_base_dict must be the same keys"
+        assert ModelType.__members__.keys() == save_model_dir_base_dict.keys(), f"ModelType members and save_model_dir_base_dict must be the same keys, ModelType.__members__.keys(): {ModelType.__members__.keys()}, model_dict.keys(): {model_dict.keys()}"
         model_dir = current_dir/f'save_models/{save_model_dir_base_dict[self.name]}/{output_file_name}/{corr_type}/corr_s{s_l}_w{w_l}'
         model_log_dir = current_dir/f'save_models/{save_model_dir_base_dict[self.name]}/{output_file_name}/{corr_type}/corr_s{s_l}_w{w_l}/train_logs/'
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -155,7 +163,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--cuda_device", type=int, nargs='?', default=0,
                              help="input the number of cuda device")
     args_parser.add_argument("--train_models", type=str, nargs='+', default=[],
-                             choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "GAE"],
+                             choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "CLASSBASELINECUSTOMFEATURE", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, Baseline, GAE]")
     args_parser.add_argument("--pretrain_encoder", type=str, nargs='?', default="",
                              help="input the path of pretrain encoder weights")
@@ -188,7 +196,7 @@ if __name__ == "__main__":
                              help="input the number of stacked-layers of gru")
     args_parser.add_argument("--gru_h", type=int, nargs='?', default=80,
                              help="input the number of gru hidden size")
-    args_parser.add_argument("--gru_input_feature_idx", type=int, nargs='?', default=None,
+    args_parser.add_argument("--gru_input_feature_idx", type=int, nargs='*', default=None,
                              help="input the order of input features of gru, the order is from 0 to combination(num_nodes, 2)-1")
     args_parser.add_argument("--two_ord_pred_prob_edge_accu_thres", type=float, nargs='?', default=None,
                              help="input the threshold of TwoOrderPredProbEdgeAccuracy")
@@ -212,7 +220,7 @@ if __name__ == "__main__":
     args_parser.add_argument("--save_model", type=bool, default=False, action=argparse.BooleanOptionalAction,  # setting of output files
                              help="input --save_model to save model weight and model info")
     args_parser.add_argument("--inference_models", type=str, nargs='+', default=[],
-                             choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "GAE"],
+                             choices=["MTSCORRAD", "MTSCORRAD2", "MTSCORRAD3", "CLASSMTSCORRAD", "CLASSMTSCORRAD3", "BASELINE", "CLASSBASELINE", "CLASSBASELINEWITHOUTSELFCORR", "CLASSBASELINEONEFEATURE", "CLASSBASELINECUSTOMFEATURE", "GAE"],
                              help="input to decide which models to train, the choices are [MTSCorrAD, MTSCORRAD2, BASELINE, GAE]")
     args_parser.add_argument("--inference_model_paths", type=str, nargs='+', default=[],
                              help="input the path of inference model weight")
@@ -226,20 +234,21 @@ if __name__ == "__main__":
     assert ARGS.output_bins is None or ARGS.output_type == "discretize", "output_bins must be input when output_type is discretize"
     assert (ARGS.use_bin_edge_acc_loss is False and ARGS.edge_acc_loss_atol is None) or bool(ARGS.use_bin_edge_acc_loss) != bool(ARGS.edge_acc_loss_atol), "use_bin_edge_acc_loss and edge_acc_loss_atol must be both not input or one input"
     assert ARGS.use_bin_edge_acc_loss is None or ARGS.target_mats_path is not None, "target_mats_path must be input when use_bin_edge_acc_loss is input"
-    assert ("MTSCORRAD" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD"
-    assert ("MTSCORRAD3" not in ARGS.train_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models is MTSCorrAD3"
-    assert "CLASSMTSCORRAD" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD"
-    assert "CLASSMTSCORRAD3" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassMTSCorrAD3"
-    assert "CLASSBASELINE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaseline"
-    assert "CLASSBASELINEWITHOUTSELFCORR" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaselineWithoutSelfCorr"
-    assert "CLASSBASELINEONEFEATURE" not in ARGS.train_models or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models is ClassBaselineOneFeatureGRUWithoutSelfCorr"
+    assert ("MTSCORRAD" not in ARGS.train_models+ARGS.inference_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models|inferene_models is MTSCorrAD"
+    assert ("MTSCORRAD3" not in ARGS.train_models+ARGS.inference_models) or (ARGS.output_type != "class_probability"), "output_type can not be class_probability when train_models|inferene_models is MTSCorrAD3"
+    assert ("CLASSMTSCORRAD" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassMTSCorrAD"
+    assert ("CLASSMTSCORRAD3" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassMTSCorrAD3"
+    assert ("CLASSBASELINE" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassBaseline"
+    assert ("CLASSBASELINEWITHOUTSELFCORR" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassBaselineWithoutSelfCorr"
+    assert ("CLASSBASELINEONEFEATURE" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassBaselineOneFeature"
+    assert ("CLASSBASELINECUSTOMFEATURE" not in ARGS.train_models+ARGS.inference_models) or ARGS.output_type == "class_probability", "output_type must be class_probability when train_models|inferene_models is ClassBaselineCustomFeature"
     assert ARGS.two_ord_pred_prob_edge_accu_thres is not None or ARGS.output_type == "class_probability", "output_type must be class_probability when two_ord_pred_prob_edge_accu_thres is input"
     assert "class_fc" not in ARGS.drop_pos or ARGS.output_type == "class_probability", "output_type must be class_probability when class_fc in drop_pos"
-    assert "CLASSBASELINEONEFEATURE" not in ARGS.train_models or ARGS.gru_input_feature_idx is not None, "gru_input_feature_idx must be input when train_models is ClassBaselineOneFeatureGRUWithoutSelfCorr"
+    assert ("CLASSBASELINEONEFEATURE" not in ARGS.train_models+ARGS.inference_models) or (ARGS.gru_input_feature_idx is not None and len(ARGS.gru_input_feature_idx) == 1), "gru_input_feature_idx must be input when train_models|inferene_models is ClassBaselineOneFeature and len(gru_input_feature_idx) must be 1"
+    assert ("CLASSBASELINECUSTOMFEATURE" not in ARGS.train_models+ARGS.inference_models) or (ARGS.gru_input_feature_idx is not None and len(ARGS.gru_input_feature_idx) > 1), "gru_input_feature_idx must be input when train_models|inferene_models is ClassBaselineCustomFeature and len(gru_input_feature_idx) must be greater than 1"
     assert not (ARGS.use_bin_edge_acc_loss and ARGS.output_type == "class_probability"), "use_bin_edge_acc_loss can't be input when output_type is class_probability"
     assert not (ARGS.edge_acc_loss_atol and ARGS.output_type == "class_probability"), "edge_acc_loss_atol and output_type can not be both input"
     assert not ARGS.use_two_ord_pred_prob_edge_acc_metric or ARGS.two_ord_pred_prob_edge_accu_thres is not None, "two_ord_pred_prob_edge_accu_thres must be input when use_two_ord_pred_prob_edge_acc_metric is input"
-    ###assert not (ARGS.use_upper_tri_edge_acc_metric and ARGS.use_two_ord_pred_prob_edge_acc_metric), "use_upper_tri_edge_acc_metric and use_two_ord_pred_prob_edge_acc_metric can not be both input"
     assert ARGS.use_upper_tri_edge_acc_metric + ARGS.use_two_ord_pred_prob_edge_acc_metric + bool(ARGS.custom_indices_edge_acc_metric_indices) <= 1, "use_upper_tri_edge_acc_metric, use_two_ord_pred_prob_edge_acc_metric and custom_indices_edge_acc_metric_indices can not be both input"
     logger.info(pformat(f"\n{vars(ARGS)}", indent=1, width=40, compact=True))
 
