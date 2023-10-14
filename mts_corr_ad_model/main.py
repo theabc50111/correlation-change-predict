@@ -90,7 +90,7 @@ class ModelType(Enum):
         baseline_gru_one_feature_cfg["gru_in_dim"] = 1
         baseline_gru_one_feature_cfg["input_feature_idx"] = args.gru_input_feature_idx
         baseline_gru_custom_feature_cfg = baseline_gru_cfg.copy()
-        baseline_gru_custom_feature_cfg["gru_in_dim"] = len(args.gru_input_feature_idx)
+        baseline_gru_custom_feature_cfg["gru_in_dim"] = len(args.gru_input_feature_idx) if args.gru_input_feature_idx else None
         baseline_gru_custom_feature_cfg["input_feature_idx"] = args.gru_input_feature_idx
         gae_cfg.pop("seq_len"); gae_cfg.pop("gru_l"); gae_cfg.pop("gru_h")
         assert ((basic_model_cfg["num_nodes"]-1)/2*(1+basic_model_cfg["num_nodes"]-1)).is_integer(), "baseline_gru_without_self_corr_cfg[gru_in_dim] is not an integer"
