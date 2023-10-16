@@ -161,12 +161,6 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         self.init_optimizer()
 
     def transform_graph_adj_to_only_triu(self, graph_adj_mats: np.ndarray):
-        ###graph_adj_mats[graph_adj_mats == 0] = -100
-        ###for i, graph_adj_t in enumerate(graph_adj_mats):
-        ###    graph_adj_mats[i] = np.triu(graph_adj_t, k=1)
-        ###graph_adj_mats = graph_adj_mats.reshape(-1, self.graph_size)
-        ###graph_adj_mats = np.apply_along_axis(lambda x: x[x != 0], 1, graph_adj_mats)
-        ###graph_adj_mats[graph_adj_mats == -100] = 0
         assert graph_adj_mats.shape[1] == graph_adj_mats.shape[2], "graph_adj_mats must be a square matrix"
         _, num_nodes, _ = graph_adj_mats.shape
         triu_idx = np.triu_indices(num_nodes, k=1)
