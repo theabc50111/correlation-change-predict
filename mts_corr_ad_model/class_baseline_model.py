@@ -161,12 +161,16 @@ class ClassBaselineGRUWithoutSelfCorr(ClassBaselineGRU):
         self.init_optimizer()
 
     def transform_graph_adj_to_only_triu(self, graph_adj_mats: np.ndarray):
-        graph_adj_mats[graph_adj_mats == 0] = -100
-        for i, graph_adj_t in enumerate(graph_adj_mats):
-            graph_adj_mats[i] = np.triu(graph_adj_t, k=1)
-        graph_adj_mats = graph_adj_mats.reshape(-1, self.graph_size)
-        graph_adj_mats = np.apply_along_axis(lambda x: x[x != 0], 1, graph_adj_mats)
-        graph_adj_mats[graph_adj_mats == -100] = 0
+        ###graph_adj_mats[graph_adj_mats == 0] = -100
+        ###for i, graph_adj_t in enumerate(graph_adj_mats):
+        ###    graph_adj_mats[i] = np.triu(graph_adj_t, k=1)
+        ###graph_adj_mats = graph_adj_mats.reshape(-1, self.graph_size)
+        ###graph_adj_mats = np.apply_along_axis(lambda x: x[x != 0], 1, graph_adj_mats)
+        ###graph_adj_mats[graph_adj_mats == -100] = 0
+        assert graph_adj_mats.shape[1] == graph_adj_mats.shape[2], "graph_adj_mats must be a square matrix"
+        _, num_nodes, _ = graph_adj_mats.shape
+        triu_idx = np.triu_indices(num_nodes, k=1)
+        graph_adj_mats = graph_adj_mats[::, triu_idx[0], triu_idx[1]]
         return graph_adj_mats
 
     def yield_batch_data(self, graph_adj_mats: np.ndarray, target_mats: np.ndarray, seq_len: int = 10, batch_size: int = 5):
@@ -239,8 +243,8 @@ class ClassBaselineGRUCustomFeatures(ClassBaselineGRUWithoutSelfCorr):
         assert len(self.model_cfg["input_feature_idx"]) > 1, "input_feature_idx must be a list with more than one element"
         selected_feature_idx = self.model_cfg["input_feature_idx"]
         graph_time_step = graph_adj_mats.shape[0] - 1  # the graph of last "t" can't be used as train data
-        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, selected_feature_idx].reshape(-1, 1)
-        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, selected_feature_idx].reshape(-1, 1)
+        graph_adj_arr = self.transform_graph_adj_to_only_triu(graph_adj_mats)[::, selected_feature_idx].reshape(-1, len(selected_feature_idx))
+        target_arr = self.transform_graph_adj_to_only_triu(target_mats)[::, selected_feature_idx].reshape(-1, len(selected_feature_idx))
         for g_t in range(0, graph_time_step, batch_size):
             cur_batch_size = batch_size if g_t+batch_size <= graph_time_step-seq_len else graph_time_step-seq_len-g_t
             if cur_batch_size <= 0: break

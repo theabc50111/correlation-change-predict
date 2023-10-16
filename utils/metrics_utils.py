@@ -221,9 +221,6 @@ class CustomIndicesEdgeAccuracyLoss(torch.nn.Module):
         selected_preds = torch.argmax(selected_input, dim=1)
         edge_acc = (selected_preds == selected_target).to(torch.float64).mean()
         loss = 1 - edge_acc
-        print(f"input.shape: {input.shape}, target.shape: {target.shape}")
-        print(f"selected_input.shape: {selected_input.shape}, selected_target.shape: {selected_target.shape}, selected_preds.shape: {selected_preds.shape}")
-
 
         return loss
 
